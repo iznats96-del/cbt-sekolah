@@ -3,11 +3,14 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 
-/// Satu sheet tabel hasil parsing.
+/// Satu sheet tabel hasil parsing. `images` memetakan id gambar (mis.
+/// `word/media/image1.png`) ke bytes-nya utk yang direferensikan sel.
 class ImportSheet {
   final String name;
   final List<List<String>> rows;
-  const ImportSheet(this.name, this.rows);
+  /// token «IMG:path» di dalam sel -> path relatif di file docx
+  final Map<String, Uint8List> images;
+  const ImportSheet(this.name, this.rows, [this.images = const {}]);
 }
 
 /// Parser file spreadsheet: Excel 2003 XML (.xls dari aplikasi sekolah),
@@ -16,7 +19,10 @@ class SheetParser {
   static List<ImportSheet> parse(Uint8List bytes) {
     // detect by magic
     if (bytes.length > 4 && bytes[0] == 0x50 && bytes[1] == 0x4B) {
-      return _parseXlsx(bytes);
+      final archive = ZipDecoder().decodeBytes(bytes);
+      final isDocx = archive.any((f) => f.name == 'word/document.xml');
+      if (isDocx) return _parseDocx(archive);
+      return _parseXlsx(archive);
     }
     final text = utf8.decode(bytes, allowMalformed: true);
     final trimmed = text.trimLeft();
@@ -69,9 +75,65 @@ class SheetParser {
     return sheets;
   }
 
-  // ---------- XLSX (zip) ----------
-  static List<ImportSheet> _parseXlsx(Uint8List bytes) {
-    final archive = ZipDecoder().decodeBytes(bytes);
+  // ---------- DOCX: tabel (baris = baris tabel) + gambar embed PNG ----------
+  static List<ImportSheet> _parseDocx(Archive archive) {
+    final docFile = archive.firstWhere((f) => f.name == 'word/document.xml');
+    final xml = utf8.decode(docFile.readBytes() ?? const <int>[]);
+    final rels = <String, String>{};
+    for (final f in archive.files) {
+      if (f.name == 'word/_rels/document.xml.rels') {
+        final rx = utf8.decode(f.readBytes() ?? const <int>[]);
+        for (final m in RegExp(r'Id="([^"]+)"[^>]*Target="([^"]+)"').allMatches(rx)) {
+          var t = m.group(2)!;
+          if (t.startsWith('../')) t = t.substring(3);
+          rels[m.group(1)!] = t;
+        }
+      }
+    }
+    final images = <String, Uint8List>{};
+    for (final f in archive.files) {
+      if (f.name.startsWith('word/media/')) {
+        images[f.name.substring('word/'.length)] = f.readBytes() ?? Uint8List(0);
+      }
+    }
+    final out = <List<String>>[];
+    for (final trm in RegExp(r'<w:tr[^>]*>[\s\S]*?</w:tr>').allMatches(xml)) {
+      final tr = trm.group(0)!;
+      final cells = <String>[];
+      for (final tcm in RegExp(r'<w:tc[^>]*>[\s\S]*?</w:tc>').allMatches(tr)) {
+        final tc = tcm.group(0)!;
+        final text = RegExp(r'<w:t[^>]*>([^<]*)</w:t>')
+            .allMatches(tc)
+            .map((m) => _xmlUnescape(m.group(1) ?? ''))
+            .join(' ')
+            .trim();
+        final blips =
+            RegExp(r'r:embed="([^"]+)"').allMatches(tc).map((m) => m.group(1)!).toList();
+        final imgTokens = <String>[];
+        for (final rid in blips) {
+          final t = rels[rid];
+          if (t != null && images.containsKey(t)) imgTokens.add('«IMG:$t»');
+        }
+        final merged = (text + (imgTokens.isEmpty ? '' : ' ' + imgTokens.join(' '))).trim();
+        if (merged.isNotEmpty) cells.add(merged);
+      }
+      if (cells.isNotEmpty) out.add(cells);
+    }
+    if (out.isEmpty) {
+      // tanpa tabel: daftar paragraf (satu nama mapel per baris)
+      for (final pm in RegExp(r'<w:p[ >][\s\S]*?</w:p>|<w:p/>').allMatches(xml)) {
+        final ptxt = RegExp(r'<w:t[^>]*>([^<]*)</w:t>')
+            .allMatches(pm.group(0)!)
+            .map((m) => _xmlUnescape(m.group(1) ?? ''))
+            .join(' ')
+            .trim();
+        if (ptxt.isNotEmpty) out.add([ptxt]);
+      }
+    }
+    return [ImportSheet('DOCX', out, images)];
+  }
+
+  static List<ImportSheet> _parseXlsx(Archive archive) {
     String? shared;
     final sheetFiles = <String>[];
     for (final f in archive) {
@@ -467,36 +529,81 @@ class SiswaImportMapper {
   }
 }
 
-/// Mapper tabel mata pelajaran (csv/xlsx: MATA PELAJARAN | KODE | JURUSAN | KKM)
+/// Mapper tabel mata pelajaran.
+/// Menerima:
+///  - tabel xlsx/csv dengan kolom MATA PELAJARAN | KODE | JURUSAN | KKM
+///  - docx: satu mapel per baris tabel (kolom [0]), atau paragraf bebas.
+///    Token «IMG:path» pada sel -> jadi field 'img' (untuk upload logo).
 class MapelMapper {
-  static List<Map<String, String>> fromRows(List<List<String>> rows) {
+  static final RegExp _imgTok = RegExp(r'«IMG:([^»]+)»');
+
+  static final List<RegExp> _skips = [
+    RegExp(r'^(daftar|yayasan|smk|nama siswa|jurusan|kode|mata pelajaran|kkm|no\.?|tahun|semester|ket(erangan)?|urut|siswa|jawaban|soal|pilihan)', caseSensitive: false),
+    RegExp(r'^[•*\s]*\d+\s*$', caseSensitive: false),
+  ];
+
+  static bool _isNoise(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return true;
+    final cleaned = t.replaceAll(RegExp(r'[.\-–—…\s]'), '');
+    if (cleaned.length < 3) return true; // 1-2 huruf = status S/I/A dsb
+    if (t.length > 80) return true; // paragraf panjang = bukan mapel
+    if (RegExp(r'^\[[^\]]*\]$').hasMatch(t)) return true; // [LOGO], [IMG], dll
+    if (RegExp(r'^[\d\s./:()-]+$').hasMatch(t)) return true;
+    if (cleaned.length <= 4 && RegExp(r'^[A-Z]\.?$').hasMatch(t)) return true;    if (cleaned.length <= 4 && RegExp(r'^[A-Z]\.?$').hasMatch(t)) return true;
+    return _skips.any((r) => r.hasMatch(t));
+  }
+
+  static List<Map<String, String>> fromRows(List<List<String>> rows,
+      {Map<String, Uint8List> images = const {}}) {
     if (rows.isEmpty) return [];
-    final head = rows.first.map((e) => e.toLowerCase().replaceAll(RegExp(r'[^a-z ]'), '').trim()).toList();
-    int nameOf(String t) => head.indexWhere((e) => e == t || e.startsWith(t));
-    final cName = nameOf('mata pelajaran') != -1
-        ? nameOf('mata pelajaran')
-        : nameOf('mapel');
-    final cKode = nameOf('kode');
-    final cJur = nameOf('jurusan');
-    final cKkm = nameOf('kkm');
-    if (cName < 0) {
-      // tanpa header dikenali -> kolom pertama = nama
-      return rows
-          .map((r) => r.isNotEmpty ? {'nama': r[0]} : const <String, String>{})
-          .where((m) => m['nama'] != null && m['nama']!.trim().isNotEmpty)
-          .toList();
-    }
+    final head = rows.first
+        .map((e) => e.toLowerCase().replaceAll(_imgTok, '').replaceAll(RegExp(r'[^a-z ]'), '').trim())
+        .toList();
+    int nameOf(String t) =>
+        head.indexWhere((e) => e == t || (t == 'mata pelajaran' && (e == 'mata pelajaran' || e.startsWith('mata pelajaran') || e.startsWith('namamapel') || e == 'mapel')));
+    final cName = nameOf('mata pelajaran');
+    final cKode = head.indexWhere((e) => e == 'kode');
+    final cJur = head.indexWhere((e) => e == 'jurusan');
+    final cKkm = head.indexWhere((e) => e == 'kkm');
     final out = <Map<String, String>>[];
-    for (final r in rows.skip(1)) {
-      String at(int c) => c >= 0 && c < r.length ? r[c].trim() : '';
-      final nama = at(cName);
-      if (nama.isEmpty) continue;
-      out.add({
-        'nama': nama,
-        if (cKode >= 0) 'kode': at(cKode),
-        if (cJur >= 0) 'jurusan': at(cJur),
-        if (cKkm >= 0) 'kkm': at(cKkm),
-      });
+    if (cName >= 0) {
+      for (final r in rows.skip(1)) {
+        String at(int c) => c >= 0 && c < r.length ? r[c] : '';
+        var nama = at(cName);
+        String img = '';
+        final im = _imgTok.firstMatch(nama);
+        if (im != null) {
+          img = im.group(1)!;
+          nama = nama.replaceAll(_imgTok, '').trim();
+        }
+        nama = nama.trim();
+        if (nama.isEmpty || _isNoise(nama)) continue;
+        out.add({
+          'nama': nama,
+          if (cKode >= 0) 'kode': at(cKode).trim(),
+          if (cJur >= 0) 'jurusan': at(cJur).trim(),
+          if (cKkm >= 0) 'kkm': at(cKkm).trim(),
+          if (img.isNotEmpty) 'img': img,
+        });
+      }
+    } else {
+      // tanpa header dikenali: kolom pertama tiap baris = nama mapel
+      for (final r in rows) {
+        if (r.isEmpty) continue;
+        var nama = r[0];
+        String img = '';
+        final im = _imgTok.firstMatch(nama);
+        if (im != null) {
+          img = im.group(1)!;
+          nama = nama.replaceAll(_imgTok, '').trim();
+        }
+        nama = RegExp(r'^\s*\d+[.)]?\s*').hasMatch(nama)
+            ? nama.replaceFirst(RegExp(r'^\s*\d+[.)]?\s*'), '').trim()
+            : nama.trim();
+        if (nama.isEmpty || _isNoise(nama)) continue;
+        out.add({'nama': nama, if (img.isNotEmpty) 'img': img});
+      }
     }
     return out;
   }

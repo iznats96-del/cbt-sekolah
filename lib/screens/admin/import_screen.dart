@@ -1,8 +1,8 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
@@ -20,6 +20,7 @@ class ImportScreen extends StatefulWidget {
 class _ImportScreenState extends State<ImportScreen> {
   List<SiswaTable> _tables = [];
   List<Map<String, String>> _mapelRows = [];
+  final Map<String, Uint8List> _imgStore = {};
   bool _parsing = false;
   bool _importing = false;
   String? _fileName;
@@ -35,7 +36,7 @@ class _ImportScreenState extends State<ImportScreen> {
   Future<void> _pickFile() async {
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xls', 'xlsx', 'csv'],
+      allowedExtensions: ['xls', 'xlsx', 'csv', 'docx', 'dotx'],
     );
     if (files.isEmpty) return;
     final f = files.first;
@@ -71,10 +72,23 @@ class _ImportScreenState extends State<ImportScreen> {
           _parsing = false;
         });
       } else {
-        final rows = MapelMapper.fromRows(sheets.expand((s) => s.rows).toList());
+        _imgStore.clear();
+        final per = <Map<String, String>>[];
+        for (final s in sheets) {
+          for (final e in s.images.entries) {
+            _imgStore[e.key] = e.value;
+          }
+          for (final m in MapelMapper.fromRows(s.rows)) {
+            if (m['nama'] == null) continue;
+            if (!per.any((e) => e['nama'] == m['nama'])) {
+              per.add(m);
+            }
+          }
+        }
+        final rows = per;
         if (rows.isEmpty) {
           setState(() {
-            _error = 'Tidak ditemukan kolom MATA PELAJARAN. Contoh kolom: MATA PELAJARAN | KODE | JURUSAN | KKM.';
+            _error = 'Tidak ditemukan data mata pelajaran. Format diterima: tabel excel (MATA PELAJARAN|KODE|JURUSAN|KKM), csv, atau docx (satu mapel per baris, gambar ikut terbaca sebagai logo).';
             _parsing = false;
           });
           return;
@@ -115,8 +129,33 @@ class _ImportScreenState extends State<ImportScreen> {
           'p_password': pw.isEmpty ? null : pw,
         });
       } else {
+        final payload = <Map<String, dynamic>>[];
+        for (final m in _mapelRows) {
+          final row = <String, dynamic>{
+            'nama': m['nama'],
+            'kode': m['kode'] ?? '',
+            'jurusan': m['jurusan'] ?? '',
+            'kkm': m['kkm'] ?? '',
+          };
+          final img = m['img'];
+          if (img != null && img.isNotEmpty && _imgStore.containsKey(img)) {
+            try {
+              final ext = img.split('.').last.toLowerCase();
+              final path = 'mapel/${DateTime.now().millisecondsSinceEpoch}_${(m['nama'] ?? 'mapel').toString().hashCode}.$ext';
+              await Api.client.storage.from('soal').uploadBinary(
+                path,
+                _imgStore[img]!,
+                fileOptions: FileOptions(
+                    contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+                    upsert: true),
+              );
+              row['logo_url'] = Api.client.storage.from('soal').getPublicUrl(path);
+            } catch (_) {/* logo opsional */}
+          }
+          payload.add(row);
+        }
         res = await Api.client
-            .rpc('admin_import_mapel', params: {'p_rows': _mapelRows});
+            .rpc('admin_import_mapel', params: {'p_rows': payload});
       }
       final m = res is Map ? Map<String, dynamic>.from(res as Map) : <String, dynamic>{};
       final created = m['created'] ?? 0;
@@ -192,8 +231,8 @@ class _ImportScreenState extends State<ImportScreen> {
                         ? 'Format didukung: export absensi/sekolah (.xls XML), Excel 2007+ (.xlsx), CSV.\n'
                             'Kolom dikenali otomatis: NIS/NISN, NAMA SISWA, L/P, KELAS.\n'
                             'Tanpa NIS? Otomatis dibuat + password awal = NIS.'
-                        : 'Format didukung: .xlsx / .csv dengan kolom: MATA PELAJARAN | KODE | JURUSAN | KKM.\n'
-                            'Baris tanpa header juga diterima (kolom pertama = nama mapel).',
+                        : 'Format didukung: Excel 2007+ (.xlsx), CSV, dan DOCX — satu mapel per baris tabel/paragraf; gambar (PNG) pada baris ikut ter-upload jadi ikon mapel.\n'
+                            'Kolom Excel/CSV: MATA PELAJARAN | KODE | JURUSAN | KKM.',
                     style: const TextStyle(fontSize: 12, height: 1.5),
                   ),
                   const SizedBox(height: 12),
@@ -295,7 +334,8 @@ class _ImportScreenState extends State<ImportScreen> {
                   rows: [
                     for (final m in _mapelRows)
                       DataRow(cells: [
-                        DataCell(Text(m['nama'] ?? '')),
+                        DataCell(Text((m['nama'] ?? '') +
+                            ((m['img']?.isNotEmpty ?? false) ? '  (ada gambar)' : ''))),
                         DataCell(Text(m['kode'] ?? '')),
                         DataCell(Text(m['jurusan'] ?? '')),
                         DataCell(Text(m['kkm'] ?? '')),
