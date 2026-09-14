@@ -443,7 +443,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                               ),
                             ],
                             const SizedBox(height: 16),
-                            if (jenis == 'pg') ...[
+                            if (jenis == 'pg' || (jenis == 'jodoh' && opsiList.isNotEmpty)) ...[
+                              if (jenis == 'jodoh')
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 8),
+                                  child: Text('Pilih pasangan yang tepat:',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                          fontStyle: FontStyle.italic)),
+                                ),
                               for (var i = 0; i < opsiList.length; i++)
                                 RadioListTile<String>(
                                   value: opsiList[i].toString(),
@@ -452,7 +461,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                                   onChanged: (v) => setState(() => _jawaban[curId] = v),
                                   dense: true,
                                 ),
-                            ] else ...[
+                            ] else if (jenis == 'essay') ...[
                               TextField(
                                 controller: TextEditingController(
                                     text: _jawaban[curId] ?? ''),

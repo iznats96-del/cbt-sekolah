@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
+import 'import_ujian_screen.dart';
 import 'ujian_form_screen.dart';
 
 class UjianListScreen extends StatefulWidget {
@@ -133,7 +134,17 @@ class _UjianListScreenState extends State<UjianListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Jadwal Ujian')),
+      appBar: AppBar(title: const Text('Jadwal Ujian'), actions: [
+        IconButton(
+          tooltip: 'Import naskah ujian (.docx)',
+          icon: const Icon(Icons.upload_file),
+          onPressed: () async {
+            final ok = await Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const ImportUjianScreen()));
+            if (ok == true) _load();
+          },
+        ),
+      ]),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         onPressed: _add,
