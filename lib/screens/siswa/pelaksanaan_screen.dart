@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../services/kiosk.dart';
 
 class PelaksanaanScreen extends StatefulWidget {
   final Map<String, dynamic> ujian;
@@ -49,6 +50,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    Kiosk.alarmStop();
+    Kiosk.setSecure(false);
     super.dispose();
   }
 
@@ -116,6 +119,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
         _kiosk = true;
         _loading = false;
       });
+      Kiosk.setSecure(true); // aktifkan anti-screenshot (hanya saat ujian)
       _startTimer();
     } catch (e) {
       if (!mounted) return;
@@ -140,14 +144,23 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // anti-cheat: catat saat keluar app
+    // anti-cheat: saat keluar app/pindah layar
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      if (_kiosk) _juangPaused++;
-      _catatPelanggaran();
-      if (_juangPaused > _penaltyLimit) {
-        _submit(auto: true);
+      if (_kiosk) {
+        _juangPaused++;
+        if (_juangPaused > _penaltyLimit) {
+          _submit(auto: true);
+        }
       }
+      // Suara warning + volume max otomatis saat keluar paksa
+      if (_kiosk && _sisaDetik > 0) {
+        Kiosk.alarmStart(maxVolume: true);
+      }
+      _catatPelanggaran();
+    } else if (state == AppLifecycleState.resumed) {
+      // kembali ke ujian -> hentikan alarm
+      Kiosk.alarmStop();
     }
   }
 

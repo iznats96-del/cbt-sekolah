@@ -156,6 +156,7 @@ class DataMasterScreen extends StatelessWidget {
       title: 'Data Umum Sekolah',
       table: 'sekolah',
       displayField: 'nama',
+      orderBy: 'updated_at',
       columns: ['npsn', 'kota'],
       fields: const [
         CrudField('nama', label: 'Nama Sekolah', required: true),

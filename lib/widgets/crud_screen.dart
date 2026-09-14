@@ -75,7 +75,7 @@ class _CrudScreenState extends State<CrudScreen> {
       _error = null;
     });
     try {
-      final rows = await _crud.list(order: widget.orderBy ?? 'created_at');
+      final rows = await _crud.list(order: widget.orderBy, limit: 500);
       if (!mounted) return;
       setState(() {
         _rows = rows;
