@@ -1,6 +1,9 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
@@ -30,6 +33,9 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   bool _loading = false;
   List<DropdownItem> _mapelOptions = [];
 
+  String? _gambarUrl;
+  bool _uploading = false;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +47,7 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       _soalCtrl.text = init['soal']?.toString() ?? '';
       _pembahasanCtrl.text = init['pembahasan']?.toString() ?? '';
       _bobotCtrl.text = '${init['bobot'] ?? 1}';
+      _gambarUrl = init['gambar_url']?.toString();
       // kunci
       final kunci = init['kunci'];
       if (_jenis == 'pg') {
@@ -136,6 +143,7 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         'pembahasan': _pembahasanCtrl.text.trim().isEmpty
             ? null
             : _pembahasanCtrl.text.trim(),
+        'gambar_url': _gambarUrl,
         'guru_id': Api.user?.id,
       };
 
@@ -157,6 +165,44 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(msg),
         backgroundColor: error ? AppTheme.danger : null));
+  }
+
+  Future<void> _pickGambar() async {
+    final files = await FilePicker.pickFiles(
+      type: FileType.image,
+    );
+    if (files.isEmpty) return;
+    final f = files.first;
+    Uint8List bytes;
+    try {
+      bytes = await f.readAsBytes();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _uploading = true);
+    try {
+      final ext = (f.extension ?? 'png').toLowerCase();
+      final path = 'soal/${DateTime.now().millisecondsSinceEpoch}.${ext == "jpeg" ? "jpg" : ext}';
+      await Api.client.storage.from('soal').uploadBinary(
+        path,
+        bytes,
+        fileOptions: FileOptions(
+          contentType: ext == 'png' ? 'image/png' : ext == 'gif' ? 'image/gif' : 'image/jpeg',
+          upsert: true,
+        ),
+      );
+      final url = Api.client.storage.from('soal').getPublicUrl(path);
+      if (!mounted) return;
+      setState(() {
+        _gambarUrl = url;
+        _uploading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _uploading = false);
+      _snack('Gagal upload gambar: $e', error: true);
+    }
   }
 
   @override
@@ -211,10 +257,69 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                       decoration: const InputDecoration(labelText: 'Pembahasan (opsional)'),
                     ),
                     const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _bobotCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Bobot / skor'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _bobotCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: 'Bobot / skor'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Gambar soal (PNG/JPG)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Gambar Soal (PNG/Foto) — opsional',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _uploading ? null : _pickGambar,
+                              icon: _uploading
+                                  ? const SizedBox(
+                                      height: 14, width: 14,
+                                      child: CircularProgressIndicator(strokeWidth: 2))
+                                  : const Icon(Icons.image_outlined, size: 18),
+                              label: const Text('Pilih Gambar'),
+                            ),
+                            if (_gambarUrl != null)
+                              TextButton(
+                                onPressed: () => setState(() => _gambarUrl = null),
+                                child: const Text('Hapus', style: TextStyle(color: AppTheme.danger)),
+                              ),
+                          ],
+                        ),
+                        if (_gambarUrl != null)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: const Color(0xFFD0D7DE)),
+                              borderRadius: BorderRadius.circular(8),
+                              color: Colors.white,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 240, maxWidth: 360),
+                              child: InteractiveViewer(
+                                child: Image.network(
+                                  _gambarUrl!,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, e, s) => const Padding(
+                                    padding: EdgeInsets.all(12),
+                                    child: Text('Gambar tidak dapat dimuat',
+                                        style: TextStyle(color: Colors.grey)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),

@@ -64,7 +64,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
       if (soalIds.isNotEmpty) {
         final rows = await Api.client
             .from('bank_soal')
-            .select('id,soal,jenis,opsi,kunci,bobot,mapel_id')
+            .select('id,soal,jenis,opsi,kunci,bobot,mapel_id,gambar_url')
             .inFilter('id', soalIds);
         soal = List<Map<String, dynamic>>.from(rows);
         // urutkan sesuai soal_list
@@ -421,6 +421,27 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                                 ),
                               ],
                             ),
+                            if (current['gambar_url']?.toString().isNotEmpty == true) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFE0E0E0)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(maxHeight: 260),
+                                    child: Image.network(
+                                      current['gambar_url'].toString(),
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (_, e, s) => const SizedBox.shrink(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             if (jenis == 'pg') ...[
                               for (var i = 0; i < opsiList.length; i++)
