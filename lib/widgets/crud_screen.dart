@@ -1,0 +1,409 @@
+import 'package:flutter/material.dart';
+
+import '../core/app_theme.dart';
+import '../services/api.dart';
+
+/// Definisi kolom untuk form CRUD generik.
+class CrudField {
+  final String key;
+  final String label;
+  final String type; // text, textarea, number, select, date, bool, password
+  final List<DropdownItem>? options;
+  final bool required;
+  final String? hint;
+  final bool readOnly;
+
+  const CrudField(
+    this.key, {
+    required this.label,
+    this.type = 'text',
+    this.options,
+    this.required = false,
+    this.hint,
+    this.readOnly = false,
+  });
+}
+
+class DropdownItem {
+  final String value;
+  final String label;
+  const DropdownItem(this.value, this.label);
+}
+
+/// Layar CRUD generik berbasis daftar + form dialog.
+class CrudScreen extends StatefulWidget {
+  final String title;
+  final String table;
+  final List<CrudField> fields;
+  final String displayField;
+  final List<String> columns;
+  final Map<String, dynamic> Function()? defaults;
+  final String? orderBy;
+  final bool Function(Map<String, dynamic> row)? canEdit;
+  const CrudScreen({
+    super.key,
+    required this.title,
+    required this.table,
+    required this.fields,
+    required this.displayField,
+    required this.columns,
+    this.defaults,
+    this.orderBy,
+    this.canEdit,
+  });
+
+  @override
+  State<CrudScreen> createState() => _CrudScreenState();
+}
+
+class _CrudScreenState extends State<CrudScreen> {
+  late Crud _crud;
+  List<Map<String, dynamic>> _rows = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _crud = Crud(widget.table, defaults: widget.defaults);
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final rows = await _crud.list(order: widget.orderBy ?? 'created_at');
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Gagal memuat data: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _openForm([Map<String, dynamic>? row]) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (_) => _CrudFormDialog(
+        fields: widget.fields,
+        initial: row,
+      ),
+    );
+    if (result == null) return;
+    try {
+      if (row != null) {
+        await _crud.update(row['id'] as String, result);
+      } else {
+        await _crud.create(result);
+      }
+      _load();
+    } catch (e) {
+      _showSnack('Gagal menyimpan: $e', error: true);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Hapus'),
+        content: Text('Yakin hapus "${row[widget.displayField]}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Hapus')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _crud.delete(row['id'] as String);
+      _load();
+    } catch (e) {
+      _showSnack('Gagal hapus: $e', error: true);
+    }
+  }
+
+  void _showSnack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text(msg),
+          backgroundColor: error ? AppTheme.danger : null),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6FA),
+      appBar: AppBar(title: Text(widget.title)),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: AppTheme.primary,
+        onPressed: () => _openForm(),
+        child: const Icon(Icons.add),
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: AppTheme.danger),
+              const SizedBox(height: 12),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: _load, child: const Text('Muat Ulang')),
+            ],
+          ),
+        ),
+      );
+    }
+    if (_rows.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inbox_outlined, size: 56, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text('Belum ada ${widget.title}',
+                style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 8),
+            FilledButton(onPressed: () => _openForm(), child: const Text('Tambah')),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: _rows.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 6),
+        itemBuilder: (context, i) {
+          final row = _rows[i];
+          return Card(
+            margin: EdgeInsets.zero,
+            child: ListTile(
+              title: Text(
+                '${row[widget.displayField] ?? ''}',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                widget.columns
+                    .map((c) =>
+                        row[c]?.toString().isNotEmpty == true ? row[c].toString() : null)
+                    .whereType<String>()
+                    .join(' · '),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _openForm(row),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, color: AppTheme.danger),
+                    onPressed: () => _delete(row),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CrudFormDialog extends StatefulWidget {
+  final List<CrudField> fields;
+  final Map<String, dynamic>? initial;
+  const _CrudFormDialog({required this.fields, this.initial});
+
+  @override
+  State<_CrudFormDialog> createState() => _CrudFormDialogState();
+}
+
+class _CrudFormDialogState extends State<_CrudFormDialog> {
+  final Map<String, TextEditingController> _ctrl = {};
+  final Map<String, String?> _select = {};
+  final Map<String, bool> _bool = {};
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final f in widget.fields) {
+      final v = widget.initial?[f.key]?.toString() ?? '';
+      _ctrl[f.key] = TextEditingController(text: v);
+      if (f.type == 'select') _select[f.key] = v;
+      if (f.type == 'bool') _bool[f.key] = (widget.initial?[f.key] == true);
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _ctrl.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final data = <String, dynamic>{};
+    for (final f in widget.fields) {
+      if (f.readOnly) {
+        if (widget.initial != null && widget.initial![f.key] != null) {
+          data[f.key] = widget.initial![f.key];
+        }
+        continue;
+      }
+      switch (f.type) {
+        case 'bool':
+          data[f.key] = _bool[f.key] ?? false;
+          break;
+        case 'number':
+          final t = _ctrl[f.key]!.text.trim();
+          data[f.key] = t.isEmpty ? null : int.tryParse(t) ?? double.tryParse(t);
+          break;
+        case 'select':
+        case 'date':
+        case 'text':
+        case 'textarea':
+        default:
+          final t = _ctrl[f.key]!.text.trim();
+          if (f.required && t.isEmpty) {
+            _show('${f.label} wajib diisi');
+            return;
+          }
+          data[f.key] = t.isEmpty ? null : t;
+      }
+    }
+    setState(() => _loading = true);
+    try {
+      Navigator.pop(context, data);
+    } catch (e) {
+      _show('Gagal: $e');
+      setState(() => _loading = false);
+    }
+  }
+
+  void _show(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(m), backgroundColor: AppTheme.danger));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initial == null ? 'Tambah Data' : 'Edit Data'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.fields.map(_buildField).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal')),
+        FilledButton(
+            onPressed: _loading ? null : _save,
+            child: _loading
+                ? const SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Simpan')),
+      ],
+    );
+  }
+
+  Widget _buildField(CrudField f) {
+    switch (f.type) {
+      case 'textarea':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _ctrl[f.key],
+            maxLines: 4,
+            decoration: InputDecoration(labelText: f.label),
+          ),
+        );
+      case 'bool':
+        return CheckboxListTile(
+          value: _bool[f.key] ?? false,
+          onChanged: (v) => setState(() => _bool[f.key] = v ?? false),
+          title: Text(f.label),
+        );
+      case 'select':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: DropdownButtonFormField<String>(
+            initialValue: _select[f.key]?.isEmpty == true ? null : _select[f.key],
+            decoration: InputDecoration(labelText: '${f.label} (opsional)'),
+            items: (f.options ?? [])
+                .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
+                .toList(),
+            onChanged: (v) => setState(() => _select[f.key] = v),
+          ),
+        );
+      case 'password':
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _ctrl[f.key],
+            obscureText: true,
+            decoration: InputDecoration(labelText: f.label),
+          ),
+        );
+      default:
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: TextField(
+            controller: _ctrl[f.key],
+            readOnly: f.readOnly,
+            keyboardType: f.type == 'number'
+                ? const TextInputType.numberWithOptions(decimal: true)
+                : TextInputType.text,
+            decoration: InputDecoration(
+                labelText: f.label,
+                hintText: f.hint,
+                helperText: f.required ? 'wajib' : null),
+          ),
+        );
+    }
+  }
+}
+
+/// Helper untuk mendapatkan daftar opsi dropdown dari tabel Supabase.
+Future<List<DropdownItem>> fetchDropdown(
+    String table, String labelField, String valueField) async {
+  final rows = await Api.client.from(table).select('$valueField,$labelField').order(labelField);
+  return (rows as List<Map<String, dynamic>>)
+      .map((r) => DropdownItem('${r[valueField]}', '${r[labelField]}'))
+      .toList();
+}
