@@ -376,28 +376,27 @@ class SiswaImportMapper {
       }
     }
 
-    // nis/nisn: kolom antara urut dan nama (atau = urut jika tidak ada urut) yang berisi angka atau kosong
+    // nis/nisn: kolom antara urut dan nama yang HANYA dinilai dari baris berisi nama siswa
+    final nameRows = data.where((r) => namaCol < r.length && _looksName(r[namaCol])).toList();
     int nisCol = -1;
     int lo = (urutCol >= 0 ? urutCol + 1 : 0);
     if (lo < namaCol) {
       double best = -1;
       for (var c = lo; c < namaCol; c++) {
-        var nums = 0, empt = 0, tot = 0;
-        for (final r in data) {
-          final v = c < r.length ? r[c].trim() : '';
-          tot++;
-          if (v.isEmpty) {
+        var nums = 0, empt = 0;
+        for (final r in nameRows) {
+          final raw = c < r.length ? r[c].trim() : '';
+          if (raw.isEmpty) {
             empt++;
-          } else if (RegExp(r'^\d{4,8}(\.0+)?$').hasMatch(v)) {
-            nums++;
-          } else {
-            best = -1;
-            break;
+            continue;
           }
+          final cleaned = raw.replaceAll(RegExp(r'[/.\s]+$'), '').replaceAll('.', '').trim();
+          if (RegExp(r'^\d{3,}').hasMatch(cleaned)) nums++;
         }
-        if (nums + empt == tot && tot > 0 && (nums > 0 || empt == tot)) {
-          final score = nums / tot + (empt == tot ? 0.5 : 0);
-          if (score > best) {
+        if (nameRows.isEmpty) continue;
+        if (nums + empt == nameRows.length && (nums > 0 || empt == nameRows.length)) {
+          final score = (nums / nameRows.length);
+          if (score > best && score > 0.6) {
             best = score;
             nisCol = c;
           }
@@ -422,10 +421,33 @@ class SiswaImportMapper {
       String at(int c) => (c >= 0 && c < r.length) ? r[c].trim() : '';
       final nama = at(namaCol);
       if (nama.isEmpty || !_looksName(nama)) continue;
-      var nis = at(nisCol);
-      if (nis.contains('.')) nis = nis.substring(0, nis.indexOf('.'));
+      // nilai bisa "0106545695 /" (NISN kosong NIS) / "2026001" / "1234567890 / 2026001"
+      var rawNis = at(nisCol);
+      var nis = '';
+      var nisn = '';
+      final parts = rawNis
+          .split(RegExp(r'[/|]'))
+          .map((p) => (RegExp(r'(\d{3,})').firstMatch(p)?.group(1) ?? '').trim())
+          .where((p) => p.isNotEmpty && !RegExp(r'^0+$').hasMatch(p))
+          .toList();
+      if (parts.isNotEmpty) {
+        final first = parts.first;
+        if (first.length >= 5 && first.length <= 10) {
+          // NISN (10 digit) / NIS pendek
+          if (first.length >= 9) {
+            nisn = first;
+            nis = parts.length > 1 ? parts[1] : first;
+          } else {
+            nis = first;
+            if (parts.length > 1) nisn = parts[1];
+          }
+        } else {
+          nis = first;
+        }
+      }
       result.add({
         'nis': nis,
+        'nisn': nisn,
         'nama': nama,
         'jk': at(jkCol),
         'kelas': '',

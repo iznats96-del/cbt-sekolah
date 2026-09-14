@@ -116,6 +116,7 @@ class _ImportScreenState extends State<ImportScreen> {
           for (final r in t.rows) {
             rows.add({
               'nis': r['nis'] ?? '',
+              'nisn': r['nisn'] ?? '',
               'nama': r['nama'] ?? '',
               'jk': r['jk'] ?? '',
               'kelas': (r['kelas'] != null && r['kelas']!.isNotEmpty) ? r['kelas'] : t.kelas,
