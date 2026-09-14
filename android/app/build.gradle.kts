@@ -12,14 +12,11 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
-val storeFile = keystoreProperties.getProperty("storeFilePath")
-    ?: System.getenv("KEYSTORE_PATH")
-val storePass = keystoreProperties.getProperty("storePassword")
-    ?: System.getenv("KEYSTORE_PASSWORD")
-val keyAlias = keystoreProperties.getProperty("keyAlias")
-    ?: System.getenv("KEYSTORE_ALIAS")
-val keyPass = keystoreProperties.getProperty("keyPassword")
-    ?: System.getenv("KEYSTORE_PASSWORD")
+val envKeyStorePath = System.getenv("KEYSTORE_PATH") ?: keystoreProperties.getProperty("storeFilePath")
+val envKeyStorePass = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("storePassword")
+val envKeyAlias = System.getenv("KEYSTORE_ALIAS") ?: keystoreProperties.getProperty("keyAlias")
+val envKeyPass = System.getenv("KEYSTORE_KEYPASSWORD") ?: keystoreProperties.getProperty("keyPassword")
+val hasSigning = envKeyStorePath != null && envKeyStorePass != null && envKeyAlias != null
 
 android {
     namespace = "com.cbtsekolah.cbt_sekolah"
@@ -41,18 +38,18 @@ android {
 
     signingConfigs {
         create("release") {
-            if (storeFile != null && storePass != null && keyAlias != null) {
-                storeFile = file(storeFile)
-                storePassword = storePass
-                keyAlias = keyAlias
-                keyPassword = keyPass
+            if (hasSigning) {
+                storeFile = file(envKeyStorePath!!)
+                storePassword = envKeyStorePass
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPass
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (storeFile != null && storePass != null && keyAlias != null)
+            signingConfig = if (hasSigning)
                 signingConfigs.getByName("release")
             else
                 signingConfigs.getByName("debug")
