@@ -135,7 +135,9 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
         'guru': doc.guru,
         'items': items,
       };
-      final res = await Api.client.rpc('admin_import_ujian_docx', params: payload);
+      final res = await Api.client.rpc('admin_import_ujian_docx', params: {
+        'p_payload': payload,
+      });
       final map = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
       if (!mounted) return;
       showDialog(

@@ -8,7 +8,12 @@ import '../../services/kiosk.dart';
 
 class PelaksanaanScreen extends StatefulWidget {
   final Map<String, dynamic> ujian;
-  const PelaksanaanScreen({super.key, required this.ujian});
+  final String pesertaId;
+  const PelaksanaanScreen({
+    super.key,
+    required this.ujian,
+    required this.pesertaId,
+  });
 
   @override
   State<PelaksanaanScreen> createState() => _PelaksanaanScreenState();
@@ -16,7 +21,7 @@ class PelaksanaanScreen extends StatefulWidget {
 
 class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     with WidgetsBindingObserver {
-  final int _penaltyLimit = 3; // keluar app > 3x -> auto submit
+  final int _penaltyLimit = 3;
 
   late int _durasiDetik;
   Timer? _timer;
@@ -29,19 +34,18 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
 
   bool _loading = true;
   bool _submitting = false;
+  bool _kirimGagal = false;
   String? _error;
 
   int _juangPaused = 0;
   bool _kiosk = false;
 
-  String? _pesertaId;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _durasiDetik = (widget.ujian['alokasi_menit'] as num?)?.toInt() ?? 90;
-    _durasiDetik *= 60;
+    final menit = (widget.ujian['alokasi_menit'] as num?)?.toInt() ?? 90;
+    _durasiDetik = menit * 60;
     _sisaDetik = _durasiDetik;
     _load();
   }
@@ -56,70 +60,29 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
   }
 
   Future<void> _load() async {
-    final userId = Api.user?.id;
-    if (userId == null) return;
     try {
-      final soalIds = (widget.ujian['soal_list'] as List?)?.map((e) => e.toString()).toList() ?? [];
-      List<Map<String, dynamic>> soal = [];
-      if (soalIds.isNotEmpty) {
-        final rows = await Api.client
-            .from('bank_soal')
-            .select('id,soal,jenis,opsi,kunci,bobot,mapel_id,gambar_url')
-            .inFilter('id', soalIds);
-        soal = List<Map<String, dynamic>>.from(rows);
-        // urutkan sesuai soal_list
-        final m = {for (final s in soal) s['id'].toString(): s};
-        soal = [for (final id in soalIds) if (m[id] != null) m[id]!];
-      }
-
-      // buat/konek peserta_ujian
-      final profile = await Api.currentProfile();
-      final siswaRows = await Api.client
-          .from('siswa')
-          .select('id')
-          .eq('profile_id', userId)
-          .limit(1);
-      String? siswaId = siswaRows.isNotEmpty ? siswaRows.first['id'].toString() : null;
-
-      // jika tidak ada siswa terhubung, buat placeholder
-      if (siswaId == null) {
-        final ins = await Api.client.from('siswa').insert({
-          'nis': 'TMP${DateTime.now().millisecondsSinceEpoch}',
-          'nama': profile?['nama'] ?? 'Peserta',
-          'profile_id': userId,
-        }).select('id');
-        siswaId = ins.first['id'].toString();
-      }
-
-      // cek peserta_ujian existing
-      final peserta = await Api.client
-          .from('peserta_ujian')
-          .select()
-          .eq('ujian_id', widget.ujian['id'])
-          .eq('siswa_id', siswaId!);
-      if (peserta.isNotEmpty) {
-        _pesertaId = peserta.first['id'].toString();
-        if (peserta.first['status'] == 'selesai') {
-          _finishLocal(title: 'Sudah dikerjakan');
-          return;
+      final res = await Api.client
+          .rpc('soal_milik_ujian', params: {'p_peserta': widget.pesertaId});
+      final data = Map<String, dynamic>.from(res as Map);
+      _soal = List<Map<String, dynamic>>.from(data['soal'] as List? ?? []);
+      final jw = data['jawaban'];
+      if (jw is Map) {
+        for (final e in jw.entries) {
+          final m = e.value;
+          if (m is Map) {
+            _jawaban['${e.key}'] = (m['jawaban'] ?? '').toString();
+            _ragu['${e.key}'] = m['ragu'] == true;
+          }
         }
-      } else {
-        final ins = await Api.client.from('peserta_ujian').insert({
-          'ujian_id': widget.ujian['id'],
-          'siswa_id': siswaId,
-          'status': 'mengikuti',
-          'started_at': DateTime.now().toUtc().toIso8601String(),
-        }).select('id');
-        _pesertaId = ins.first['id'].toString();
       }
-
+      final sisa = data['sisa_detik'];
+      if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
       if (!mounted) return;
       setState(() {
-        _soal = soal;
         _kiosk = true;
         _loading = false;
       });
-      Kiosk.setSecure(true); // aktifkan anti-screenshot (hanya saat ujian)
+      Kiosk.setSecure(true); // anti-screenshot hanya selama ujian
       _startTimer();
     } catch (e) {
       if (!mounted) return;
@@ -142,145 +105,75 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     });
   }
 
+  // ---------- Anti-cheat ----------
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // anti-cheat: saat keluar app/pindah layar
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       if (_kiosk) {
         _juangPaused++;
+        if (_sisaDetik > 0) Kiosk.alarmStart(maxVolume: true);
+        _catatPelanggaran();
         if (_juangPaused > _penaltyLimit) {
           _submit(auto: true);
         }
       }
-      // Suara warning + volume max otomatis saat keluar paksa
-      if (_kiosk && _sisaDetik > 0) {
-        Kiosk.alarmStart(maxVolume: true);
-      }
-      _catatPelanggaran();
     } else if (state == AppLifecycleState.resumed) {
-      // kembali ke ujian -> hentikan alarm
       Kiosk.alarmStop();
     }
   }
 
   Future<void> _catatPelanggaran() async {
     try {
-      if (_pesertaId == null) return;
-      final cur = await Api.client
-          .from('hasil_ujian')
-          .select('pelanggaran,rincian_pelanggaran')
-          .eq('peserta_ujian_id', _pesertaId!);
-      int pel = 0;
-      List<dynamic> rincian = [];
-      if (cur.isNotEmpty) {
-        pel = (cur.first['pelanggaran'] as num?)?.toInt() ?? 0;
-        final r = cur.first['rincian_pelanggaran'];
-        if (r is List) rincian = r;
-      }
-      rincian.add({
-        'waktu': DateTime.now().toIso8601String(),
-        'jenis': 'keluar_app_atau_pindah_layar',
-      });
-      await Api.client.from('hasil_ujian').upsert({
-        'peserta_ujian_id': _pesertaId,
-        'pelanggaran': pel + 1,
-        'rincian_pelanggaran': rincian,
-      });
+      await Api.client.rpc('catat_pelanggaran',
+          params: {'p_peserta': widget.pesertaId});
     } catch (_) {}
   }
 
+  // ---------- Simpan jawaban (auto, tanpa kunci) ----------
+  Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
+    try {
+      await Api.client.rpc('simpan_jawaban', params: {
+        'p_peserta': widget.pesertaId,
+        'p_soal': soalId,
+        'p_jawaban': _jawaban[soalId] ?? '',
+        'p_ragu': _ragu[soalId] ?? false,
+      });
+      if (mounted && _kirimGagal) setState(() => _kirimGagal = false);
+    } catch (_) {
+      if (flush && mounted) setState(() => _kirimGagal = true);
+    }
+  }
+
   Future<void> _submit({bool auto = false}) async {
-    final pesertaId = _pesertaId;
-    if (_submitting || pesertaId == null) return;
+    if (_submitting) return;
     setState(() => _submitting = true);
     _timer?.cancel();
+    Kiosk.alarmStop();
     try {
-      // simpan jawaban soal tersisa
+      // sinkron final semua jawaban
       for (final s in _soal) {
-        final jawaban = _jawaban[s['id'].toString()];
-        if (jawaban != null) {
-          await Api.client.from('jawaban_siswa').upsert({
-            'peserta_ujian_id': pesertaId,
-            'soal_id': s['id'],
-            'jawaban': jawaban,
-            'ragu_ragu': (_ragu[s['id'].toString()] ?? false),
-          });
-        }
+        await _saveJawaban(s['id'].toString(), flush: true);
       }
-      // tandai selesai
-      await Api.client.from('peserta_ujian').update({
-        'status': 'selesai',
-        'finished_at': DateTime.now().toUtc().toIso8601String(),
-      }).eq('id', pesertaId);
-      // hitung nilai otomatis (server side function optional; fallback local)
-      try {
-        // coba panggil RPC bila ada
-        await Api.client.rpc('hitung_nilai', params: {
-          'p_peserta': pesertaId,
-        });
-      } catch (_) {
-        _hitungNilaiLokal();
-      }
+      await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
       if (!mounted) return;
-      _finishLocal(title: auto ? 'Waktu habis' : 'Ujian selesai');
+      _kiosk = false;
+      Navigator.of(context).pushReplacement(MaterialPageRoute(
+        builder: (_) => _SelesaiScreen(title: auto ? 'Waktu habis' : 'Ujian selesai'),
+      ));
     } catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal menyimpan: $e'), backgroundColor: AppTheme.danger),
+        SnackBar(content: Text('Gagal mengumpulkan: $e'), backgroundColor: AppTheme.danger),
       );
-      // jangan matikan timer di sini, lanjut
       if (!auto) _startTimer();
     }
   }
 
-  Future<void> _hitungNilaiLokal() async {
-    try {
-      int benar = 0, salah = 0, kosong = 0;
-      for (final s in _soal) {
-        final j = _jawaban[s['id'].toString()];
-        if (j == null) {
-          kosong++;
-          continue;
-        }
-        final kunci = s['kunci'];
-        bool ok = false;
-        if (kunci is Map && kunci['jawaban'] != null) {
-          ok = j.trim().toLowerCase() == kunci['jawaban'].toString().trim().toLowerCase();
-        } else if (kunci is List) {
-          ok = kunci.map((k) => k.toString().toLowerCase()).toSet().containsAll(
-              j.split(',').map((x) => x.trim().toLowerCase()).toSet());
-        }
-        if (ok) {
-          benar++;
-        } else {
-          salah++;
-        }
-      }
-      final total = benar + salah + kosong;
-      final persen = total == 0 ? 0 : (benar * 100 / total);
-      if (_pesertaId != null) {
-        await Api.client.from('hasil_ujian').upsert({
-          'peserta_ujian_id': _pesertaId,
-          'jumlah_benar': benar,
-          'jumlah_salah': salah,
-          'jumlah_kosong': kosong,
-          'skor': benar,
-          'nilai': persen.roundToDouble(),
-          'dinilai': true,
-        });
-      }
-    } catch (_) {}
-  }
-
-  void _finishLocal({required String title}) {
-    _kiosk = false;
-    _timer?.cancel();
-    if (!mounted) return;
-    Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => _SelesaiScreen(title: title),
-    ));
+  String _fmt(int d) {
+    final mm = (d ~/ 60).toString().padLeft(2, '0');
+    final ss = (d % 60).toString().padLeft(2, '0');
+    return '$mm:$ss';
   }
 
   @override
@@ -319,68 +212,62 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     final opsi = current['opsi'];
     final opsiList = opsi is List ? opsi : <dynamic>[];
 
-    // format waktu
-    final mm = (_sisaDetik ~/ 60).toString().padLeft(2, '0');
-    final ss = (_sisaDetik % 60).toString().padLeft(2, '0');
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: Text('${widget.ujian['nama'] ?? 'Ujian'}'),
-        automaticallyImplyLeading: false,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _sisaDetik < 60 ? AppTheme.danger : Colors.white24,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.timer, size: 16),
-                    const SizedBox(width: 6),
-                    Text('$mm:$ss', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _catatPelanggaran();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Anda tidak dapat keluar dari ujian. Lanjutkan mengerjakan.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text('${widget.ujian['nama'] ?? 'Ujian'}',
+              overflow: TextOverflow.ellipsis),
+          automaticallyImplyLeading: false,
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _sisaDetik < 60 ? AppTheme.danger : Colors.white24,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.timer, size: 16),
+                      const SizedBox(width: 6),
+                      Text(_fmt(_sisaDetik),
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: PopScope(
-        canPop: false,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) {
-            _catatPelanggaran();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Anda tidak dapat keluar dari ujian. Lanjutkan mengerjakan.'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          }
-        },
-        child: Column(
+          ],
+        ),
+        body: Column(
           children: [
-            // soal nomor
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               color: const Color(0xFFF4F6FA),
               child: Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      'Soal ${_idx + 1} dari ${_soal.length}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                    child: Text('Soal ${_idx + 1} dari ${_soal.length}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
-                  Text(
-                    'PG' == jenis ? '' : '',
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
+                  if (_kirimGagal)
+                    const Text('● tersimpan lokal',
+                        style: TextStyle(fontSize: 10, color: AppTheme.danger)),
                 ],
               ),
             ),
@@ -390,7 +277,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // kartu soal + navigasi
                     Card(
                       margin: EdgeInsets.zero,
                       child: Padding(
@@ -407,21 +293,21 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                                     color: AppTheme.primary,
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Text(
-                                    '${_idx + 1}',
-                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                  ),
+                                  child: Text('${_idx + 1}',
+                                      style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12)),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(
-                                    current['soal']?.toString() ?? '',
-                                    style: const TextStyle(fontSize: 16, height: 1.5),
-                                  ),
+                                  child: Text(current['soal']?.toString() ?? '',
+                                      style: const TextStyle(fontSize: 16, height: 1.5)),
                                 ),
                               ],
                             ),
-                            if (current['gambar_url']?.toString().isNotEmpty == true) ...[
+                            if (current['gambar_url']?.toString().isNotEmpty ==
+                                true) ...[
                               const SizedBox(height: 12),
                               Container(
                                 width: double.infinity,
@@ -436,14 +322,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                                     child: Image.network(
                                       current['gambar_url'].toString(),
                                       fit: BoxFit.contain,
-                                      errorBuilder: (_, e, s) => const SizedBox.shrink(),
+                                      errorBuilder: (_, e, s) =>
+                                          const SizedBox.shrink(),
                                     ),
                                   ),
                                 ),
                               ),
                             ],
                             const SizedBox(height: 16),
-                            if (jenis == 'pg' || (jenis == 'jodoh' && opsiList.isNotEmpty)) ...[
+                            if (jenis == 'pg' ||
+                                (jenis == 'jodoh' && opsiList.isNotEmpty)) ...[
                               if (jenis == 'jodoh')
                                 const Padding(
                                   padding: EdgeInsets.only(bottom: 8),
@@ -457,19 +345,26 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                                 RadioListTile<String>(
                                   value: opsiList[i].toString(),
                                   groupValue: _jawaban[curId],
-                                  title: Text('${String.fromCharCode(65 + i)}. ${opsiList[i]}'),
-                                  onChanged: (v) => setState(() => _jawaban[curId] = v),
+                                  title: Text(
+                                      '${String.fromCharCode(65 + i)}. ${opsiList[i]}'),
+                                  onChanged: (v) {
+                                    setState(() => _jawaban[curId] = v);
+                                    _saveJawaban(curId);
+                                  },
                                   dense: true,
                                 ),
                             ] else if (jenis == 'essay') ...[
                               TextField(
-                                controller: TextEditingController(
-                                    text: _jawaban[curId] ?? ''),
-                                maxLines: 4,
+                                controller:
+                                    TextEditingController(text: _jawaban[curId] ?? ''),
+                                maxLines: 5,
+                                onChanged: (v) {
+                                  _jawaban[curId] = v;
+                                  _saveJawaban(curId);
+                                },
                                 decoration: const InputDecoration(
                                   hintText: 'Tulis jawaban Anda...',
                                 ),
-                                onChanged: (v) => setState(() => _jawaban[curId] = v),
                               ),
                             ],
                           ],
@@ -481,7 +376,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                       children: [
                         Checkbox(
                           value: _ragu[curId] ?? false,
-                          onChanged: (v) => setState(() => _ragu[curId] = v ?? false),
+                          onChanged: (v) {
+                            setState(() => _ragu[curId] = v ?? false);
+                            _saveJawaban(curId);
+                          },
                         ),
                         const Text('Tandai ragu-ragu'),
                       ],
@@ -490,7 +388,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                 ),
               ),
             ),
-            // navigasi bawah
             SafeArea(
               child: Container(
                 padding: const EdgeInsets.all(12),
@@ -510,14 +407,14 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                       )
                     else
                       FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: AppTheme.secondary),
-                        onPressed: _submitting
-                            ? null
-                            : () => _confirmSubmit(),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: AppTheme.secondary),
+                        onPressed: _submitting ? null : _confirmSubmit,
                         child: _submitting
                             ? const SizedBox(
                                 height: 18, width: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
                             : const Text('Selesai & Kumpulkan'),
                       ),
                   ],
@@ -526,14 +423,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
             ),
           ],
         ),
+        bottomNavigationBar: _soalNavigator(),
       ),
-
-      // Navigator soal (grid)
-      bottomNavigationBar: _soalNavigator(context),
     );
   }
 
-  Widget _soalNavigator(BuildContext context) {
+  Widget _soalNavigator() {
     return Container(
       height: 110,
       color: const Color(0xFFF4F6FA),
@@ -569,10 +464,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
                 ),
               ),
               alignment: Alignment.center,
-              child: Text(
-                '${i + 1}',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-              ),
+              child: Text('${i + 1}',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12)),
             ),
           );
         },
@@ -581,7 +477,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
   }
 
   Future<void> _confirmSubmit() async {
-    final belum = _soal.length - (_jawaban.values.where((v) => v != null && v.isNotEmpty).length);
+    final belum = _soal.length - _jawaban.values.where((v) => v != null && v.isNotEmpty).length;
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
@@ -590,7 +486,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
             ? 'Masih ada $belum soal belum dijawab. Yakin ingin mengumpulkan?'
             : 'Semua soal sudah dijawab. Yakin ingin mengumpulkan?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Periksa Lagi')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Periksa Lagi')),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
             child: const Text('Kumpulkan'),
@@ -610,24 +508,36 @@ class _SelesaiScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(title == 'Waktu habis' ? Icons.timer_off : Icons.check_circle_outline,
-                  size: 72, color: AppTheme.secondary),
-              const SizedBox(height: 16),
-              Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text('Jawaban Anda telah dikumpulkan.', textAlign: TextAlign.center),
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
-                child: const Text('Kembali ke Beranda'),
-              ),
-            ],
+      body: PopScope(
+        canPop: true,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                    title == 'Waktu habis'
+                        ? Icons.timer_off
+                        : Icons.check_circle_outline,
+                    size: 72,
+                    color: AppTheme.secondary),
+                const SizedBox(height: 16),
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text(
+                    'Jawaban Anda telah dikumpulkan.\nNilai muncul otomatis bila kunci jawaban sudah diisi guru.',
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 24),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.of(context).popUntil((r) => r.isFirst),
+                  child: const Text('Kembali ke Beranda'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

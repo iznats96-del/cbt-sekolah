@@ -224,6 +224,32 @@ if (RegExp(r'MENJODOHKAN|JODOHKAN|MENJODOH', caseSensitive: false).hasMatch(line
         }
       }
     }
+    // dedup: soal ganda/terpotong -> satu pertahankan (bandingkan teks ternormalisasi)
+    final uniq = <PgSoal>[];
+    String norm(PgSoal p) =>
+        p.soal.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    for (final p in u.pg) {
+      final nk = norm(p);
+      final dupIdx = uniq.indexWhere(
+          (e) => norm(e) == nk || norm(e).startsWith(nk) || nk.startsWith(norm(e)));
+      if (dupIdx >= 0) {
+        if (p.opsi.length > uniq[dupIdx].opsi.length) {
+          if (p.kunci == null) p.kunci = uniq[dupIdx].kunci;
+          uniq[dupIdx] = p;
+        } else if (uniq[dupIdx].kunci == null && p.kunci != null) {
+          uniq[dupIdx].kunci = p.kunci;
+        }
+        continue;
+      }
+      uniq.add(p);
+    }
+    final pgBefore = u.pg.length;
+    u.pg
+      ..clear()
+      ..addAll(uniq);
+    if (u.pg.length < pgBefore) {
+      u.warnings.add('${pgBefore - u.pg.length} soal duplikat/ganda telah digabung');
+    }
     if (u.mapel.isEmpty) u.warnings.add('Nama Mata Pelajaran tidak terdeteksi di dokumen');
     if (u.kelas.isEmpty) u.warnings.add('Kelas tidak terdeteksi di dokumen');
     if (u.pg.isEmpty && u.jodoh.isEmpty && u.essay.isEmpty) {

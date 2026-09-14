@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
 import 'import_ujian_screen.dart';
+import '../shared/kunci_jawaban_screen.dart';
 import 'ujian_form_screen.dart';
 
 class UjianListScreen extends StatefulWidget {
@@ -65,13 +66,36 @@ class _UjianListScreenState extends State<UjianListScreen> {
   Future<void> _toggleStatus(Map<String, dynamic> u) async {
     final next =
         u['status'] == 'aktif' ? 'selesai' : (u['status'] == 'draft' ? 'aktif' : 'aktif');
+
+    // guard: PG tanpa kunci -> nilai otomatis tidak akan keluar
+    String extraWarn = '';
+    if (next == 'aktif') {
+      try {
+        final ids = (u['soal_list'] as List?)?.map((e) => e.toString()).toList() ?? [];
+        if (ids.isNotEmpty) {
+          final soal = await Api.client
+              .from('bank_soal')
+              .select('id,jenis,kunci')
+              .inFilter('id', ids);
+          final tanpaKunci = (soal as List)
+              .where((s) => s['jenis'] == 'pg' && (s['kunci'] == null ||
+                  (s['kunci'] is Map && !(s['kunci'] as Map).containsKey('jawaban'))))
+              .length;
+          if (tanpaKunci > 0) {
+            extraWarn =
+                '\n\n⚠ $tanpaKunci soal PG belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
+          }
+        }
+      } catch (_) {}
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(u['status'] == 'aktif' ? 'Akhiri Ujian?' : 'Aktifkan Ujian?'),
-        content: Text(u['status'] == 'aktif'
-            ? 'Ujian "aktif" akan berhenti menerima jawaban. Lanjutkan?'
-            : 'Ujian akan bisa diakses siswa. Lanjutkan?'),
+        content: Text((u['status'] == 'aktif'
+                ? 'Ujian "aktif" akan berhenti menerima jawaban. Lanjutkan?'
+                : 'Ujian akan bisa diakses siswa. Lanjutkan?') +
+            extraWarn),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
           FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Ya')),
@@ -258,6 +282,12 @@ class _UjianListScreenState extends State<UjianListScreen> {
                       ? Icons.stop_circle_outlined
                       : Icons.play_circle_outline),
                   onPressed: () => _toggleStatus(u),
+                ),
+                IconButton(
+                  tooltip: 'Isi kunci jawaban',
+                  icon: const Icon(Icons.vpn_key_outlined, color: AppTheme.secondary),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => KunciJawabanScreen(ujian: u))),
                 ),
                 IconButton(
                   tooltip: 'Lihat token',
