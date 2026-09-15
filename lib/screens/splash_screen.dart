@@ -79,6 +79,11 @@ class _SplashScreenState extends State<SplashScreen> {
                 'Computer Based Test',
                 style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
+              const SizedBox(height: 4),
+              const Text(
+                'API v15+ (kunci & token terkunci server)',
+                style: TextStyle(color: Colors.white38, fontSize: 10),
+              ),
             ],
           ),
         ),
