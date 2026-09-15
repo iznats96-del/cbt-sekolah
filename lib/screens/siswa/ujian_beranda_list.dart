@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../core/app_theme.dart';
 import '../../core/config.dart';
 import '../../services/api.dart';
+import '../auth/login_screen.dart';
 import 'pelaksanaan_screen.dart';
 
 class UjianBerandaList extends StatefulWidget {
@@ -31,22 +32,49 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
       _loading = true;
       _error = null;
     });
-    try {
-      // RPC AMAN: tanpa token & tanpa kunci
-      final rows = await Api.client.rpc('my_ujian_aktif');
-      if (!mounted) return;
-      dynamic data = rows;
-      if (data is String) data = jsonDecode(data);
-      setState(() {
-        _ujian = List<dynamic>.from(data as List);
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'Gagal memuat: $e';
-        _loading = false;
-      });
+    // kalau sesi sudah kedaluwarsa → paksakan refresh dulu (diem-diem)
+    final s = Api.client.auth.currentSession;
+    if (s != null &&
+        DateTime.fromMillisecondsSinceEpoch((s.expiresAt ?? 0) * 1000)
+            .isBefore(DateTime.now().subtract(const Duration(minutes: 1)))) {
+      try {
+        await Api.client.auth.refreshSession();
+      } catch (_) {
+        if (mounted) {
+          await Api.client.auth.signOut();
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (r) => false);
+          }
+        }
+        return;
+      }
+    }
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        // RPC AMAN: tanpa token & tanpa kunci
+        final rows = await Api.client.rpc('my_ujian_aktif');
+        if (!mounted) return;
+        dynamic data = rows;
+        if (data is String) data = jsonDecode(data);
+        setState(() {
+          _ujian = List<dynamic>.from(data as List);
+          _loading = false;
+        });
+        return;
+      } catch (e) {
+        if (attempt == 0) {
+          // satu retry setelah coba refresh (rate-limit & network flake)
+          await Future.delayed(const Duration(milliseconds: 1200));
+          continue;
+        }
+        if (!mounted) return;
+        setState(() {
+          _error = 'Gagal memuat: $e';
+          _loading = false;
+        });
+      }
     }
   }
 
@@ -182,7 +210,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: SelectableText(
-                      'DIAGNOSTIK\nlogin : ${Api.user?.email ?? '-'}\nsesi  : ${Api.client.auth.currentSession?.expiresAt ?? 'expired?'}\ncepat : ${snap.data ?? '(cek)'}',
+                      'DIAGNOSTIK\nlogin : ${Api.user?.email ?? '(belum login)'}\nrole  : ${Api.role ?? '-'}\ncepat : ${snap.data ?? '(cek)'}',
                       style: const TextStyle(fontSize: 10.5, height: 1.5),
                     ),
                   ),
