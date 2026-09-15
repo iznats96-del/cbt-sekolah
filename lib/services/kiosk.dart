@@ -64,6 +64,15 @@ class Kiosk {
     }
   }
 
+  static Future<bool> isDeviceOwner() async {
+    try {
+      final ok = await _channel.invokeMethod('isDeviceOwner');
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Hentikan alarm.
   static Future<bool> alarmStop() async {
     try {

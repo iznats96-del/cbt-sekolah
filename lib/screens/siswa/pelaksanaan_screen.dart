@@ -77,8 +77,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       });
       Kiosk.setSecure(true);
       Kiosk.enterKiosk();
-      Kiosk.enforceVolume();
       _startTimer();
+      _cekDeviceOwner();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -97,8 +97,13 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         t.cancel();
         _submit(auto: true);
       }
-      if (_sisaDetik % 30 == 0) Kiosk.enforceVolume();
     });
+  }
+
+  bool _isOwner = false;
+  void _cekDeviceOwner() async {
+    final ok = await Kiosk.isDeviceOwner();
+    if (mounted) setState(() => _isOwner = ok);
   }
 
   @override
@@ -107,14 +112,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       if (_kiosk) {
         _juangPaused++;
         if (_sisaDetik > 0) Kiosk.alarmStart(maxVolume: true);
-        Kiosk.enforceVolume();
         _catatPelanggaran();
         if (_juangPaused > _penaltyLimit) _submit(auto: true);
       }
     } else if (state == AppLifecycleState.resumed) {
       Kiosk.alarmStop();
       if (_kiosk) {
-        Kiosk.enforceVolume();
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       }
     }
@@ -303,9 +306,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: _isOwner ? const Color(0xFF14532D) : const Color(0xFF78350F),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  border: Border.all(color: _isOwner ? const Color(0xFF22C55E) : const Color(0xFFF59E0B).withOpacity(0.5)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -313,12 +316,15 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                          color: _isOwner ? const Color(0xFF22C55E) : const Color(0xFFF59E0B),
+                          shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
-                    const Text('TERKUNCI', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    Text(_isOwner ? 'TERKUNCI' : 'TERBATAS',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
                     const SizedBox(width: 6),
-                    const Icon(Icons.lock, color: Colors.white, size: 12),
+                    Icon(_isOwner ? Icons.lock : Icons.lock_open, color: Colors.white, size: 12),
                   ],
                 ),
               ),

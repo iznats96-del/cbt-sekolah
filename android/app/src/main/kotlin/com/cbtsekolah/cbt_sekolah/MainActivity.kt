@@ -68,7 +68,6 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         if (isKioskLocked) {
             applyImmersive()
-            enforceMaxVolume()
         }
     }
 
@@ -144,8 +143,20 @@ class MainActivity : FlutterActivity() {
                 "isKioskActive" -> {
                     result.success(isKioskLocked)
                 }
+                "isDeviceOwner" -> {
+                    result.success(isDeviceOwner())
+                }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun isDeviceOwner(): Boolean {
+        return try {
+            val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+            dpm.isDeviceOwnerApp(packageName)
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -159,6 +170,10 @@ class MainActivity : FlutterActivity() {
             if (dpm.isDeviceOwnerApp(packageName)) {
                 dpm.setStatusBarDisabled(admin, true)
                 dpm.setKeyguardDisabled(admin, true)
+                dpm.setCameraDisabled(admin, true)
+                dpm.getUserRestrictions(admin) // ensure available
+                val r = Bundle()
+                r.putBoolean(DevicePolicyManager.DISALLOW_SAFE_BOOT, true)
             }
         } catch (_: Exception) {}
         try {
@@ -166,8 +181,6 @@ class MainActivity : FlutterActivity() {
                 startLockTask()
             }
         } catch (_: Exception) {}
-        enforceMaxVolume()
-        startVolumeEnforcer()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         return true
     }
