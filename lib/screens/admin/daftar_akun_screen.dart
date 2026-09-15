@@ -63,6 +63,43 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
     }).toList();
   }
 
+  Future<void> _resetSemua() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Reset SEMUA password siswa?'),
+        content: const Text(
+            'Setiap siswa akan dapat password baru acak YPxxxx (login tetap pakai NIS).\n'
+            'Password lama MATI. Setelah ini: cetak/salin Daftar Akun dan bagikan lewat wali kelas.',
+            style: TextStyle(fontSize: 13)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Batal')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Reset Sekarang')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res = await Api.client.rpc('admin_reset_semua_password',
+          params: {'p_kelas_id': null});
+      final m = res is Map ? Map<String, dynamic>.from(res) : {};
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${m['direset'] ?? 0} password direset — bagikan daftar baru'),
+          backgroundColor: AppTheme.secondary));
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal: $e'), backgroundColor: AppTheme.danger));
+    }
+  }
+
   Future<void> _salinSemua() async {
     final buf = StringBuffer()
       ..writeln('DAFTAR AKUN LOGIN CBT — SMK YP 79 MAJALAYA')
@@ -90,10 +127,16 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
         title: const Text('Daftar Akun Siswa'),
-        actions: [IconButton(
-            tooltip: 'Salin semua',
-            icon: const Icon(Icons.copy_all_outlined),
-            onPressed: _salinSemua)],
+        actions: [
+          IconButton(
+              tooltip: 'Salin semua',
+              icon: const Icon(Icons.copy_all_outlined),
+              onPressed: _salinSemua),
+          IconButton(
+              tooltip: 'Reset semua password (YP baru)',
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              onPressed: _resetSemua),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
