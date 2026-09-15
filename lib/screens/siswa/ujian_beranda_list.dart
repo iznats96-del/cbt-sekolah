@@ -58,6 +58,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
         if (!mounted) return;
         dynamic data = rows;
         if (data is String) data = jsonDecode(data);
+        debugPrint('CBT-DIAG list=${data.length} user=${Api.user?.email}');
         setState(() {
           _ujian = List<dynamic>.from(data as List);
           _loading = false;
@@ -70,7 +71,8 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
           continue;
         }
         if (!mounted) return;
-        setState(() {
+        debugPrint('CBT-DIAG ERROR $e');
+          setState(() {
           _error = 'Gagal memuat: $e';
           _loading = false;
         });

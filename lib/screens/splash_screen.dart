@@ -32,6 +32,7 @@ class _SplashScreenState extends State<SplashScreen> {
     }
 
     final ok = await Api.init();
+    debugPrint('CBT-DIAG splash ok=$ok role=${Api.role} user=${Supabase.instance.client.auth.currentUser?.email}');
     if (!mounted) return;
 
     // patch: role kosong berarti baru daftar -> paksa ke login
