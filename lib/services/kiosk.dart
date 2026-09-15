@@ -15,9 +15,49 @@ class Kiosk {
   }
 
   /// Mulai alarm peringatan + naikkan volume semaksimal mungkin.
-  static Future<bool> alarmStart({bool maxVolume = true}) async {
+  /// customPath: path file mp3 custom (mis. 4_5948414805994900225.mp3)
+  static Future<bool> alarmStart({bool maxVolume = true, String? customPath}) async {
     try {
-      await _channel.invokeMethod('alarmStart', {'maxVolume': maxVolume});
+      await _channel.invokeMethod('alarmStart', {'maxVolume': maxVolume, 'customPath': customPath});
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Masuk mode kiosk hard lock (block status bar, recent, split, floating)
+  static Future<bool> enterKiosk() async {
+    try {
+      final ok = await _channel.invokeMethod('enterKiosk');
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Keluar mode kiosk
+  static Future<bool> exitKiosk() async {
+    try {
+      await _channel.invokeMethod('exitKiosk');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Paksa volume ke maksimal (dipanggil periodik saat ujian)
+  static Future<bool> enforceVolume() async {
+    try {
+      await _channel.invokeMethod('enforceVolume');
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<bool> stopVolumeEnforcer() async {
+    try {
+      await _channel.invokeMethod('stopVolumeEnforcer');
       return true;
     } catch (_) {
       return false;

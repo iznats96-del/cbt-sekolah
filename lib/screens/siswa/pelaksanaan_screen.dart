@@ -1,7 +1,6 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../services/kiosk.dart';
@@ -9,41 +8,33 @@ import '../../services/kiosk.dart';
 class PelaksanaanScreen extends StatefulWidget {
   final Map<String, dynamic> ujian;
   final String pesertaId;
-  const PelaksanaanScreen({
-    super.key,
-    required this.ujian,
-    required this.pesertaId,
-  });
-
+  const PelaksanaanScreen({super.key, required this.ujian, required this.pesertaId});
   @override
   State<PelaksanaanScreen> createState() => _PelaksanaanScreenState();
 }
 
-class _PelaksanaanScreenState extends State<PelaksanaanScreen>
-    with WidgetsBindingObserver {
+class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindingObserver {
   final int _penaltyLimit = 3;
-
   late int _durasiDetik;
   Timer? _timer;
   int _sisaDetik = 0;
-
   List<Map<String, dynamic>> _soal = [];
   Map<String, String?> _jawaban = {};
   Map<String, bool> _ragu = {};
   int _idx = 0;
-
   bool _loading = true;
   bool _submitting = false;
   bool _kirimGagal = false;
   String? _error;
-
   int _juangPaused = 0;
   bool _kiosk = false;
+  bool _showPalette = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     final menit = (widget.ujian['alokasi_menit'] as num?)?.toInt() ?? 90;
     _durasiDetik = menit * 60;
     _sisaDetik = _durasiDetik;
@@ -56,13 +47,15 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     _timer?.cancel();
     Kiosk.alarmStop();
     Kiosk.setSecure(false);
+    Kiosk.exitKiosk();
+    Kiosk.stopVolumeEnforcer();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
   Future<void> _load() async {
     try {
-      final res = await Api.client
-          .rpc('soal_milik_ujian', params: {'p_peserta': widget.pesertaId});
+      final res = await Api.client.rpc('soal_milik_ujian', params: {'p_peserta': widget.pesertaId});
       final data = Map<String, dynamic>.from(res as Map);
       _soal = List<Map<String, dynamic>>.from(data['soal'] as List? ?? []);
       final jw = data['jawaban'];
@@ -82,7 +75,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
         _kiosk = true;
         _loading = false;
       });
-      Kiosk.setSecure(true); // anti-screenshot hanya selama ujian
+      Kiosk.setSecure(true);
+      Kiosk.enterKiosk();
+      Kiosk.enforceVolume();
       _startTimer();
     } catch (e) {
       if (!mounted) return;
@@ -102,34 +97,35 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
         t.cancel();
         _submit(auto: true);
       }
+      if (_sisaDetik % 30 == 0) Kiosk.enforceVolume();
     });
   }
 
-  // ---------- Anti-cheat ----------
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       if (_kiosk) {
         _juangPaused++;
         if (_sisaDetik > 0) Kiosk.alarmStart(maxVolume: true);
+        Kiosk.enforceVolume();
         _catatPelanggaran();
-        if (_juangPaused > _penaltyLimit) {
-          _submit(auto: true);
-        }
+        if (_juangPaused > _penaltyLimit) _submit(auto: true);
       }
     } else if (state == AppLifecycleState.resumed) {
       Kiosk.alarmStop();
+      if (_kiosk) {
+        Kiosk.enforceVolume();
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
     }
   }
 
   Future<void> _catatPelanggaran() async {
     try {
-      await Api.client.rpc('catat_pelanggaran',
-          params: {'p_peserta': widget.pesertaId});
+      await Api.client.rpc('catat_pelanggaran', params: {'p_peserta': widget.pesertaId});
     } catch (_) {}
   }
 
-  // ---------- Simpan jawaban (auto, tanpa kunci) ----------
   Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
     try {
       await Api.client.rpc('simpan_jawaban', params: {
@@ -150,13 +146,13 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     _timer?.cancel();
     Kiosk.alarmStop();
     try {
-      // sinkron final semua jawaban
       for (final s in _soal) {
         await _saveJawaban(s['id'].toString(), flush: true);
       }
       await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
       if (!mounted) return;
       _kiosk = false;
+      await Kiosk.exitKiosk();
       Navigator.of(context).pushReplacement(MaterialPageRoute(
         builder: (_) => _SelesaiScreen(title: auto ? 'Waktu habis' : 'Ujian selesai'),
       ));
@@ -180,14 +176,23 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: AppTheme.primary,
-        body: const Center(
+        backgroundColor: const Color(0xFF0F172A),
+        body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircularProgressIndicator(color: Colors.white),
-              SizedBox(height: 16),
-              Text('Menyiapkan ujian...', style: TextStyle(color: Colors.white)),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+              ),
+              const SizedBox(height: 24),
+              const Text('Menyiapkan Lingkungan Ujian', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text('Mode terkunci • Anti-curang aktif', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13)),
             ],
           ),
         ),
@@ -195,8 +200,23 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Kesalahan')),
-        body: Center(child: Text(_error!)),
+        backgroundColor: const Color(0xFFF4F6FA),
+        appBar: AppBar(title: const Text('Kesalahan'), backgroundColor: AppTheme.danger),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: AppTheme.danger),
+                const SizedBox(height: 16),
+                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87)),
+                const SizedBox(height: 24),
+                FilledButton.icon(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.arrow_back), label: const Text('Kembali')),
+              ],
+            ),
+          ),
+        ),
       );
     }
     if (_soal.isEmpty) {
@@ -211,6 +231,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     final jenis = current['jenis']?.toString() ?? 'pg';
     final opsi = current['opsi'];
     final opsiList = opsi is List ? opsi : <dynamic>[];
+    final progress = (_idx + 1) / _soal.length;
+    final answeredCount = _jawaban.values.where((v) => v != null && v!.isNotEmpty).length;
+    final isLowTime = _sisaDetik < 300;
+    final isCriticalTime = _sisaDetik < 60;
 
     return PopScope(
       canPop: false,
@@ -219,260 +243,486 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
           _catatPelanggaran();
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Anda tidak dapat keluar dari ujian. Lanjutkan mengerjakan.'),
+              content: Row(children: [Icon(Icons.block, color: Colors.white, size: 20), SizedBox(width: 12), Expanded(child: Text('Tombol kembali diblokir selama ujian', style: TextStyle(fontWeight: FontWeight.w600)))]),
+              backgroundColor: AppTheme.danger,
               behavior: SnackBarBehavior.floating,
             ),
           );
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: Text('${widget.ujian['nama'] ?? 'Ujian'}',
-              overflow: TextOverflow.ellipsis),
-          automaticallyImplyLeading: false,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _sisaDetik < 60 ? AppTheme.danger : Colors.white24,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.timer, size: 16),
-                      const SizedBox(width: 6),
-                      Text(_fmt(_sisaDetik),
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+        backgroundColor: const Color(0xFFF1F5F9),
         body: Column(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              color: const Color(0xFFF4F6FA),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text('Soal ${_idx + 1} dari ${_soal.length}',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                  if (_kirimGagal)
-                    const Text('● tersimpan lokal',
-                        style: TextStyle(fontSize: 10, color: AppTheme.danger)),
-                ],
-              ),
+            _buildHeader(progress, isLowTime, isCriticalTime, answeredCount),
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor: Colors.white,
+              valueColor: AlwaysStoppedAnimation(isLowTime ? AppTheme.danger : AppTheme.primary),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Card(
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: const BoxDecoration(
-                                    color: AppTheme.primary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Text('${_idx + 1}',
-                                      style: const TextStyle(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 12)),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(current['soal']?.toString() ?? '',
-                                      style: const TextStyle(fontSize: 16, height: 1.5)),
-                                ),
-                              ],
-                            ),
-                            if (current['gambar_url']?.toString().isNotEmpty ==
-                                true) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: const Color(0xFFE0E0E0)),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxHeight: 260),
-                                    child: Image.network(
-                                      current['gambar_url'].toString(),
-                                      fit: BoxFit.contain,
-                                      errorBuilder: (_, e, s) =>
-                                          const SizedBox.shrink(),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-                            if (jenis == 'pg' ||
-                                (jenis == 'jodoh' && opsiList.isNotEmpty)) ...[
-                              if (jenis == 'jodoh')
-                                const Padding(
-                                  padding: EdgeInsets.only(bottom: 8),
-                                  child: Text('Pilih pasangan yang tepat:',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey,
-                                          fontStyle: FontStyle.italic)),
-                                ),
-                              for (var i = 0; i < opsiList.length; i++)
-                                RadioListTile<String>(
-                                  value: opsiList[i].toString(),
-                                  groupValue: _jawaban[curId],
-                                  title: Text(
-                                      '${String.fromCharCode(65 + i)}. ${opsiList[i]}'),
-                                  onChanged: (v) {
-                                    setState(() => _jawaban[curId] = v);
-                                    _saveJawaban(curId);
-                                  },
-                                  dense: true,
-                                ),
-                            ] else if (jenis == 'essay') ...[
-                              TextField(
-                                controller:
-                                    TextEditingController(text: _jawaban[curId] ?? ''),
-                                maxLines: 5,
-                                onChanged: (v) {
-                                  _jawaban[curId] = v;
-                                  _saveJawaban(curId);
-                                },
-                                decoration: const InputDecoration(
-                                  hintText: 'Tulis jawaban Anda...',
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _ragu[curId] ?? false,
-                          onChanged: (v) {
-                            setState(() => _ragu[curId] = v ?? false);
-                            _saveJawaban(curId);
-                          },
-                        ),
-                        const Text('Tandai ragu-ragu'),
-                      ],
-                    ),
+                    _buildQuestionCard(current, curId, jenis, opsiList),
+                    const SizedBox(height: 16),
+                    _buildOptions(curId, jenis, opsiList),
+                    const SizedBox(height: 16),
+                    _buildRaguChip(curId),
+                    const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
-            SafeArea(
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    OutlinedButton(
-                      onPressed: _idx > 0
-                          ? () => setState(() => _idx--)
-                          : null,
-                      child: const Text('Sebelum'),
-                    ),
-                    const Spacer(),
-                    if (_idx < _soal.length - 1)
-                      FilledButton(
-                        onPressed: () => setState(() => _idx++),
-                        child: const Text('Berikutnya'),
-                      )
-                    else
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                            backgroundColor: AppTheme.secondary),
-                        onPressed: _submitting ? null : _confirmSubmit,
-                        child: _submitting
-                            ? const SizedBox(
-                                height: 18, width: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : const Text('Selesai & Kumpulkan'),
-                      ),
-                  ],
-                ),
-              ),
-            ),
+            _buildBottomNav(),
+            if (_showPalette) _buildPalette(),
           ],
         ),
-        bottomNavigationBar: _soalNavigator(),
       ),
     );
   }
 
-  Widget _soalNavigator() {
+  Widget _buildHeader(double progress, bool low, bool critical, int answered) {
     return Container(
-      height: 110,
-      color: const Color(0xFFF4F6FA),
-      padding: const EdgeInsets.all(8),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 44,
-          mainAxisSpacing: 6,
-          crossAxisSpacing: 6,
+      padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 12, bottom: 12, left: 16, right: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFF0F172A), AppTheme.primary.withOpacity(0.95)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        itemCount: _soal.length,
-        itemBuilder: (context, i) {
-          final id = _soal[i]['id'].toString();
-          final answered = _jawaban[id] != null && _jawaban[id]!.isNotEmpty;
-          final ragu = _ragu[id] ?? false;
-          final isCurrent = i == _idx;
-          Color bg;
-          if (answered) {
-            bg = AppTheme.secondary;
-          } else if (ragu) {
-            bg = AppTheme.accent;
-          } else {
-            bg = Colors.grey[400]!;
-          }
-          return InkWell(
-            onTap: () => setState(() => _idx = i),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isCurrent ? AppTheme.primary : bg,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: isCurrent ? AppTheme.primary : Colors.transparent,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(color: Color(0xFF22C55E), shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text('TERKUNCI', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.lock, color: Colors.white, size: 12),
+                  ],
                 ),
               ),
-              alignment: Alignment.center,
-              child: Text('${i + 1}',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12)),
-            ),
-          );
-        },
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: critical ? AppTheme.danger : low ? const Color(0xFFFEF3C7) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: critical ? [BoxShadow(color: AppTheme.danger.withOpacity(0.4), blurRadius: 8)] : null,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer_outlined, size: 16, color: critical ? Colors.white : low ? const Color(0xFF92400E) : AppTheme.primary),
+                    const SizedBox(width: 6),
+                    Text(_fmt(_sisaDetik),
+                        style: TextStyle(
+                            color: critical ? Colors.white : low ? const Color(0xFF92400E) : AppTheme.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            letterSpacing: 1)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${widget.ujian['nama'] ?? 'UJIAN'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 4),
+                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _buildCircleProgress(progress),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCircleProgress(double progress) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: 44,
+          height: 44,
+          child: CircularProgressIndicator(value: progress, strokeWidth: 4, backgroundColor: Colors.white.withOpacity(0.2), valueColor: const AlwaysStoppedAnimation(Colors.white)),
+        ),
+        Text('${((progress) * 100).round()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildQuestionCard(Map<String, dynamic> current, String curId, String jenis, List opsiList) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: jenis == 'essay' ? const Color(0xFFFEF3C7) : jenis == 'jodoh' ? const Color(0xFFE0E7FF) : const Color(0xFFDBEAFE),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(jenis.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: jenis == 'essay' ? const Color(0xFF92400E) : jenis == 'jodoh' ? const Color(0xFF4338CA) : AppTheme.primary)),
+              ),
+              const Spacer(),
+              if (_ragu[curId] == true)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: AppTheme.accent.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag, size: 12, color: AppTheme.accent), const SizedBox(width: 4), Text('RAGU', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.accent))]),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(10)),
+                alignment: Alignment.center,
+                child: Text('${_idx + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(current['soal']?.toString() ?? '', style: const TextStyle(fontSize: 16, height: 1.6, color: Color(0xFF0F172A), fontWeight: FontWeight.w500)),
+              ),
+            ],
+          ),
+          if (current['gambar_url']?.toString().isNotEmpty == true) ...[
+            const SizedBox(height: 14),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(border: Border.all(color: const Color(0xFFE2E8F0)), borderRadius: BorderRadius.circular(12)),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 280),
+                  child: Image.network(current['gambar_url'].toString(), fit: BoxFit.contain, errorBuilder: (_, e, s) => const SizedBox.shrink()),
+                ),
+              ),
+            ),
+          ],
+          if (_kirimGagal)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: AppTheme.danger.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.danger.withOpacity(0.2))),
+              child: Row(children: [Icon(Icons.cloud_off, size: 14, color: AppTheme.danger), const SizedBox(width: 8), const Expanded(child: Text('Gagal simpan - akan dicoba lagi', style: TextStyle(fontSize: 12, color: AppTheme.danger)))]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptions(String curId, String jenis, List opsiList) {
+    if (jenis == 'pg' || (jenis == 'jodoh' && opsiList.isNotEmpty)) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (jenis == 'jodoh')
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: const Color(0xFFE0E7FF), borderRadius: BorderRadius.circular(8)),
+              child: Row(children: [Icon(Icons.link, size: 14, color: Color(0xFF4338CA)), SizedBox(width: 6), Text('Pilih satu pasangan yang paling tepat', style: TextStyle(fontSize: 12, color: Color(0xFF4338CA), fontWeight: FontWeight.w600))]),
+            ),
+          for (var i = 0; i < opsiList.length; i++)
+            _buildOptionCard(i, opsiList[i].toString(), curId, _jawaban[curId] == opsiList[i].toString()),
+        ],
+      );
+    } else if (jenis == 'essay') {
+      return Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12)]),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [Icon(Icons.edit_note, size: 18, color: AppTheme.primary), SizedBox(width: 8), Text('Jawaban Essay', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary))]),
+            const SizedBox(height: 12),
+            TextField(
+              controller: TextEditingController(text: _jawaban[curId] ?? ''),
+              maxLines: 6,
+              minLines: 4,
+              onChanged: (v) {
+                _jawaban[curId] = v;
+                _saveJawaban(curId);
+                setState(() {});
+              },
+              decoration: InputDecoration(
+                hintText: 'Ketik jawaban lengkap Anda di sini...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey[200]!)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.primary, width: 2)),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildOptionCard(int index, String text, String curId, bool selected) {
+    final letter = String.fromCharCode(65 + index);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: selected ? AppTheme.primary.withOpacity(0.08) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: () {
+            setState(() => _jawaban[curId] = text);
+            _saveJawaban(curId);
+          },
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: selected ? AppTheme.primary : const Color(0xFFE2E8F0), width: selected ? 2 : 1),
+              boxShadow: selected ? [BoxShadow(color: AppTheme.primary.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 2))] : null,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: selected ? AppTheme.primary : const Color(0xFFF1F5F9),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: selected ? AppTheme.primary : const Color(0xFFE2E8F0)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(letter, style: TextStyle(color: selected ? Colors.white : const Color(0xFF64748B), fontWeight: FontWeight.bold, fontSize: 14)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text(text, style: TextStyle(fontSize: 14, height: 1.4, color: selected ? const Color(0xFF0F172A) : const Color(0xFF334155), fontWeight: selected ? FontWeight.w600 : FontWeight.normal))),
+                const SizedBox(width: 8),
+                Icon(selected ? Icons.check_circle : Icons.circle_outlined, color: selected ? AppTheme.primary : const Color(0xFFCBD5E1), size: 22),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRaguChip(String curId) {
+    final isRagu = _ragu[curId] ?? false;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _ragu[curId] = !isRagu);
+        _saveJawaban(curId);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isRagu ? AppTheme.accent.withOpacity(0.12) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isRagu ? AppTheme.accent : const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isRagu ? Icons.flag : Icons.outlined_flag, size: 18, color: isRagu ? AppTheme.accent : const Color(0xFF64748B)),
+            const SizedBox(width: 8),
+            Text(isRagu ? 'Ditandai ragu-ragu' : 'Tandai ragu-ragu', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isRagu ? AppTheme.accent : const Color(0xFF475569))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, -4))],
+        border: Border(top: BorderSide(color: const Color(0xFFE2E8F0))),
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: _idx > 0 ? () => setState(() => _idx--) : null,
+              icon: const Icon(Icons.chevron_left, size: 18),
+              label: const Text('Sebelumnya'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: () => setState(() => _showPalette = !_showPalette),
+                icon: Icon(_showPalette ? Icons.close : Icons.grid_view, size: 18),
+                label: Text(_showPalette ? 'Tutup' : 'Daftar Soal'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF0F172A),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (_idx < _soal.length - 1)
+              FilledButton(
+                onPressed: () => setState(() => _idx++),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Row(children: [const Text('Lanjut'), SizedBox(width: 4), Icon(Icons.chevron_right, size: 18)]),
+              )
+            else
+              FilledButton(
+                onPressed: _submitting ? null : _confirmSubmit,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.secondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _submitting
+                    ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Kumpulkan'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPalette() {
+    return Container(
+      height: 148,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: const Color(0xFFE2E8F0))),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4))],
+      ),
+      child: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: Row(
+              children: [
+                const Text('Navigasi Soal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const Spacer(),
+                _buildLegendDot(AppTheme.secondary, 'Dijawab'),
+                const SizedBox(width: 12),
+                _buildLegendDot(AppTheme.accent, 'Ragu'),
+                const SizedBox(width: 12),
+                _buildLegendDot(Colors.grey[400]!, 'Kosong'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: GridView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 48,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemCount: _soal.length,
+              itemBuilder: (context, i) {
+                final id = _soal[i]['id'].toString();
+                final answered = _jawaban[id] != null && _jawaban[id]!.isNotEmpty;
+                final ragu = _ragu[id] ?? false;
+                final isCurrent = i == _idx;
+                Color bg;
+                if (answered) bg = AppTheme.secondary;
+                else if (ragu) bg = AppTheme.accent;
+                else bg = Colors.grey[300]!;
+                return InkWell(
+                  onTap: () => setState(() {
+                    _idx = i;
+                    _showPalette = false;
+                  }),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isCurrent ? AppTheme.primary : bg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: isCurrent ? AppTheme.primary : Colors.transparent, width: 2),
+                      boxShadow: isCurrent ? [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 8)] : null,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text('${i + 1}', style: TextStyle(color: isCurrent || answered || ragu ? Colors.white : const Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendDot(Color c, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 10, height: 10, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+      ],
     );
   }
 
@@ -481,17 +731,30 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Kumpulkan Ujian?'),
-        content: Text(belum > 0
-            ? 'Masih ada $belum soal belum dijawab. Yakin ingin mengumpulkan?'
-            : 'Semua soal sudah dijawab. Yakin ingin mengumpulkan?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.assignment_turned_in, color: AppTheme.primary)), const SizedBox(width: 12), const Text('Kumpulkan Ujian?')]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(belum > 0 ? 'Masih ada $belum soal belum dijawab.' : 'Semua soal sudah dijawab.', style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(belum > 0 ? 'Soal kosong akan dianggap salah. Yakin?' : 'Periksa kembali jawaban ragu-ragu sebelum mengumpulkan.', style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+            if (belum > 0)
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: AppTheme.accent.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Row(children: [Icon(Icons.warning_amber_rounded, color: AppTheme.accent, size: 18), const SizedBox(width: 8), Expanded(child: Text('$belum soal kosong', style: TextStyle(color: AppTheme.accent, fontWeight: FontWeight.w600, fontSize: 13)))]),
+              ),
+          ],
+        ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c, false),
-              child: const Text('Periksa Lagi')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Periksa Lagi')),
           FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.secondary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Kumpulkan'),
+            child: const Text('Ya, Kumpulkan'),
           ),
         ],
       ),
@@ -503,41 +766,39 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen>
 class _SelesaiScreen extends StatelessWidget {
   final String title;
   const _SelesaiScreen({required this.title});
-
   @override
   Widget build(BuildContext context) {
+    final isTimeout = title == 'Waktu habis';
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      body: PopScope(
-        canPop: true,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                    title == 'Waktu habis'
-                        ? Icons.timer_off
-                        : Icons.check_circle_outline,
-                    size: 72,
-                    color: AppTheme.secondary),
-                const SizedBox(height: 16),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                const Text(
-                    'Jawaban Anda telah dikumpulkan.\nNilai muncul otomatis bila kunci jawaban sudah diisi guru.',
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () =>
-                      Navigator.of(context).popUntil((r) => r.isFirst),
-                  child: const Text('Kembali ke Beranda'),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(color: (isTimeout ? AppTheme.danger : AppTheme.secondary).withOpacity(0.12), shape: BoxShape.circle),
+                child: Icon(isTimeout ? Icons.timer_off_rounded : Icons.check_circle_rounded, size: 64, color: isTimeout ? AppTheme.danger : AppTheme.secondary),
+              ),
+              const SizedBox(height: 24),
+              Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+              const SizedBox(height: 12),
+              Text(isTimeout ? 'Waktu ujian telah berakhir dan jawaban otomatis terkumpul.' : 'Jawaban berhasil dikumpulkan!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.5)),
+              const SizedBox(height: 8),
+              Text('Nilai akan muncul setelah guru mengoreksi.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.of(context).popUntil((r) => r.isFirst),
+                  icon: const Icon(Icons.home_rounded),
+                  label: const Text('Kembali ke Beranda'),
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
