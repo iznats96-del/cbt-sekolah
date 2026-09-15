@@ -171,9 +171,6 @@ class MainActivity : FlutterActivity() {
                 dpm.setStatusBarDisabled(admin, true)
                 dpm.setKeyguardDisabled(admin, true)
                 dpm.setCameraDisabled(admin, true)
-                dpm.getUserRestrictions(admin) // ensure available
-                val r = Bundle()
-                r.putBoolean(DevicePolicyManager.DISALLOW_SAFE_BOOT, true)
             }
         } catch (_: Exception) {}
         try {
@@ -196,6 +193,7 @@ class MainActivity : FlutterActivity() {
             if (dpm.isDeviceOwnerApp(packageName)) {
                 dpm.setStatusBarDisabled(admin, false)
                 dpm.setKeyguardDisabled(admin, false)
+                dpm.setCameraDisabled(admin, false)
             }
         } catch (_: Exception) {}
         try {
