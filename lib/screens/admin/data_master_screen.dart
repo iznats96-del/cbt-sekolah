@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_theme.dart';
+import '../../services/api.dart';
+
 import '../home.dart';
 import '../../widgets/crud_screen.dart';
 import 'import_screen.dart';
@@ -137,6 +140,16 @@ class DataMasterScreen extends StatelessWidget {
       table: 'siswa',
       displayField: 'nama',
       columns: ['nis', 'kelas_id'],
+      extraActions: (ctx, row) => [
+        IconButton(
+          icon: const Icon(Icons.vpn_key_outlined, color: AppTheme.secondary),
+          tooltip: 'Password akun',
+          onPressed: () => showDialog(
+            context: ctx,
+            builder: (_) => PasswordAkunDialog(siswa: row),
+          ),
+        ),
+      ],
       fields: const [
         CrudField('nis', label: 'NIS', required: true),
         CrudField('nisn', label: 'NISN'),
@@ -185,6 +198,127 @@ class _PlaceholderPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: const Center(child: Text('Fitur segera hadir')),
+    );
+  }
+}
+/// Dialog info/reset password akun siswa (khusus admin).
+class PasswordAkunDialog extends StatefulWidget {
+  final Map<String, dynamic> siswa;
+  const PasswordAkunDialog({super.key, required this.siswa});
+
+  @override
+  State<PasswordAkunDialog> createState() => _PasswordAkunDialogState();
+}
+
+class _PasswordAkunDialogState extends State<PasswordAkunDialog> {
+  String? _pw;
+  bool _loading = true;
+  bool _resetting = false;
+  String? _pesan;
+
+  @override
+  void initState() {
+    super.initState();
+    _cari();
+  }
+
+  Future<void> _cari() async {
+    try {
+      final p = await Api.client
+          .from('profiles')
+          .select('pw_default')
+          .eq('nis', widget.siswa['nis']?.toString() ?? '')
+          .limit(1);
+      if (!mounted) return;
+      setState(() {
+        _pw = (p.isNotEmpty && p.first['pw_default'] != null)
+            ? p.first['pw_default'].toString() : '';
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _pw = '';
+        _pesan = 'gagal baca: $e';
+      });
+    }
+  }
+
+  Future<void> _reset() async {
+    setState(() => _resetting = true);
+    try {
+      final np = await Api.client.rpc('reset_password_siswa',
+          params: {'p_siswa': widget.siswa['id']});
+      if (!mounted) return;
+      setState(() {
+        _pw = np.toString();
+        _resetting = false;
+        _pesan = 'Password baru dibuat — catat & serahkan ke wali kelas';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _resetting = false;
+        _pesan = 'Gagal reset: $e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final nis = widget.siswa['nis']?.toString() ?? '-';
+    return AlertDialog(
+      title: Text('Akun: ${widget.siswa['nama']}',
+          style: const TextStyle(fontSize: 16)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Username login  :', style: TextStyle(fontSize: 12)),
+          SelectableText(nis,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          const Text('Password awal  :', style: TextStyle(fontSize: 12)),
+          const SizedBox(height: 4),
+          if (_loading)
+            const Padding(
+                padding: EdgeInsets.all(8),
+                child: CircularProgressIndicator())
+          else if (_pw == null || _pw!.isEmpty)
+            const Text(
+                '(belum tercatat — akun dibuat sebelum fitur; tekan Reset)',
+                style: TextStyle(fontSize: 12, color: Colors.grey))
+          else
+            SelectableText(_pw!,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.5)),
+          if (_pesan != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(_pesan!,
+                  style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup')),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(backgroundColor: AppTheme.secondary),
+          onPressed: _resetting ? null : _reset,
+          icon: _resetting
+              ? const SizedBox(
+                  height: 14, width: 14,
+                  child:
+                      CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.refresh, size: 16),
+          label: const Text('Reset (YP baru)'),
+        ),
+      ],
     );
   }
 }

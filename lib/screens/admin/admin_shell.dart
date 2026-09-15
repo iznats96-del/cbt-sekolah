@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../home.dart';
 import 'data_master_screen.dart';
@@ -7,6 +8,8 @@ import 'bank_soal_screen.dart';
 import 'ujian_list_screen.dart';
 import 'hasil_screen.dart';
 import 'pengumuman_screen.dart';
+import 'daftar_akun_screen.dart';
+import '../shared/rekap_nilai_screen.dart';
 import 'pengaturan_screen.dart';
 
 class AdminShell extends StatefulWidget {
@@ -116,6 +119,35 @@ class _AdminHome extends StatelessWidget {
             _FeatureCard(icon: Icons.person_outline, label: 'Guru', color: Color(0xFF2E9B8F)),
             _FeatureCard(icon: Icons.quiz_outlined, label: 'Bank Soal', color: Color(0xFFF4A940)),
             _FeatureCard(icon: Icons.assignment_outlined, label: 'Ujian', color: Color(0xFFD9534F)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    foregroundColor: AppTheme.primary),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const RekapNilaiScreen())),
+                icon: const Icon(Icons.insert_chart_outlined, size: 18),
+                label: const Text('Rekap Nilai', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    foregroundColor: AppTheme.secondary),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => const DaftarAkunScreen())),
+                icon: const Icon(Icons.badge_outlined, size: 18),
+                label: const Text('Daftar Akun + Password',
+                    style: TextStyle(fontSize: 11)),
+              ),
+            ),
           ],
         ),
       ],

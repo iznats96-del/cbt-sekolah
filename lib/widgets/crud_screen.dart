@@ -40,6 +40,7 @@ class CrudScreen extends StatefulWidget {
   final Map<String, dynamic> Function()? defaults;
   final String? orderBy;
   final bool Function(Map<String, dynamic> row)? canEdit;
+  final List<Widget> Function(BuildContext context, Map<String, dynamic> row)? extraActions;
   const CrudScreen({
     super.key,
     required this.title,
@@ -50,6 +51,7 @@ class CrudScreen extends StatefulWidget {
     this.defaults,
     this.orderBy,
     this.canEdit,
+    this.extraActions,
   });
 
   @override
@@ -219,6 +221,7 @@ class _CrudScreenState extends State<CrudScreen> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  ...?widget.extraActions?.call(context, row),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
                     onPressed: () => _openForm(row),

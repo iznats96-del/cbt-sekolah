@@ -24,6 +24,8 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
 
   String? _jenisUjianId, _mapelId, _kelasId, _sesiId;
   String? _tanggal;
+  TimeOfDay? _jamMulai;
+  TimeOfDay? _jamSelesai;
   List<String> _selectedSoal = [];
   bool _statusAktif = false;
   bool _loading = false;
@@ -45,6 +47,8 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       _kelasId = init['kelas_id']?.toString();
       _sesiId = init['sesi_id']?.toString();
       _tanggal = init['tanggal']?.toString().split('T').first;
+      _jamMulai = _timeFromIso(init['waktu_mulai']?.toString());
+      _jamSelesai = _timeFromIso(init['waktu_selesai']?.toString());
       final sl = init['soal_list'];
       if (sl is List) _selectedSoal = sl.map((e) => e.toString()).toList();
       _statusAktif = init['status'] == 'aktif';
@@ -59,6 +63,24 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     final r = Random();
     return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
+  }
+
+  String _fmtTod(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  TimeOfDay? _timeFromIso(String? iso) {
+    final d = DateTime.tryParse(iso ?? '');
+    if (d == null) return null;
+    final l = d.toLocal();
+    return TimeOfDay(hour: l.hour, minute: l.minute);
+  }
+
+  Future<void> _pickJam(bool mulai) async {
+    final t = await showTimePicker(
+      context: context,
+      initialTime: (mulai ? _jamMulai : _jamSelesai) ?? const TimeOfDay(hour: 7, minute: 30),
+    );
+    if (t != null) setState(() => mulai ? _jamMulai = t : _jamSelesai = t);
   }
 
   Future<void> _loadOptions() async {
@@ -95,12 +117,19 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   Future<void> _pickSoal() async {
     final result = await showDialog<List<String>>(
       context: context,
-      builder: (_) => _SoalPickerDialog(
+      builder: (_) => SoalPickerDialog(
         allSoal: _bankSoal,
         selected: _selectedSoal,
       ),
     );
     if (result != null) setState(() => _selectedSoal = result);
+  }
+
+  String? _gabung(String? tgl, TimeOfDay? t) {
+    if (tgl == null || t == null) return null;
+    final d = DateTime.tryParse('${tgl}T00:00:00');
+    if (d == null) return null;
+    return DateTime(d.year, d.month, d.day, t.hour, t.minute).toUtc().toIso8601String();
   }
 
   Future<void> _pickTanggal() async {
@@ -139,6 +168,8 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'token': _tokenCtrl.text.trim().isEmpty ? _genToken() : _tokenCtrl.text.trim(),
         'soal_list': _selectedSoal,
         'catatan': _catatanCtrl.text.trim().isEmpty ? null : _catatanCtrl.text.trim(),
+        'waktu_mulai': _gabung(_tanggal, _jamMulai),
+        'waktu_selesai': _gabung(_tanggal, _jamSelesai),
       };
       if (widget.ujianId != null) {
         await Api.client.from('ujian').update(data).eq('id', widget.ujianId!);
@@ -223,6 +254,60 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                           text: _tanggal ?? ''),
                       onTap: _pickTanggal,
                       decoration: const InputDecoration(labelText: 'Tanggal Ujian *'),
+                    ),
+                    const SizedBox(height: 12),
+                                        const SizedBox(height: 12),
+                    // ── Jendela jam ujian (sesuai jadwal pelajaran) ──
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEAF3FB),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('JAM AKSES (kosongkan = bebas dalam status aktif)',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: AppTheme.primary),
+                                  onPressed: () => _pickJam(true),
+                                  icon: const Icon(Icons.schedule, size: 18),
+                                  label: Text('Mulai '
+                                      '${_jamMulai != null ? _fmtTod(_jamMulai!) : '—'}'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: AppTheme.danger),
+                                  onPressed: () => _pickJam(false),
+                                  icon: const Icon(Icons.event_busy, size: 18),
+                                  label: Text('Selesai '
+                                      '${_jamSelesai != null ? _fmtTod(_jamSelesai!) : '—'}'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (_jamMulai != null && _jamSelesai != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                  'Siswa hanya bisa masuk & mengerjakan pk ${_fmtTod(_jamMulai!)} – ${_fmtTod(_jamSelesai!)}',
+                                  style: const TextStyle(
+                                      fontSize: 11, color: Colors.grey)),
+                            ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -317,16 +402,16 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   }
 }
 
-class _SoalPickerDialog extends StatefulWidget {
+class SoalPickerDialog extends StatefulWidget {
   final List<Map<String, dynamic>> allSoal;
   final List<String> selected;
-  const _SoalPickerDialog({required this.allSoal, required this.selected});
+  const SoalPickerDialog({required this.allSoal, required this.selected});
 
   @override
-  State<_SoalPickerDialog> createState() => _SoalPickerDialogState();
+  State<SoalPickerDialog> createState() => SoalPickerDialogState();
 }
 
-class _SoalPickerDialogState extends State<_SoalPickerDialog> {
+class SoalPickerDialogState extends State<SoalPickerDialog> {
   late final Set<String> _sel = widget.selected.toSet();
   String _q = '';
 

@@ -15,6 +15,8 @@ class BankSoalScreen extends StatefulWidget {
 
 class _BankSoalScreenState extends State<BankSoalScreen> {
   List<Map<String, dynamic>> _soal = [];
+  List<Map<String, dynamic>> _mapelList = [];
+  String? _filterMapel;
   bool _loading = true;
   String? _error;
 
@@ -22,6 +24,18 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadMapel();
+  }
+
+  Future<void> _loadMapel() async {
+    try {
+      final rows = await Api.client
+          .from('mata_pelajaran')
+          .select('id,nama')
+          .order('nama');
+      if (!mounted) return;
+      setState(() => _mapelList = List<Map<String, dynamic>>.from(rows));
+    } catch (_) {}
   }
 
   Future<void> _load() async {
@@ -30,10 +44,11 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('bank_soal')
-          .select('*,mata_pelajaran(nama)')
-          .order('created_at', ascending: false);
+          .select('*,mata_pelajaran(nama)');
+      if (_filterMapel != null) q = q.eq('mapel_id', _filterMapel!);
+      final rows = await q.order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {
         _soal = List<Map<String, dynamic>>.from(rows);
@@ -97,7 +112,41 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Bank Soal')),
+      appBar: AppBar(
+        title: const Text('Bank Soal'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(46),
+          child: Container(
+            color: Colors.white,
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  FilterChip(
+                    label: const Text('Semua', style: TextStyle(fontSize: 12)),
+                    selected: _filterMapel == null,
+                    onSelected: (_) { setState(() => _filterMapel = null); _load(); },
+                  ),
+                  const SizedBox(width: 6),
+                  for (final m in _mapelList)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FilterChip(
+                        label: Text('${m['nama']}',
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis),
+                        selected: _filterMapel == m['id'],
+                        onSelected: (on) { setState(() => _filterMapel = on ? m['id'].toString() : null); _load(); },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         onPressed: _add,

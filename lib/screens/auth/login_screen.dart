@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/config.dart';
 import '../../services/api.dart';
@@ -20,6 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   bool _obscure = true;
   String? _error;
+  String? _queueNote; // info antrian rate-limit
+  int _attempt = 0;
 
   final _auth = AuthService();
 
@@ -33,6 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _queueNote = null;
+      _attempt = 0;
     });
     try {
       // dukung login pakai NIS -> map ke email internal
@@ -40,7 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!email.contains('@')) {
         loginEmail = '${email.toLowerCase()}@cbt.local';
       }
-      final res = await _auth.loginEmail(loginEmail, pass);
+      final res = await _loginResilient(loginEmail, pass);
       if (res.user != null) {
         Api.setRole(res.user!.userMetadata?['role'] as String?);
         // pastikan profil default
@@ -57,11 +62,53 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       _goToRole();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = _parseAuthError(e);
         _loading = false;
+        _queueNote = null;
       });
     }
+  }
+
+  /// Login dengan antrian otomatis menghadapi rate-limit server (HTTP 429).
+  /// Total waktu tunggu maks ~4 menit (sesuai perilaku bot yang lolos 384/384).
+  Future<AuthResponse> _loginResilient(String email, String pass) async {
+    const maxTries = 60;
+    Object? lastErr;
+    for (_attempt = 1; _attempt <= maxTries; _attempt++) {
+      try {
+        final res = await _auth.loginEmail(email, pass);
+        return res;
+      } on AuthException catch (e) {
+        lastErr = e;
+        final rateLimited = _isRateLimit(e);
+        if (!rateLimited) rethrow; // error nyata (password salah dll) langsung tampil
+        final wait = 2 + (_attempt % 5).toDouble(); // 2-6 dtk acak
+        if (mounted) {
+          setState(() => _queueNote =
+              'Server lagi ramai — kamu antrian ke-$_attempt. '
+              'Tunggu ${wait.toStringAsFixed(0)} detik, JANGAN tutup aplikasi.');
+        }
+        await Future.delayed(
+            Duration(milliseconds: (wait * 1000).round()));
+      } on PostgrestException catch (e) {
+        lastErr = e;
+        if (e.code != '429') rethrow;
+        if (mounted) {
+          setState(() => _queueNote = 'Antrian server ($_attempt)... jangan tutup aplikasi.');
+        }
+        await Future.delayed(Duration(seconds: 2 + (_attempt % 4)));
+      }
+    }
+    throw lastErr ?? Exception('Gagal login setelah banyak percobaan');
+  }
+
+  bool _isRateLimit(AuthException e) {
+    final s = '${e.statusCode ?? ''} ${e.message}';
+    return s.contains('429') ||
+        s.toLowerCase().contains('rate limit') ||
+        s.toLowerCase().contains('too many');
   }
 
   String _parseAuthError(Object e) {
@@ -155,6 +202,22 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
+                          if (_queueNote != null) ...[
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const SizedBox(
+                                    width: 14, height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(_queueNote!,
+                                      style: const TextStyle(
+                                          fontSize: 12, color: Colors.grey)),
+                                ),
+                              ],
+                            ),
+                          ],
                           if (_error != null) ...[
                             const SizedBox(height: 12),
                             Text(_error!,
