@@ -1,6 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/app_theme.dart';
+import '../../core/config.dart';
 import '../../services/api.dart';
 import 'pelaksanaan_screen.dart';
 
@@ -31,8 +35,10 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
       // RPC AMAN: tanpa token & tanpa kunci
       final rows = await Api.client.rpc('my_ujian_aktif');
       if (!mounted) return;
+      dynamic data = rows;
+      if (data is String) data = jsonDecode(data);
       setState(() {
-        _ujian = List<dynamic>.from(rows as List);
+        _ujian = List<dynamic>.from(data as List);
         _loading = false;
       });
     } catch (e) {
@@ -41,6 +47,29 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
         _error = 'Gagal memuat: $e';
         _loading = false;
       });
+    }
+  }
+
+  /// Probe mentah REST (jalur sama dgn supabase lib) utk diagnosa layar kosong.
+  Future<String> _diag() async {
+    final s = Api.client.auth.currentSession;
+    if (s == null) return 'NO SESSION (login ulang)';
+    try {
+      final r = await http
+          .post(
+            Uri.parse('${AppConfig.supabaseUrl}/rest/v1/rpc/my_ujian_aktif'),
+            headers: {
+              'apikey': AppConfig.supabaseAnonKey,
+              'Authorization': 'Bearer ${s.accessToken}',
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          )
+          .timeout(const Duration(seconds: 10));
+      final body = r.body.trim();
+      return 'HTTP ${r.statusCode} → ${body.length > 170 ? '${body.substring(0, 170)}…' : body}';
+    } catch (e) {
+      return 'NET ERROR: $e';
     }
   }
 
@@ -133,8 +162,40 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
       );
     }
     if (_ujian.isEmpty) {
-      return const Center(
-        child: Text('Belum ada ujian aktif.\nSabar ya.', textAlign: TextAlign.center),
+      return FutureBuilder<String>(
+        future: _diag(),
+        builder: (c, snap) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.rule_folder_outlined,
+                    size: 40, color: AppTheme.accent),
+                const SizedBox(height: 10),
+                const Text('Belum ada ujian aktif untukmu.\nTarik ke bawah utk muat ulang.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(height: 1.4)),
+                const SizedBox(height: 14),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SelectableText(
+                      'DIAGNOSTIK\nlogin : ${Api.user?.email ?? '-'}\nsesi  : ${Api.client.auth.currentSession?.expiresAt ?? 'expired?'}\ncepat : ${snap.data ?? '(cek)'}',
+                      style: const TextStyle(fontSize: 10.5, height: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                    onPressed: _load,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Cek Ulang')),
+              ],
+            ),
+          ),
+        ),
       );
     }
     return RefreshIndicator(
