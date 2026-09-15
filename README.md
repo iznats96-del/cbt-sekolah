@@ -44,3 +44,12 @@ Pilih salah satu:
 - Push ke branch `main` → GitHub Actions build `app-release.apk` (signed release/keystore via Secrets) + web.
 - Download APK: tab Releases repo ini.
 - Kiosk penuh (Home/Recents mati total) = `adb shell dpm set-device-owner` per HP (Device Owner), provisioning sekali per perangkat saat install.
+
+## Update fitur (sesi ini)
+- **Jam akses ujian**: tiap ujian punya jendela `waktu_mulai–waktu_selesai` (dipilih jam di form). Di luar jam: siswa tidak dapat ujian di daftar, token ditolak server, timer berhenti di jam selesai.
+- **Nomor peserta**: menu Ujian → ⋮ → *Terbitkan Nomor Peserta* → otomatis `001…` urut nama untuk semua siswa rombel (peserta dibuat bila belum ada). Nomor tampil di rekap.
+- **Password awal siswa = `YP` + 4 digit acak** per anak; tercatat di DB (kolom `pw_default`), dilihat admin di beranda → *Daftar Akun + Password* (grup per rombel + tombol salin semua untuk walas), atau ikon 🔑 per siswa (lihat & reset password).
+- **Rekap Nilai per Rombel**: menu Ujian → ikon grafik — rata-rata, % tuntas vs KKM mapel, maks/min, daftar nilai + status + pelanggaran per anak, dikelompokkan rombel (X/XI/XII — TKJ/TSM/AKA).
+- **Duplikat ujian ke banyak rombel**: ⋮ → *Duplikat* — centang rombel → tiap kelas dapat ujian sendiri (DRAFT, token otomatis `TOKEN-NAMAROMBEL` atau seragam), tinggal atur jam & aktifkan.
+- **Bank Soal difilter per mapel** (chip di bawah judul, admin & guru) + pengambilan soal saat kelola ujian juga difilter mapel ujian itu.
+- **Login tahan lonjakan**: jika server menolak (rate-limit), aplikasi mengantri ulang otomatis dengan pesan "Server lagi ramai — JANGAN tutup aplikasi".
