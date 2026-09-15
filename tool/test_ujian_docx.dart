@@ -2,26 +2,18 @@ import 'dart:io';
 import '../lib/services/ujian_docx_parser.dart';
 
 void main(List<String> args) {
-  final fp = args[0];
-  final u = UjianDocxParser.parse(File(fp).readAsBytesSync());
-  print('MAPEL  : ${u.mapel}');
-  print('KELAS  : ${u.kelas}');
-  print('JUDUL  : ${u.judul}');
-  print('WAKTU  : ${u.waktuMenit}');
-  print('GURU   : ${u.guru}');
-  print('PG     : ${u.pg.length}');
-  if (u.pg.isNotEmpty) {
-    print('  [1] ${u.pg[0].soal}');
-    print('      opsi: ${u.pg[0].opsi}');
-    print('      kunci: ${u.pg[0].kunci}');
-    print('  [45] ${u.pg[44 < u.pg.length ? 44 : u.pg.length-1].soal}');
+  final u = UjianDocxParser.parse(File(args[0]).readAsBytesSync());
+  print('MAPEL: ${u.mapel} | KELAS: ${u.kelas} | JUDUL: ${u.judul} | WAKTU: ${u.waktuMenit} | GURU: ${u.guru}');
+  print('PG=${u.pg.length} JODOH=${u.jodoh.length} ESSAY=${u.essay.length} KUNCI=${u.pg.where((p) => p.kunci != null).length}');
+  for (final p in u.pg.take(3)) {
+    print(' Q: ${p.soal.length > 70 ? p.soal.substring(0, 70) : p.soal}');
+    print('   O: ${p.opsi.map((o) => o.length > 28 ? '${o.substring(0, 28)}…' : o).toList()}  K=${p.kunci}');
   }
-  print('JODOH  : ${u.jodoh.length}');
-  if (u.jodoh.isNotEmpty) {
-    print('  [1] ${u.jodoh.first.soal}');
-    print('  opsi: ${u.jodoh.first.opsi}');
+  if (u.pg.length > 3) {
+    final p = u.pg[u.pg.length - 1];
+    print(' QTERAKHIR: ${p.soal.substring(0, p.soal.length > 70 ? 70 : p.soal.length)} O=${p.opsi.length}');
   }
-  print('ESSAY  : ${u.essay.length}');
-  if (u.essay.isNotEmpty) print('  [1] ${u.essay.first.soal}');
-  print('WARN   : ${u.warnings}');
+  if (u.essay.isNotEmpty) print(' ES1: ${u.essay.first.soal}');
+  if (u.jodoh.isNotEmpty) print(' JOD1: ${u.jodoh.first.soal} opsi=${u.jodoh.first.opsi.length}');
+  print('WARN: ${u.warnings}');
 }

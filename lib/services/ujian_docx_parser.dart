@@ -5,15 +5,16 @@ import 'package:archive/archive.dart';
 
 class PgSoal {
   final String soal;
-  final List<String> opsi; // teks opsi TANPA label
-  String? kunci;           // huruf 'A'..'E' kalau ada kunci
+  final List<String> opsi;
+  final Map<String, String> hurufOpsi; // huruf -> teks (hasil deteksi)
+  String? kunci;
   final String? imgPath;
-  PgSoal(this.soal, this.opsi, this.kunci, this.imgPath);
+  PgSoal(this.soal, this.opsi, this.hurufOpsi, this.kunci, this.imgPath);
 }
 
 class JodohSoal {
   final String soal;
-  final List<String> opsi; // full 'A. xxx'
+  final List<String> opsi;
   JodohSoal(this.soal, this.opsi);
 }
 
@@ -25,7 +26,6 @@ class EssaySoal {
 class UjianDocx {
   String mapel;
   String kelas;
-  int? tingkat;
   String judul;
   int? waktuMenit;
   String guru;
@@ -35,40 +35,39 @@ class UjianDocx {
   final List<EssaySoal> essay = [];
   final Map<String, Uint8List> images = {};
   final List<String> warnings = [];
-  UjianDocx(
-      {this.mapel = '',
-      this.kelas = '',
-      this.judul = 'Ujian',
-      this.guru = '',
-      this.tingkat});
+  UjianDocx({this.mapel = '', this.kelas = '', this.judul = 'Ujian', this.guru = ''});
 }
 
-/// Blok dokumen urut: paragraf teks atau tabel.
 class _Block {
   bool isTable = false;
   String text = '';
   List<String> imgs = const [];
-  List<List<List<String>>>? table; // rows -> cells -> paragraph lines
+  List<List<List<String>>>? table;
 }
 
+/// Parser naskah ujian .docx — mendukung (minimal) 2 style:
+///  A) satu baris penuh per soal: "...?a. A. x b. B. y c. C. z ..."
+///  B) list mode: soal = baris "...." / "?" lalu opsi di paragraf berikutnya,
+///     huruf a/b/c auto-numbering word (tidak ada di teks), d/e nempel eksplisit,
+///     plus tabel PERTANYAAN|PILIHAN JAWABAN utk esai/jodoh.
 class UjianDocxParser {
-  static final _optMarker = RegExp(r'(?<![a-zA-Z])([a-eA-E])\s*\.\s*');
-  static final _label = RegExp(r'^\s*([A-Ja-j])[\.\)]\s*');
+  static final _qEnd = RegExp(r'(\.{3}|…+|\?)\s*$');
+  static final _explOpt = RegExp(r'([a-fA-F])[.)]\s+(?=[A-Z])');
+  static final _combined = RegExp(r'([a-e])[.)]\s*([A-F])[.)]');
 
   static UjianDocx parse(Uint8List bytes) {
     final archive = ZipDecoder().decodeBytes(bytes);
     final docFile = archive.files.firstWhere(
       (f) => f.name == 'word/document.xml',
-      orElse: () => throw FormatException('bukan docx'),
+      orElse: () => throw const FormatException('bukan docx'),
     );
-    final xml = utf8.decode(docFile.readBytes() ?? const []);
+    final xml = utf8.decode(docFile.readBytes() ?? const <int>[]);
     final u = UjianDocx();
 
-    // rels rId -> media path
     final rels = <String, String>{};
     for (final f in archive.files) {
       if (f.name == 'word/_rels/document.xml.rels') {
-        final rx = utf8.decode(f.readBytes() ?? const []);
+        final rx = utf8.decode(f.readBytes() ?? const <int>[]);
         for (final m in RegExp(r'Id="([^"]+)"[^>]*Target="([^"]+)"').allMatches(rx)) {
           var t = m.group(2)!;
           if (t.startsWith('../')) t = t.substring(3);
@@ -78,21 +77,18 @@ class UjianDocxParser {
     }
     for (final f in archive.files) {
       if (f.name.startsWith('word/media/')) {
-        u.images[f.name.substring('word/'.length)] =
-            f.readBytes() ?? Uint8List(0);
+        u.images[f.name.substring('word/'.length)] = f.readBytes() ?? Uint8List(0);
       }
     }
 
-    // pisah tubuh: teks vs tabel, berurutan
     final body = RegExp(r'<w:body>(.*)</w:body>', dotAll: true).firstMatch(xml)?.group(1) ?? xml;
     final blocks = <_Block>[];
-    // selang-seling: teks non-tabel dan tabel, urut
     int cursor = 0;
     for (final tbl in RegExp(r'<w:tbl>.*?</w:tbl>', dotAll: true).allMatches(body)) {
       _addTextParts(blocks, body.substring(cursor, tbl.start), rels);
-      final t = _Block()..isTable = true;
-      t.table = _parseTable(tbl.group(0)!);
-      blocks.add(t);
+      blocks.add(_Block()
+        ..isTable = true
+        ..table = _parseTable(tbl.group(0)!));
       cursor = tbl.end;
     }
     _addTextParts(blocks, body.substring(cursor), rels);
@@ -101,6 +97,7 @@ class UjianDocxParser {
     return u;
   }
 
+  // ---------------- block helpers ---------------
   static void _addTextParts(List<_Block> blocks, String part, Map<String, String> rels) {
     if (part.trim().isEmpty) return;
     for (final pm in RegExp(r'<w:p [^>]*>.*?</w:p>|<w:p>.*?</w:p>|<w:p/>').allMatches(part)) {
@@ -109,26 +106,25 @@ class UjianDocxParser {
           .allMatches(p)
           .map((m) => _un(m.group(1) ?? ''))
           .join('');
-      final imgs = RegExp(r'r:embed="([^"]+)"')
+      final imgs = RegExp(r'r:embed="([^"]+)"|r:id="(rId\d+)"')
           .allMatches(p)
-          .map((m) => rels[m.group(1)!] ?? '')
+          .map((m) => rels[(m.group(1) ?? m.group(2))!] ?? '')
           .where((s) => s.isNotEmpty)
           .toList();
-      if (txt.trim().isEmpty && imgs.isEmpty) continue;
-      blocks.add(_Block()
-        ..isTable = false
-        ..text = txt.trim()
-        ..imgs = imgs);
+      final t = txt.trim();
+      if (t.isEmpty && imgs.isEmpty) continue;
+      blocks.add(_Block()..isTable = false..text = t..imgs = imgs);
     }
   }
 
   static List<List<List<String>>> _parseTable(String t) {
     final rows = <List<List<String>>>[];
-    for (final r in RegExp(r'<w:tr[ >].*?</w:tr>').allMatches(t)) {
+    for (final r in RegExp(r'<w:tr[ >].*?</w:tr>', dotAll: true).allMatches(t)) {
       final cells = <List<String>>[];
-      for (final c in RegExp(r'<w:tc[ >].*?</w:tc>').allMatches(r.group(0)!)) {
+      for (final c in RegExp(r'<w:tc[ >].*?</w:tc>|<w:tc/>', dotAll: true).allMatches(r.group(0)!)) {
         final lines = <String>[];
-        for (final p in RegExp(r'<w:p[ >].*?</w:p>|<w:p/>').allMatches(c.group(0)!)) {
+        final raw = c.group(0)!;
+        for (final p in RegExp(r'<w:p [^>]*>.*?</w:p>|<w:p>.*?</w:p>|<w:p/>').allMatches(raw)) {
           final txt = RegExp(r'<w:t[^>]*>([^<]*)</w:t>')
               .allMatches(p.group(0)!)
               .map((m) => _un(m.group(1) ?? ''))
@@ -138,23 +134,56 @@ class UjianDocxParser {
         }
         cells.add(lines);
       }
-      rows.add(cells);
+      if (cells.isNotEmpty) rows.add(cells);
     }
     return rows;
   }
 
+  // ---------------- mesin eksrtraksi ----------------
   static void _extract(List<_Block> blocks, UjianDocx u) {
-    String sec = 'meta'; // meta | pg | jodoh | essay | kunci
+    String sec = 'meta'; // meta|pg|jodoh|essay|kunci
+    // list-mode state
+    String? curQ;
+    List<String> curOpsi = [];
+    Map<String, String> curHuruf = {};
+    List<String> curAll = [];
+    String? curImg;
+
+    void flushPg() {
+      if (curQ != null && curOpsi.length >= 2) {
+        u.pg.add(PgSoal(curQ!, curOpsi, curHuruf, null, curImg));
+      }
+      curQ = null;
+      curOpsi = [];
+      curHuruf = {};
+      curAll = [];
+      curImg = null;
+    }
+
+
     for (final b in blocks) {
       if (b.isTable) {
-        _handleTable(b, u, sec);
+        _handleTable(b, u,
+            essaySink: (t) => u.essay.add(EssaySoal(t)),
+            onJodoh: (it, opsi) => u.jodoh.add(JodohSoal(it, opsi)));
+        if (sec == 'pg') flushPg();
         continue;
       }
-      final line = b.text.replaceAll(RegExp(r'\s+', multiLine: true), ' ').trim();
+      final line = b.text.replaceAll(RegExp(r'\s+'), ' ').trim();
       if (line.isEmpty) continue;
       final up = line.toUpperCase();
 
-      // meta
+      if (sec == 'kunci') {
+        final mk = RegExp(r'^(\d{1,3})\s*[.):=]\s*([A-J])\b', caseSensitive: false).firstMatch(line);
+        if (mk != null) {
+          final n = int.tryParse(mk.group(1)!) ?? 0;
+          if (n >= 1 && n <= u.pg.length) {
+            u.pg[n - 1].kunci = mk.group(2)!.toUpperCase();
+          }
+        }
+        continue;
+      }
+
       final mMapel = RegExp(r'^Mata\s*Pelajaran\s*[:\-]\s*(.+)$', caseSensitive: false).firstMatch(line);
       if (mMapel != null) {
         u.mapel = _clean(mMapel.group(1)!);
@@ -180,76 +209,110 @@ class UjianDocxParser {
         u.guru = _clean(mGuru.group(1)!);
         continue;
       }
-      if (RegExp(r'^(PILIHAN\s+GANDA)', caseSensitive: false).hasMatch(line)) {
+      if (RegExp(r'^(PILIHAN|LEMBAR|PETUNJUK.*PILIHAN)\s+GANDA', caseSensitive: false).hasMatch(line) ||
+          (up.contains('PILIHAN GANDA') && !up.startsWith('JAWABAN') && sec != 'pg')) {
+        flushPg();
         sec = 'pg';
         continue;
       }
-if (RegExp(r'MENJODOHKAN|JODOHKAN|MENJODOH', caseSensitive: false).hasMatch(line)) {
+      if (RegExp(r'MENJODOHKAN|JODOHKAN|MENJODOH|MENCOCOKKAN', caseSensitive: false).hasMatch(line)) {
+        flushPg();
         sec = 'jodoh';
         continue;
       }
       if (RegExp(r'ESSAY|URAIAN', caseSensitive: false).hasMatch(up)) {
+        if (up.contains('KUNCI')) {
+          flushPg();
+          sec = 'kunci';
+          continue;
+        }
+        flushPg();
         sec = 'essay';
-        final m = RegExp(r'^[A-E]?\.?\s*(?:ESSAY|URAIAN)\s*[:\-]?\s*(.+)?$', caseSensitive: false).firstMatch(line);
+        final m = RegExp(r'^(?:[A-E]\.?\s*)?(?:ESSAY|URAIAN|ESSAY\s+(?:SINGKAT|URAIAN))\s*[:\-]?\s*(.*)$', caseSensitive: false).firstMatch(line);
         final extra = (m?.group(1) ?? '').trim();
-        if (extra.isNotEmpty && extra.length > 6) u.essay.add(EssaySoal(extra));
+        if (extra.isNotEmpty && _looksLikeEssay(extra)) u.essay.add(EssaySoal(extra));
         continue;
       }
       if (up.contains('KUNCI JAWABAN')) {
+        flushPg();
         sec = 'kunci';
         continue;
       }
-      // judul: baris pertama yang bukan kop & meta
       if (u.judul == 'Ujian' && sec == 'meta' &&
-          RegExp(r'PENILAIAN|SUMATIF|ULANGAN|UJIAN|TRY\s*OUT|ASESMEN', caseSensitive: false).hasMatch(up) &&
+          RegExp(r'PENILAIAN|SUMATIF|ULANGAN|UJIAN|TRY\s*OUT|ASESMEN|ASAT|ASUMPTIF', caseSensitive: false).hasMatch(up) &&
           !up.contains('PILIHAN GANDA')) {
         u.judul = _clean(line);
         continue;
       }
 
       if (sec == 'pg') {
-        if (!line.contains('Pilihlah') && !line.startsWith('Nama Siswa')) {
-          _parsePgLine(line, b, u);
+        if ((line.contains('Pilihlah') && line.length < 90) || line.startsWith('Nama Siswa')) continue;
+        // MODE A: 1 baris = 1 soal lengkap dgn pasangan 'a. A.'
+        final cmb = _combined.allMatches(line).length;
+        if (cmb >= 2) {
+          flushPg();
+          _parsePgCombined(line, b, u);
+          continue;
         }
-      } else if (sec == 'essay') {
-        var t = line.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim();
-        if (t.length > 6) u.essay.add(EssaySoal(t));
-      } else if (sec == 'kunci') {
-        final mk = RegExp(r'^(\d{1,3})\s*[.):=]\s*([A-J])\b', caseSensitive: false).firstMatch(line);
-        if (mk != null) {
-          final n = int.tryParse(mk.group(1)!) ?? 0;
-          if (n >= 1 && n <= u.pg.length) {
-            u.pg[n - 1].kunci = mk.group(2)!.toUpperCase();
-          }
+        // MODE B: list
+        if (_qEnd.hasMatch(line)) {
+          flushPg();
+          curQ = _clean(line.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim());
+          curImg = b.imgs.isNotEmpty ? b.imgs.first : null;
+          continue;
         }
-      }
-    }
-    // dedup: soal ganda/terpotong -> satu pertahankan (bandingkan teks ternormalisasi)
-    final uniq = <PgSoal>[];
-    String norm(PgSoal p) =>
-        p.soal.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-    for (final p in u.pg) {
-      final nk = norm(p);
-      final dupIdx = uniq.indexWhere(
-          (e) => norm(e) == nk || norm(e).startsWith(nk) || nk.startsWith(norm(e)));
-      if (dupIdx >= 0) {
-        if (p.opsi.length > uniq[dupIdx].opsi.length) {
-          if (p.kunci == null) p.kunci = uniq[dupIdx].kunci;
-          uniq[dupIdx] = p;
-        } else if (uniq[dupIdx].kunci == null && p.kunci != null) {
-          uniq[dupIdx].kunci = p.kunci;
+        if (curQ != null) {
+          if (b.imgs.isNotEmpty && curImg == null) curImg = b.imgs.first;
+          _consumeOptLine(line, curOpsi, curHuruf);
+          if (curOpsi.length >= 5) flushPg();
         }
         continue;
+      } else if (sec == 'essay') {
+        var t = line.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim();
+        if (_looksLikeEssay(t)) u.essay.add(EssaySoal(t));
+      } else if (sec == 'jodoh') {
+        if (_qEnd.hasMatch(line) && line.length > 18) {
+          u.jodoh.add(JodohSoal(line, const []));
+        }
       }
-      uniq.add(p);
     }
-    final pgBefore = u.pg.length;
+    flushPg();
+
+    // ---- dedup & laporan kualitas ----
+    final uniq = <String, PgSoal>{};
+    String norm(PgSoal p) => p.soal.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final list = <PgSoal>[];
+    for (final p in u.pg) {
+      final key = norm(p);
+      final idx = list.indexWhere((e) {
+        final ek = norm(e);
+        return ek == key || ek.startsWith(key) || key.startsWith(ek);
+      });
+      if (idx < 0) {
+        list.add(p);
+      } else {
+        final ex = list[idx];
+        if (p.opsi.length > ex.opsi.length || (p.kunci != null && ex.kunci == null)) {
+          final nn = p.kunci ?? ex.kunci;
+          final opsi = p.opsi.length >= ex.opsi.length ? p.opsi : ex.opsi;
+          list[idx] = PgSoal(
+              p.soal.length >= ex.soal.length ? p.soal : ex.soal,
+              opsi,
+              opsi == p.opsi ? p.hurufOpsi : ex.hurufOpsi,
+              nn,
+              p.imgPath ?? ex.imgPath);
+        }
+      }
+    }
+    final before = u.pg.length;
     u.pg
       ..clear()
-      ..addAll(uniq);
-    if (u.pg.length < pgBefore) {
-      u.warnings.add('${pgBefore - u.pg.length} soal duplikat/ganda telah digabung');
+      ..addAll(list);
+    if (u.pg.length < before) {
+      u.warnings.add('${before - u.pg.length} soal duplikat/ganda telah digabung');
     }
+    final tanpaOpsi = u.pg.where((p) => p.opsi.length < 2).length;
+    if (tanpaOpsi > 0) u.warnings.add('$tanpaOpsi soal PG terdeteksi tanpa opsi — periksa sebelum disimpan');
     if (u.mapel.isEmpty) u.warnings.add('Nama Mata Pelajaran tidak terdeteksi di dokumen');
     if (u.kelas.isEmpty) u.warnings.add('Kelas tidak terdeteksi di dokumen');
     if (u.pg.isEmpty && u.jodoh.isEmpty && u.essay.isEmpty) {
@@ -257,8 +320,183 @@ if (RegExp(r'MENJODOHKAN|JODOHKAN|MENJODOH', caseSensitive: false).hasMatch(line
     }
     final adaKunci = u.pg.any((p) => p.kunci != null);
     if (!adaKunci && u.pg.isNotEmpty) {
-      u.warnings.add('Kunci jawaban PG tidak terdeteksi — soal masuk sebagai DRAFT, isi kunci per soal atau edit sebelum diaktifkan');
+      u.warnings.add('Kunci jawaban PG tidak terdeteksi — soal masuk DRAFT, isi via menu “Isi Kunci Jawaban”');
     }
+
+  }
+
+  static bool _looksLikeEssay(String t) =>
+      t.length > 6 &&
+      !RegExp(r'^[\d.\s]+$').hasMatch(t) &&
+      RegExp('[A-Za-zÀ-ÿ]').hasMatch(t) &&
+      RegExp(r'^(sebutkan|jelaskan|uraikan|bandingkan|mengapa|apa|bagaimana|carakan|tuliskan|tentukan|analisis|hitung|ceritakan|menurut|diantaranya|berikut)', caseSensitive: false).hasMatch(t.replaceFirst(RegExp(r'^["\-–—•]+\s*'), '')) || t.length > 20;
+
+  /// mode B: satukan potongan opsi (termasuk yang nempel 'sematad. Politik')
+  static void _consumeOptLine(String line, List<String> opsi, Map<String, String> huruf) {
+    final hits = _explOpt.allMatches(line).toList();
+    if (hits.isEmpty) {
+      final t = line.trim();
+      if (t.isNotEmpty) huruf[_nextUnused(huruf)] = t;
+    } else {
+      // segmen kiri dari potongan pertama = opsi implicit (a / b / c ...)
+      var firstLeft = line.substring(0, hits.first.start).trim();
+      // buang huruf nyempil: 'Ekonomi sematad' + 'd. Politik...'
+      final stray = hits.first.group(1)!;
+      if (firstLeft.length > 2 &&
+          firstLeft.toLowerCase().endsWith(stray.toLowerCase())) {
+        firstLeft = firstLeft.substring(0, firstLeft.length - 1).trim();
+      }
+      if (firstLeft.isNotEmpty) {
+        huruf[_nextUnused(huruf)] = firstLeft;
+      }
+      for (var i = 0; i < hits.length; i++) {
+        final lbl = hits[i].group(1)!.toUpperCase();
+        final end = i + 1 < hits.length ? hits[i + 1].start : line.length;
+        var body = line.substring(hits[i].start, end).trim();
+        body = body.replaceFirst(RegExp(r'^[a-fA-F][.)]\s*'), '').trim();
+        if (body.isNotEmpty) huruf[lbl] = body;
+      }
+    }
+    opsi
+      ..clear()
+      ..addAll((huruf.keys.toList()..sort()).map((k) => huruf[k]!)
+          .toList());
+  }
+
+  static String _nextUnused(Map<String, String> huruf) {
+    for (final c in ['A', 'B', 'C', 'D', 'E', 'F']) {
+      if (!huruf.containsKey(c)) return c;
+    }
+    return 'F';
+  }
+
+  /// mode A: baris penuh dengan pasangan 'a. A. ... b. B.'
+  static void _parsePgCombined(String line, _Block b, UjianDocx u) {
+    final ms = _combined.allMatches(line).toList();
+    final first = ms.first.start;
+    var q = line.substring(0, first).trim();
+    q = q.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim();
+    if (q.isEmpty || q.length < 4) return;
+    final opsi = <String>[];
+    final huruf = <String, String>{};
+    for (var i = 0; i < ms.length; i++) {
+      final st = ms[i].start;
+      final en = i + 1 < ms.length ? ms[i + 1].start : line.length;
+      var t = line.substring(st, en);
+      t = t.replaceFirst(RegExp(r'^[a-e][.)]\s*'), '').replaceFirst(RegExp(r'^[A-F][.)]\s*'), '').trim();
+      if (t.isNotEmpty) {
+        final ltr = String.fromCharCode(65 + i);
+        opsi.add(t);
+        huruf[ltr] = t;
+      }
+    }
+    if (opsi.length >= 2) {
+      u.pg.add(PgSoal(q, opsi, huruf, null, b.imgs.isNotEmpty ? b.imgs.first : null));
+    }
+  }
+
+  static void _handleTable(_Block b, UjianDocx u,
+      {required void Function(String) essaySink,
+      required void Function(String item, List<String> opsi) onJodoh}) {
+    if (b.table == null) return;
+    final cells = <List<String>>[];
+    for (final r in b.table!) {
+      for (final c in r) {
+        if (c.isNotEmpty) cells.add(c);
+      }
+    }
+    final joined = cells.map((c) => c.join(' ')).join(' ~ ').toUpperCase();
+    final hasOpsiKolom = joined.contains('PILIHAN JAWABAN');
+    final hasKiri = joined.contains('SOAL') || joined.contains('PERTANYAAN') || joined.contains('Cocokkan');
+    final hasPasang = joined.contains('PASANGKANLAH') || joined.contains('JODOHKANLAH');
+    if (!hasOpsiKolom || !hasKiri && !hasPasang) {
+      // mungkin jawabian kosong / header jawaban — lewati
+      return;
+    }
+    final kiriLines = <String>[];
+    final opsiLines = <String>[];
+    for (final c in cells) {
+      final txt = c.join(' ').toUpperCase();
+      final isRight = txt.contains('PILIHAN JAWABAN');
+      final isLeft = txt.contains('SOAL') || txt.contains('PERTANYAAN');
+      final isAnswerCol =
+          txt.startsWith('JAWABAN') && !isRight && !isLeft; // kolom isian siswa (1……)
+      int from = 0;
+      for (; from < c.length; from++) {
+        final l = c[from].toUpperCase().trim();
+        if (l == 'SOAL' || l == 'PERTANYAAN' || l == 'PILIHAN JAWABAN' ||
+            l == 'JAWABAN' || l.startsWith('JAWABAN')) {
+          continue;
+        }
+        break;
+      }
+      if (isAnswerCol) continue;
+      final body = c.skip(from).where((l) => !_isDots(l) && !RegExp(r'^\d+[.…]+$').hasMatch(l.trim())).toList();
+      if (isRight) {
+        opsiLines.addAll(body);
+      } else if (isLeft) {
+        kiriLines.addAll(body);
+      } else if (kiriLines.isEmpty || body.isNotEmpty) {
+        // bukan kolom jawaban & bukan header → kemungkinan soal juga (tabel tanpa header jelas)
+        kiriLines.addAll(body);
+      }
+    }
+    if (kiriLines.isEmpty) return;
+    final opsi = _splitOpts(opsiLines);
+    if (opsi.length >= 2) {
+      for (final it in kiriLines) {
+        final t = it.trim();
+        if (t.isEmpty || RegExp(r'^(SOAL|KUNCI)', caseSensitive: false).hasMatch(t)) continue;
+        onJodoh(t, opsi);
+      }
+    } else {
+      final joinedHeader =
+          (b.table!.expand((r) => r).expand((c) => c).join(' ').toUpperCase());
+      final isEssayTable = joinedHeader.contains('PERTANYAAN') ||
+          joinedHeader.contains('ESSAY') ||
+          joinedHeader.contains('URAIAN');
+      if (isEssayTable) {
+        for (final it in kiriLines) {
+          final t = it.trim();
+          if (t.length > 8 && RegExp('[A-Za-zÀ-ÿ]').hasMatch(t) && !t.startsWith('https')) {
+            essaySink(t);
+          }
+        }
+      }
+    }
+  }
+
+  static bool _isDots(String s) => RegExp(r'^[\s.…_—-]+$').hasMatch(s.trim());
+
+  static List<String> _splitOpts(List<String> lines) {
+    final out = <String>[];
+    for (final raw in lines) {
+      var t = raw.trim();
+      if (t.isEmpty) continue;
+      final pos = <int, String>{};
+      for (final mm in RegExp(r'([A-J])\s*[.)]\s+(?=[A-Z])').allMatches(t)) {
+        pos.putIfAbsent(mm.start, () => mm.group(1)!);
+      }
+      final ps = pos.keys.toList()..sort();
+      if (ps.length >= 2) {
+        final pre = t.substring(0, ps.first).replaceAll(RegExp(r'^PILIHAN JAWABAN\s*', caseSensitive: false), '').trim();
+        if (pre.length > 1) {
+          final first = pos[ps.first]!;
+          final prev = String.fromCharCode(first.codeUnitAt(0) - 1);
+          out.add('$prev. $pre');
+        }
+        for (var i = 0; i < ps.length; i++) {
+          final start = ps[i];
+          final end = i + 1 < ps.length ? ps[i + 1] : t.length;
+          final body = t.substring(start, end).trim();
+          final pure = body.replaceFirst(RegExp(r'^[A-J][.)]\s*'), '').trim();
+          if (pure.isNotEmpty) out.add('${pos[start]}. $pure');
+        }
+      } else {
+        if (!_isDots(t)) out.add(t);
+      }
+    }
+    return out;
   }
 
   static String _normKelas(String raw) {
@@ -266,137 +504,23 @@ if (RegExp(r'MENJODOHKAN|JODOHKAN|MENJODOH', caseSensitive: false).hasMatch(line
     t = t.replaceAll('–', '-');
     final m = RegExp(r'(X{1,3}|XI{0,2}|I{1,3})\s*[-/]?\s*([A-Z]{2,6}(?:\s*\d+)?)', caseSensitive: false).firstMatch(t.toUpperCase());
     if (m != null) {
-      final tingkat = m.group(1)!;
-      final kode = m.group(2)!;
-      return '${tingkat} $kode'.toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
+      return '${m.group(1)} ${m.group(2)}'.toUpperCase().replaceAll(RegExp(r'\s+'), ' ');
     }
+    final mTunggal = RegExp(r'^(X{1,3}|I{1,3})\b', caseSensitive: false).firstMatch(t.trim());
+    if (mTunggal != null) return mTunggal.group(1)!.toUpperCase();
     return _clean(raw);
   }
 
-  static void _parsePgLine(String line, _Block b, UjianDocx u) {
-    // pola umum dokumen ini: '...?a. A. opsi b. B. opsi' -> marker berpasangan 'x. A.'
-    final combined = RegExp(r'([a-e])[.)]\s*([A-F])[.)]\s*');
-    final cm = combined.allMatches(line).toList();
-    positions:
-    if (cm.length >= 2) {
-      // split pakai posisi grup-1 (huruf kecil x)
-      final ps = cm.map((m) => m.start).toList();
-      final first = ps.first;
-      var q = line.substring(0, first).trim();
-      q = q.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim();
-      if (q.isEmpty || q.length < 4) {
-        u.warnings.add('Soal terlewat (pertanyaan kosong): ${line.substring(0, line.length > 60 ? 60 : line.length)}');
-        break positions;
-      }
-      final opsi = <String>[];
-      for (var i = 0; i < ps.length; i++) {
-        final start = cm[i].start;
-        final end = i + 1 < ps.length ? ps[i + 1] : line.length;
-        var t = line.substring(start, end);
-        // buang 'a.' juga 'A.' di awal segmen
-        t = t.replaceFirst(RegExp(r'^[a-e][.)]\s*'), '').replaceFirst(RegExp(r'^[A-F][.)]\s*'), '').trim();
-        if (t.isNotEmpty) opsi.add(t);
-      }
-      if (opsi.length >= 2) {
-        u.pg.add(PgSoal(q, opsi, null, b.imgs.isNotEmpty ? b.imgs.first : null));
-      }
-      break positions;
-    }
-    // fallback: opsi tanpa label ganda 'a. xxx b. yyy' (berbatas spasi/awal)
-    final bare = RegExp(r'(^|[\s\)])([a-e])[.)]\s+');
-    final bm = bare.allMatches(line).toList();
-    if (bm.length >= 2) {
-      final first = bm.first.start + bm.first.group(1)!.length;
-      var q = line.substring(0, first).trim();
-      q = q.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim();
-      final opsi = <String>[];
-      for (var i = 0; i < bm.length; i++) {
-        final startIdx = (bm[i].start + bm[i].group(1)!.length + (bm[i].group(2)!.length + 2)).clamp(0, line.length);
-        final end = i + 1 < bm.length ? bm[i + 1].start : line.length;
-        final t = line.substring(startIdx, end > startIdx ? end : startIdx).trim();
-        if (t.isNotEmpty) opsi.add(t);
-      }
-      if (q.length >= 4 && opsi.length >= 2) {
-        u.pg.add(PgSoal(q, opsi, null, b.imgs.isNotEmpty ? b.imgs.first : null));
-      }
-    }
-  }
-
-  static void _handleTable(_Block b, UjianDocx u, String sec) {
-    if (b.table == null) return;
-    // cari tabel jodoh: cell dengan 'PILIHAN JAWABAN' / 'SOAL'
-    for (final row in b.table!) {
-      final texts = row.map((c) => c.join(' ')).toList();
-      final joined = texts.join(' ').toUpperCase();
-      if (joined.contains('PILIHAN JAWABAN') || joined.contains('PASANGKANLAH') || joined.contains('JODOHKANLAH')) {
-        List<String>? kiri, kanan;
-        for (final cell in row) {
-          final t = cell.join(' ').toUpperCase();
-          if (t.contains('SOAL') && !t.contains('PILIHAN')) kiri ??= cell;
-          if (t.contains('PILIHAN JAWABAN')) kanan ??= cell;
-        }
-        if (kiri != null && kanan != null) {
-          final items = kiri.where((l) => !RegExp(r'^SOAL$', caseSensitive: false).hasMatch(l.trim())).toList();
-          var opsiLines = _splitOpts(kanan.skip(1).toList());
-          var firstIdx = -1;
-          for (var i = 0; i < items.length; i++) {
-            final it = items[i];
-            if (it.trim().isEmpty) continue;
-            u.jodoh.add(JodohSoal(it.trim(), opsiLines));
-            firstIdx++;
-          }
-          if (firstIdx < 0) u.warnings.add('Tabel menjodohkan kosong');
-        }
-      }
-    }
-  }
-
-  /// pilah 'PILIHAN JAWABAN' cell -> list 'A. xxx'
-  /// teks bisa menyatu tanpa baris baru ('verifikasi...B. hak akses')
-  static List<String> _splitOpts(List<String> lines) {
-    final out = <String>[];
-    for (final raw in lines) {
-      var t = raw.trim();
-      if (t.isEmpty) continue;
-      // pisah pakai marker 'A.' 'B.' dst (termasuk yang nempel ke huruf sebelumnya: 'identitasB. ')
-      final pos = <int, String>{};
-      for (final mm in RegExp(r'([A-J])\s*[.)]\s+(?=[A-Z])').allMatches(t)) {
-        pos.putIfAbsent(mm.start, () => mm.group(1)!);
-      }
-      final ps = pos.keys.toList()..sort();
-      if (ps.length >= 2) {
-        // segmen sebelum marker pertama = opsi A (sering tanpa label 'A.')
-        final pre = t.substring(0, ps.first).replaceAll(RegExp(r'^PILIHAN JAWABAN\s*', caseSensitive: false), '').trim();
-        if (pre.length > 1) {
-          final lbl = pos[ps.first]!;
-          final prev = String.fromCharCode(lbl.codeUnitAt(0) - 1);
-          out.add('$prev. $pre'); // 'A. Verifikasi identitas'
-        }
-        for (var i = 0; i < ps.length; i++) {
-          final start = ps[i];
-          final end = i + 1 < ps.length ? ps[i + 1] : t.length;
-          final body = t.substring(start, end).trim();
-          final letter = pos[start]!;
-          final pure = body.replaceFirst(RegExp(r'^[A-J][.)]\s*'), '').trim();
-          if (pure.isNotEmpty) out.add('$letter. $pure');
-        }
-      } else {
-        out.add(t);
-      }
-    }
-    return out;
-  }
-
-  static String _clean(String s) {
-    var t = s.replaceAll('&amp;', '&');
-    t = RegExp(r'^[A-Z]\.\s*', caseSensitive: false).hasMatch(t) ? t : t;
-    return t.replaceAll('…', '').trim();
-  }
+  static String _clean(String s) => s
+      .replaceAll('&amp;', '&')
+      .replaceAll('…', '')
+      .trim();
 
   static String _un(String s) => s
       .replaceAll('&amp;', '&')
       .replaceAll('&lt;', '<')
       .replaceAll('&gt;', '>')
       .replaceAll('&quot;', '"')
-      .replaceAll('&apos;', "'");
+      .replaceAll('&apos;', "'")
+      .replaceAll(RegExp(r'_x[0-9A-Fa-f]{4}_'), '');
 }
