@@ -180,11 +180,23 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         await _saveJawaban(s['id'].toString(), flush: true);
       }
       await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
+      Map<String, dynamic> rekap = {};
+      try {
+        final ans = await Api.client
+            .from('jawaban_siswa')
+            .select('soal_id,ragu_ragu')
+            .eq('peserta_ujian_id', widget.pesertaId);
+        rekap = {
+          'jawab': ans.length,
+          'ragu': ans.where((a) => a['ragu_ragu'] == true).length,
+        };
+      } catch (_) {}
       if (!mounted) return;
       _kiosk = false;
       await Kiosk.exitKiosk();
       Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => _SelesaiScreen(title: auto ? 'Waktu habis' : 'Ujian selesai'),
+        builder: (_) => _SelesaiScreen(
+            title: auto ? 'Waktu habis' : 'Ujian selesai', rekap: rekap),
       ));
     } catch (e) {
       if (!mounted) return;
@@ -798,7 +810,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
 
 class _SelesaiScreen extends StatelessWidget {
   final String title;
-  const _SelesaiScreen({required this.title});
+  final Map<String, dynamic> rekap;
+  const _SelesaiScreen({required this.title, this.rekap = const {}});
   @override
   Widget build(BuildContext context) {
     final isTimeout = title == 'Waktu habis';
@@ -820,7 +833,11 @@ class _SelesaiScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Text(isTimeout ? 'Waktu ujian telah berakhir dan jawaban otomatis terkumpul.' : 'Jawaban berhasil dikumpulkan!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.5)),
               const SizedBox(height: 8),
-              Text('Nilai akan muncul setelah guru mengoreksi.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                Text((rekap['jawab'] ?? 0) > 0
+                    ? 'Tersimpan di server: ${rekap['jawab']} butir${(rekap['ragu'] ?? 0) > 0 ? ' • ${rekap['ragu']} ditandai ragu' : ''}'
+                    : 'Jawaban Anda telah terkirim ke server.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Color(0xFF059669), fontSize: 12)),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,

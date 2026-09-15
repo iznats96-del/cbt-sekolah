@@ -7,6 +7,7 @@ import '../../widgets/crud_screen.dart';
 import 'import_ujian_screen.dart';
 import '../shared/kunci_jawaban_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
+import '../shared/koreksi_esai_screen.dart';
 import 'daftar_akun_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
 import 'daftar_akun_screen.dart';
@@ -316,6 +317,9 @@ class _UjianListScreenState extends State<UjianListScreen> {
                             builder: (_) => KunciJawabanScreen(ujian: u)));
                       case 'token':
                         _publishToken(u);
+                      case 'esai':
+                        Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => KoreksiEsaiScreen(ujian: u)));
                       case 'nomor':
                         _terbitkanNomor(u);
                       case 'duplikat':
@@ -348,7 +352,14 @@ class _UjianListScreenState extends State<UjianListScreen> {
                             dense: true, contentPadding: EdgeInsets.zero,
                             leading: Icon(Icons.key),
                             title: Text('Lihat Token'))),
-                    if (Api.role == 'admin')
+                    const PopupMenuItem(
+                      value: 'esai',
+                      child: ListTile(
+                          dense: true, contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.rate_review_outlined,
+                              color: AppTheme.secondary),
+                          title: Text('Koreksi Esai (nilai manual)'))),
+                  if (Api.role == 'admin')
                     const PopupMenuItem(
                         value: 'akun',
                         child: ListTile(
