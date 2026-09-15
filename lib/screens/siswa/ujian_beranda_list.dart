@@ -228,49 +228,49 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
         ),
       );
     }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        itemCount: _ujian.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final u = Map<String, dynamic>.from(_ujian[i] as Map);
-          return Card(
-            margin: EdgeInsets.zero,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${u['nama'] ?? 'Ujian'}',
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  if ((u['mapel'] ?? '').toString().isNotEmpty)
-                    _row(Icons.menu_book_outlined, '${u['mapel']}'),
-                  if ((u['kelas'] ?? '').toString().isNotEmpty)
-                    _row(Icons.groups_outlined, '${u['kelas']}'),
-                                  if ((u['tanggal'] ?? '').toString().isNotEmpty)
-                  _row(Icons.event_outlined, 'Tanggal: ${u['tanggal']}'),
-                if ((u['jam'] ?? '').toString().isNotEmpty)
-                  _row(Icons.schedule_outlined, 'Jam ujian: ${u['jam']}'),
-                                _row(Icons.timer_outlined,
-                      '${u['alokasi_menit'] ?? '?'} menit • ${u['jumlah_soal'] ?? '?'} soal'),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => _start(u),
-                      icon: const Icon(Icons.play_arrow),
-                      label: const Text('Kerjakan Ujian'),
+    return Column(
+      children: [
+        for (int i = 0; i < _ujian.length; i++) ...[
+          Builder(builder: (context) {
+            final u = Map<String, dynamic>.from(_ujian[i] as Map);
+            return Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${u['nama'] ?? 'Ujian'}',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    if ((u['mapel'] ?? '').toString().isNotEmpty)
+                      _row(Icons.menu_book_outlined, '${u['mapel']}'),
+                    if ((u['kelas'] ?? '').toString().isNotEmpty)
+                      _row(Icons.groups_outlined, '${u['kelas']}'),
+                    if ((u['tanggal'] ?? '').toString().isNotEmpty)
+                      _row(Icons.event_outlined, 'Tanggal: ${u['tanggal']}'),
+                    if ((u['jam'] ?? '').toString().isNotEmpty)
+                      _row(Icons.schedule_outlined, 'Jam ujian: ${u['jam']}'),
+                    _row(Icons.timer_outlined,
+                        '${u['alokasi_menit'] ?? '?'} menit • ${u['jumlah_soal'] ?? '?'} soal'),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _start(u),
+                        icon: const Icon(Icons.play_arrow),
+                        label: const Text('Kerjakan Ujian'),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
-      ),
+            );
+          }),
+          if (i != _ujian.length - 1) const SizedBox(height: 8),
+        ],
+      ],
     );
   }
 
