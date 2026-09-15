@@ -7,6 +7,7 @@ import '../home.dart';
 import '../../widgets/crud_screen.dart';
 import 'import_screen.dart';
 import 'jadwal_pelajaran_screen.dart';
+import 'kelas_rombel_screen.dart';
 
 class DataMasterScreen extends StatelessWidget {
   const DataMasterScreen({super.key});
@@ -27,7 +28,7 @@ class DataMasterScreen extends StatelessWidget {
       (icon: Icons.calendar_month_outlined, title: 'Tahun Pelajaran', page: () => _tahunPelajaran()),
       (icon: Icons.school_outlined, title: 'Jurusan', page: () => _jurusan()),
       (icon: Icons.menu_book_outlined, title: 'Mata Pelajaran', page: () => _mataPelajaran()),
-      (icon: Icons.groups_outlined, title: 'Kelas / Rombel', page: () => _kelas()),
+      (icon: Icons.groups_outlined, title: 'Kelas / Rombel', page: () => const KelasRombelScreen()),
       (icon: Icons.person_outline, title: 'Guru', page: () => _guru()),
       (icon: Icons.people_alt_outlined, title: 'Siswa', page: () => _siswa()),
       (icon: Icons.business_outlined, title: 'Data Umum', page: () => _sekolah()),
@@ -141,6 +142,13 @@ class DataMasterScreen extends StatelessWidget {
       title: 'Siswa',
       table: 'siswa',
       displayField: 'nama',
+      extraSelect: 'kelas(nama)',
+      colRender: {
+        'kelas_id': (row) {
+          final k = row['kelas'];
+          return k is Map && k['nama'] != null ? 'Kelas: ${k['nama']}' : '';
+        },
+      },
       columns: ['nis', 'kelas_id'],
       extraActions: (ctx, row) => [
         IconButton(

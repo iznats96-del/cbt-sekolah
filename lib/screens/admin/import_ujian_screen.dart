@@ -23,11 +23,67 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
   String? _error;
 
   final _mapelCtrl = TextEditingController();
-  final _kelasCtrl = TextEditingController();
+  TextEditingController _kelasCtrl = TextEditingController();
+  List<Map<String,dynamic>> _kelOptions = [];
+  String? _kelSelectedId;
+  bool _kelLoading = false;
   final _judulCtrl = TextEditingController();
   final _waktuCtrl = TextEditingController(text: '60');
   final _tokenCtrl = TextEditingController();
   String? _fileName;
+
+  Future<void> _loadKelas() async {
+    setState(() => _kelLoading = true);
+    try {
+      final rows = await Api.client
+          .from('kelas')
+          .select('id,nama,jurusan(singkatan)')
+          .order('nama');
+      setState(() {
+        _kelOptions = List<Map<String, dynamic>>.from(rows);
+        _kelLoading = false;
+      });
+    } catch (_) {
+      setState(() => _kelLoading = false);
+    }
+  }
+
+  /// dokumen nulis 'X AKUNTA' / 'XI TKJ' → rombel asli X AKA 1 / XI TKJ 1(?)
+  String? _guessKelas(String docKelas) {
+    final up = docKelas.toUpperCase().trim();
+    String tingkat = '';
+    for (final t in ['XII', 'XI', 'X']) {
+      if (up.startsWith(t)) { tingkat = t; break; }
+    }
+    if (tingkat.isEmpty) return null;
+    final rest = up
+        .substring(tingkat.length)
+        .replaceAll(RegExp(r'[^A-Z0-9]'), '')
+        .replaceAll(RegExp(r'^(SEBELAS|DUA BELAS|SEPULUH)*'), '');
+    final cand = _kelOptions.where((k) {
+      final nm = '${k['nama']}'.toUpperCase();
+      return nm.startsWith(tingkat) &&
+          RegExp('^$tingkat\\b').hasMatch(nm) == false;
+    }).where((k) => '${k['nama']}'.toUpperCase().startsWith(tingkat)).toList();
+    List<Map<String, dynamic>> pool;
+    if (tingkat == 'XI') {
+      pool = cand.where((k) => RegExp(r'^XI[^I]').hasMatch('${k['nama']}'.toUpperCase().trim())).toList();
+    } else if (tingkat == 'XII') {
+      pool = cand.where((k) => '${k['nama']}'.toUpperCase().trim().startsWith('XII')).toList();
+    } else {
+      pool = cand.where((k) => RegExp(r'^X[^I]').hasMatch('${k['nama']}'.toUpperCase().trim())).toList();
+    }
+    if (pool.isEmpty) return null;
+    if (pool.length == 1 || rest.isEmpty) return '${pool.first['id']}';
+    for (final k in pool) {
+      final j = k['jurusan'];
+      final kode = (j is Map ? '${j['singkatan'] ?? ''}' : '').toUpperCase();
+      if (kode.isNotEmpty && rest.startsWith(kode)) return '${k['id']}';
+      final nm = '${k['nama']}'.toUpperCase();
+      if (kode.isNotEmpty && nm.contains(kode) && rest.startsWith(kode)) return '${k['id']}';
+    }
+    return null;
+  }
 
   Future<void> _pickFile() async {
     final files = await FilePicker.pickFiles(
@@ -36,6 +92,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
     );
     if (files.isEmpty) return;
     final f = files.first;
+    if (_kelOptions.isEmpty) await _loadKelas();
     setState(() {
       _parsing = true;
       _error = null;
@@ -50,6 +107,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
         _doc = doc;
         _mapelCtrl.text = doc.mapel;
         _kelasCtrl.text = doc.kelas;
+        _kelSelectedId = _guessKelas(doc.kelas);
         _judulCtrl.text = doc.judul;
         _waktuCtrl.text = '${doc.waktuMenit ?? 60}';
         _tokenCtrl.text = '';
@@ -128,6 +186,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
         'mapel': _mapelCtrl.text.trim(),
         'jurusan': doc.jurusan ?? '',
         'kelas': _kelasCtrl.text.trim(),
+        'kelas_id': _kelSelectedId ?? '',
         'judul': _judulCtrl.text.trim(),
         'waktu': _waktuCtrl.text.trim(),
         'token': _tokenCtrl.text.trim(),
@@ -268,7 +327,27 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                     const SizedBox(height: 16),
                     TextField(controller: _mapelCtrl, decoration: const InputDecoration(labelText: 'Mata Pelajaran *')),
                     const SizedBox(height: 12),
-                    TextField(controller: _kelasCtrl, decoration: const InputDecoration(labelText: 'Kelas *')),
+                    DropdownButtonFormField<String?>(
+                      value: _kelSelectedId,
+                      borderRadius: BorderRadius.circular(12),
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                          labelText: 'Kelas (rombel wajib sudah ada) *',
+                          helperText: 'kalau rombel baru, buat dulu di Data Master → Kelas / Rombel'),
+                      items: [
+                        if (_kelSelectedId == null)
+                          const DropdownMenuItem(
+                              value: null, child: Text('— pilih / belum ketemu —')),
+                        ..._kelOptions.map((k) {
+                          final j = k['jurusan'];
+                          return DropdownMenuItem(
+                              value: '${k['id']}',
+                              child: Text(
+                                  '${k['nama']}${j is Map && j['singkatan'] != null ? '  •  ${j['singkatan']}' : ''}'));
+                        }),
+                      ],
+                      onChanged: (v) => setState(() => _kelSelectedId = v),
+                    ),
                     const SizedBox(height: 12),
                     TextField(controller: _judulCtrl, decoration: const InputDecoration(labelText: 'Judul Ujian')),
                     const SizedBox(height: 12),

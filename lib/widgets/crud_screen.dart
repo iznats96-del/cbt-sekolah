@@ -41,6 +41,8 @@ class CrudScreen extends StatefulWidget {
   final String? orderBy;
   final bool Function(Map<String, dynamic> row)? canEdit;
   final List<Widget> Function(BuildContext context, Map<String, dynamic> row)? extraActions;
+  final String? extraSelect;
+  final Map<String, String Function(Map<String, dynamic> row)>? colRender;
   const CrudScreen({
     super.key,
     required this.title,
@@ -52,6 +54,8 @@ class CrudScreen extends StatefulWidget {
     this.orderBy,
     this.canEdit,
     this.extraActions,
+    this.extraSelect,
+    this.colRender,
   });
 
   @override
@@ -77,10 +81,13 @@ class _CrudScreenState extends State<CrudScreen> {
       _error = null;
     });
     try {
-      final rows = await _crud.list(order: widget.orderBy, limit: 500);
+      final sel = widget.extraSelect == null ? '*' : '*,${widget.extraSelect}';
+      dynamic q = Api.client.from(widget.table).select(sel);
+      if (widget.orderBy != null) q = q.order(widget.orderBy!);
+      final rows = await q.limit(500);
       if (!mounted) return;
       setState(() {
-        _rows = rows;
+        _rows = List<Map<String, dynamic>>.from(rows);
         _loading = false;
       });
     } catch (e) {
@@ -211,8 +218,14 @@ class _CrudScreenState extends State<CrudScreen> {
               ),
               subtitle: Text(
                 widget.columns
-                    .map((c) =>
-                        row[c]?.toString().isNotEmpty == true ? row[c].toString() : null)
+                    .map((c) {
+                      final r = widget.colRender?[c];
+                      if (r != null) {
+                        final v = r(row);
+                        return v.isEmpty ? null : v;
+                      }
+                      return row[c]?.toString().isNotEmpty == true ? row[c].toString() : null;
+                    })
                     .whereType<String>()
                     .join(' · '),
                 maxLines: 2,
