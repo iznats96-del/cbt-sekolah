@@ -21,6 +21,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.cbtsekolah.cbt_sekolah/kiosk"
     private var isKioskLocked = false
+    private var ch: MethodChannel? = null
     private var volumeObserver: ContentObserver? = null
     private val handler = Handler(Looper.getMainLooper())
     private var volumeEnforcer: Runnable? = null
@@ -53,6 +54,13 @@ class MainActivity : FlutterActivity() {
         super.onWindowFocusChanged(hasFocus)
         if (isKioskLocked && hasFocus) {
             handler.postDelayed({ applyImmersive() }, 300)
+            // balik fokus = kembali ke layar ujian -> alarm & volume-lock MATI lagi
+            handler.postDelayed({
+                stopVolumeEnforcer()
+                try {
+                    stopService(Intent(this, AlarmService::class.java))
+                } catch (_: Exception) {}
+            }, 250)
         }
         if (isKioskLocked && !hasFocus) {
             handler.postDelayed({
@@ -61,7 +69,24 @@ class MainActivity : FlutterActivity() {
                     am.moveTaskToFront(taskId, 0)
                 } catch (_: Exception) {}
             }, 500)
+            reportIntrusion()
         }
+    }
+
+    private var lastIntrusionAt = 0L
+    private fun reportIntrusion() {
+        val now = System.currentTimeMillis()
+        if (now - lastIntrusionAt < 3000) return
+        lastIntrusionAt = now
+        try {
+            enforceMaxVolume()
+            startVolumeEnforcer()
+        } catch (_: Exception) {}
+        try {
+            val intent = Intent(this, AlarmService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
+        } catch (_: Exception) {}
+        try { ch?.invokeMethod("onIntrusion", null) } catch (_: Exception) {}
     }
 
     override fun onResume() {
@@ -102,7 +127,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        ch!!.setMethodCallHandler { call, result ->
             when (call.method) {
                 "setSecure" -> {
                     val secure = call.argument<Boolean>("secure") ?: false

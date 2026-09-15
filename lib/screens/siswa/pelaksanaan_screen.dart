@@ -48,6 +48,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     Kiosk.alarmStop();
     Kiosk.setSecure(false);
     Kiosk.exitKiosk();
+    Kiosk.detachIntrusion();
     Kiosk.stopVolumeEnforcer();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -77,6 +78,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       });
       Kiosk.setSecure(true);
       Kiosk.enterKiosk();
+      Kiosk.onIntrusion(_onIntrusion);
       _startTimer();
       _cekDeviceOwner();
     } catch (e) {
@@ -104,6 +106,31 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   void _cekDeviceOwner() async {
     final ok = await Kiosk.isDeviceOwner();
     if (mounted) setState(() => _isOwner = ok);
+  }
+
+  void _onIntrusion() {
+    if (!_kiosk || !mounted) return;
+    _juangPaused++;
+    _catatPelanggaran();
+    setState(() {});
+    _snackIntrusi();
+    if (_juangPaused > _penaltyLimit) _submit(auto: true);
+  }
+
+  void _snackIntrusi() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.white),
+            SizedBox(width: 10),
+            Expanded(child: Text('Terdeteksi jendela/overlay lain! Alarm aktif — kembali fokus ke ujian.', style: TextStyle(fontWeight: FontWeight.w600))),
+          ],
+        ),
+        backgroundColor: AppTheme.danger,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -360,7 +387,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   children: [
                     Text('${widget.ujian['nama'] ?? 'UJIAN'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
-                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab${_juangPaused > 0 ? ' • ⚠ keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withOpacity(_juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
                   ],
                 ),
               ),

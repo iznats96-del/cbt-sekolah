@@ -4,6 +4,18 @@ import 'package:flutter/services.dart';
 class Kiosk {
   static const _channel = MethodChannel('com.cbtsekolah.cbt_sekolah/kiosk');
 
+  /// pasang handler utk event dari native (onIntrusion saat fokus hilang
+  /// karena overlay/chat head/notification shade)
+  static void onIntrusion(void Function()? cb) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onIntrusion') cb?.call();
+    });
+  }
+
+  static void detachIntrusion() {
+    _channel.setMethodCallHandler(null);
+  }
+
   /// Aktifkan/nonaktifkan anti-screenshot (FLAG_SECURE)
   static Future<bool> setSecure(bool secure) async {
     try {

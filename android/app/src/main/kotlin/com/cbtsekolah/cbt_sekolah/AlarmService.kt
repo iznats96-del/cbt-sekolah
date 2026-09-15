@@ -97,12 +97,19 @@ class AlarmService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val customPath = intent?.getStringExtra("customPath")
         val maxVolume = intent?.getBooleanExtra("maxVolume", true) ?: true
         if (maxVolume) enforceMaxVolume()
-        playAlarm(customPath)
-        vibrate()
+        // IDEMPOTENT: kalau sudah bunyi JANGAN restart (dulu: 'tot-tot' tiap focus-lost)
+        if (player == null || tryGetIsPlaying() != true) {
+            val customPath = intent?.getStringExtra("customPath")
+            playAlarm(customPath)
+            vibrate()
+        }
         return START_STICKY
+    }
+
+    private fun tryGetIsPlaying(): Boolean? {
+        return try { player?.isPlaying } catch (_: Exception) { null }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
