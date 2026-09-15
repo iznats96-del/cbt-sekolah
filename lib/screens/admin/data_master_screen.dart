@@ -6,6 +6,7 @@ import '../../services/api.dart';
 import '../home.dart';
 import '../../widgets/crud_screen.dart';
 import 'import_screen.dart';
+import 'jadwal_pelajaran_screen.dart';
 
 class DataMasterScreen extends StatelessWidget {
   const DataMasterScreen({super.key});
@@ -32,6 +33,7 @@ class DataMasterScreen extends StatelessWidget {
       (icon: Icons.business_outlined, title: 'Data Umum', page: () => _sekolah()),
       (icon: Icons.upload_file_outlined, title: 'Import Siswa (XLS/XLSX/CSV)', page: () => const ImportScreen(isSiswa: true)),
       (icon: Icons.upload_file_outlined, title: 'Import Mata Pelajaran', page: () => const ImportScreen(isSiswa: false)),
+      (icon: Icons.date_range_outlined, title: 'Jadwal Pelajaran (Hari & Jam)', page: () => const JadwalPelajaranScreen()),
     ];
 
     return ListView(

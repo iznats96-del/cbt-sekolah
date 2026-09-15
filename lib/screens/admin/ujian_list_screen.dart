@@ -281,6 +281,12 @@ class _UjianListScreenState extends State<UjianListScreen> {
             if (u['waktu_mulai'] != null)
               _info(Icons.schedule,
                   'Jam akses ${_jam(u['waktu_mulai'])} – ${u['waktu_selesai'] != null ? _jam(u['waktu_selesai']) : 'selesai'}'),
+            if (u['jadwal_mapel'] is Map)
+              _info(Icons.date_range,
+                  'Jadwal: '
+                  '${_hariNm[((u['jadwal_mapel'] as Map)['hari'] as num?)?.toInt() ?? 0]} '
+                  '${((u['jadwal_mapel'] as Map)['jam_mulai'] ?? '').toString().substring(0, 4)}–'
+                  '${((u['jadwal_mapel'] as Map)['jam_selesai'] ?? '').toString().substring(0, 4)} (hanya buka pada jam itu)'),
             if (u['token'] != null) _info(Icons.key, 'Token: ${u['token']}'),
             const Divider(height: 20),
             Row(
@@ -407,6 +413,8 @@ class _UjianListScreenState extends State<UjianListScreen> {
       _load();
     }
   }
+
+  static const _hariNm = {1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu'};
 
   String _jam(String? iso) {
 

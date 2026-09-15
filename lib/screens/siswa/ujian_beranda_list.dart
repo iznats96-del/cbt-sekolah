@@ -159,7 +159,11 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
                     _row(Icons.menu_book_outlined, '${u['mapel']}'),
                   if ((u['kelas'] ?? '').toString().isNotEmpty)
                     _row(Icons.groups_outlined, '${u['kelas']}'),
-                  _row(Icons.timer_outlined,
+                                  if ((u['tanggal'] ?? '').toString().isNotEmpty)
+                  _row(Icons.event_outlined, 'Tanggal: ${u['tanggal']}'),
+                if ((u['jam'] ?? '').toString().isNotEmpty)
+                  _row(Icons.schedule_outlined, 'Jam ujian: ${u['jam']}'),
+                                _row(Icons.timer_outlined,
                       '${u['alokasi_menit'] ?? '?'} menit • ${u['jumlah_soal'] ?? '?'} soal'),
                   const SizedBox(height: 12),
                   SizedBox(

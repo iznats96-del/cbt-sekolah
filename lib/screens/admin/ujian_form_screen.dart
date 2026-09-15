@@ -26,6 +26,8 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   String? _tanggal;
   TimeOfDay? _jamMulai;
   TimeOfDay? _jamSelesai;
+  String? _jadwalId;
+  List<dynamic> _jadwalSemua = [];
   List<String> _selectedSoal = [];
   bool _statusAktif = false;
   bool _loading = false;
@@ -52,11 +54,13 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       final sl = init['soal_list'];
       if (sl is List) _selectedSoal = sl.map((e) => e.toString()).toList();
       _statusAktif = init['status'] == 'aktif';
+      _jadwalId = init['jadwal_id']?.toString();
     } else {
       _tokenCtrl.text = _genToken();
     }
     _loadOptions();
     _loadBankSoal();
+    _loadJadwal();
   }
 
   String _genToken() {
@@ -101,6 +105,18 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     } catch (e) {
       if (mounted) _snack('Gagal muat opsi: $e', error: true);
     }
+  }
+
+  Future<void> _loadJadwal() async {
+    try {
+      final rows = await Api.client
+          .from('jadwal_mapel')
+          .select('id,hari,jam_mulai,jam_selesai,mata_pelajaran(nama)')
+          .order('hari')
+          .order('jam_mulai');
+      if (!mounted) return;
+      setState(() => _jadwalSemua = List<dynamic>.from(rows));
+    } catch (_) {}
   }
 
   Future<void> _loadBankSoal() async {
@@ -168,6 +184,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'token': _tokenCtrl.text.trim().isEmpty ? _genToken() : _tokenCtrl.text.trim(),
         'soal_list': _selectedSoal,
         'catatan': _catatanCtrl.text.trim().isEmpty ? null : _catatanCtrl.text.trim(),
+        'jadwal_id': _jadwalId,
         'waktu_mulai': _gabung(_tanggal, _jamMulai),
         'waktu_selesai': _gabung(_tanggal, _jamSelesai),
       };
@@ -245,6 +262,28 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                       items: [const DropdownMenuItem(value: null, child: Text('— tidak ada —')), ..._sesiOpt
                           .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
                       onChanged: (v) => setState(() => _sesiId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      initialValue: _jadwalId,
+                      borderRadius: BorderRadius.circular(12),
+                      decoration: const InputDecoration(
+                          labelText: 'Ikuti Jadwal Pelajaran (jam otomatis)',
+                          helperText: 'ujian auto-buka/tutup sesuai hari & jam jadwal. Kosongkan utk jam manual.'),
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('— manual / tanpa jadwal —')),
+                        ..._jadwalSemua.map((j) {
+                          const hn = {1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu'};
+                          final m = j['mata_pelajaran'];
+                          return DropdownMenuItem(
+                              value: '${j['id']}',
+                              child: Text(
+                                  '${hn[j['hari']] ?? '?'} ${(j['jam_mulai'] ?? '').toString().substring(0, 5)}-${(j['jam_selesai'] ?? '').toString().substring(0, 5)} · ${m is Map ? m['nama'] ?? '' : ''}',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 12)));
+                        }),
+                      ],
+                      onChanged: (v) => setState(() => _jadwalId = v),
                     ),
                     const SizedBox(height: 12),
                     // tanggal
