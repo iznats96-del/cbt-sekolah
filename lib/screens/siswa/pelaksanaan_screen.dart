@@ -69,8 +69,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
           }
         }
       }
-      final sisa = data['sisa_detik'];
-      if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
+    final sisa = data['sisa_detik'];
+      if (sisa is num && sisa >= 0) _sisaDetik = sisa.toInt();
       if (!mounted) return;
       setState(() {
         _kiosk = true;
@@ -79,7 +79,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       Kiosk.setSecure(true);
       Kiosk.enterKiosk();
       Kiosk.onIntrusion(_onIntrusion);
-      _startTimer();
+      // ===== BUG FIX: jika sisa=0/habis → langsung submit (jangan start timer penuh lagi) =====
+      if (_sisaDetik <= 0) { _timer?.cancel(); _submit(auto: true); }
+      else { _startTimer(); }
       _cekDeviceOwner();
     } catch (e) {
       if (!mounted) return;

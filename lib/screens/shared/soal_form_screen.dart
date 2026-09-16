@@ -29,6 +29,11 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   List<TextEditingController> _opsi = [];
   int? _kunciIdx;
   String _essayKunci = '';
+  
+  // JODOH variables
+  List<TextEditingController> _jodohLeft = [];
+  List<TextEditingController> _jodohRight = [];
+  Map<int, int?> _jodohPairs = {}; // index(left) -> index(right)
 
   bool _loading = false;
   List<DropdownItem> _mapelOptions = [];
@@ -61,11 +66,29 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
           _opsi = m.entries.map((e) => TextEditingController(text: e.value.toString())).toList();
         }
         if (kunci is Map) _kunciIdx = _parseIndex(kunci);
+      } else if (_jenis == 'jodoh') {
+        // Initialize jodoh data from saved
+        final items = init['jodoh_items'] as List? ?? [];
+        for (int i = 0; i < items.length; i++) {
+          final item = items[i] as Map<String, dynamic>;
+          _jodohLeft.add(TextEditingController(text: '${item['left'] ?? ''}'));
+          _jodohRight.add(TextEditingController(text: '${item['right'] ?? ''}'));
+          final pair = item['pair'] as int?;
+          if (pair != null && pair >= 0 && pair < _jodohRight.length) {
+            _jodohPairs[i] = pair;
+          }
+        }
+        final k = kunci;
+        if (k is Map) _kunciIdx = _parseIndex(k);
       } else {
         _essayKunci = kunci != null ? jsonEncode(kunci) : '';
       }
     }
     if (_opsi.isEmpty) _opsi = List.generate(4, (_) => TextEditingController());
+    if (_jodohLeft.isEmpty) {
+      _jodohLeft = List.generate(3, (_) => TextEditingController());
+      _jodohRight = List.generate(3, (_) => TextEditingController());
+    }
   }
 
   int? _parseIndex(Map kunci) {
@@ -91,6 +114,12 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
     for (final o in _opsi) {
       o.dispose();
     }
+    for (final l in _jodohLeft) {
+      l.dispose();
+    }
+    for (final r in _jodohRight) {
+      r.dispose();
+    }
     super.dispose();
   }
 
@@ -113,6 +142,23 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         _snack('Tandai jawaban benar pada opsi.', error: true);
         return;
       }
+    } else if (_jenis == 'jodoh') {
+      bool allFilled = true;
+      for (int i = 0; i < _jodohLeft.length; i++) {
+        if (_jodohLeft[i].text.trim().isEmpty || _jodohRight[i].text.trim().isEmpty) {
+          allFilled = false;
+          break;
+        }
+      }
+      if (!allFilled) {
+        _snack('Semua pasangan jodoh harus diisi (kiri & kanan).', error: true);
+        return;
+      }
+      // Check that at least one pair is matched
+      if (_jodohPairs.values.where((v) => v != null).length == 0) {
+        _snack(' minimal 1 pasangan dikunci.', error: true);
+        return;
+      }
     } else {
       if (_essayKunci.trim().isEmpty) {
         _snack('Isi kata kunci / pedoman jawaban essay.', error: true);
@@ -127,6 +173,26 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       if (_jenis == 'pg') {
         opsi = [for (final o in _opsi) o.text.trim()];
         kunci = {'index': _kunciIdx, 'jawaban': _opsi[_kunciIdx!].text.trim()};
+      } else if (_jenis == 'jodoh') {
+        // JODOH: store paired items
+        final items = <Map<String, dynamic>>[];
+        for (int i = 0; i < _jodohLeft.length; i++) {
+          if (_jodohLeft[i].text.trim().isEmpty || _jodohRight[i].text.trim().isEmpty) continue;
+          items.add({
+            'left': _jodohLeft[i].text.trim(),
+            'right': _jodohRight[i].text.trim(),
+            'pair': _jodohPairs[i] ?? -1, // -1 = not matched
+          });
+        }
+        opsi = items;
+        // Kunci jawaban = array of matched indices
+        final matches = <String, dynamic>{};
+        for (var entry in _jodohPairs.entries) {
+          if (entry.value != null && entry.value >= 0 && entry.value < _jodohRight.length) {
+            matches['${entry.key}_to_${entry.value}'] = true;
+          }
+        }
+        kunci = {'matches': matches};
       } else {
         opsi = null;
         kunci = jsonDecode(_essayKunci);
@@ -380,6 +446,133 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                             child: const Text('Hapus opsi terakhir'),
                           ),
                         ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+
+            if (_jenis == 'jodoh') ...[
+              const SizedBox(height: 8),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Pasangan Kata/Frasa (JODOH)',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              'Kiri (Pertanyaan)',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 1,
+                            child: Text(
+                              'Kanan (Jawaban)',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 32),
+                          const Text('Kunci', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                      const Divider(height: 24),
+                      for (int i = 0; i < _jodohLeft.length; i++) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: TextField(
+                                controller: _jodohLeft[i],
+                                decoration: InputDecoration(
+                                  hintText: 'Item kiri ${i + 1}',
+                                  border: const OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              flex: 1,
+                              child: TextField(
+                                controller: _jodohRight[i],
+                                decoration: InputDecoration(
+                                  hintText: 'Item kanan ${i + 1}',
+                                  border: const OutlineInputBorder(),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Checkbox(
+                              value: _jodohPairs[i] != null && _jodohPairs[i] == i,
+                              onChanged: (v) {
+                                setState(() {
+                                  if (v == true) {
+                                    _jodohPairs[i] = i; // Pair this row with itself
+                                  } else {
+                                    _jodohPairs.remove(i); // Unpair
+                                  }
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _jodohLeft.length < 6
+                                ? () => setState(() {
+                                    _jodohLeft.add(TextEditingController());
+                                    _jodohRight.add(TextEditingController());
+                                    _jodohPairs[_jodohLeft.length - 1] = null;
+                                  })
+                                : null,
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text('Tambah Pasangan', style: TextStyle(fontSize: 12)),
+                          ),
+                          const SizedBox(width: 8),
+                          if (_jodohLeft.length > 2)
+                            TextButton(
+                              onPressed: () => setState(() {
+                                _jodohLeft.removeLast();
+                                _jodohRight.removeLast();
+                                _jodohPairs.remove(_jodohLeft.length);
+                              }),
+                              child: const Text('Hapus Terakhir', style: TextStyle(color: AppTheme.danger)),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          '💡 Tips: Klik checkbox untuk mencocokkan pasangan yang benar.',
+                          style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic),
+                        ),
+                      ),
                     ],
                   ),
                 ),

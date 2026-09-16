@@ -22,17 +22,16 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   final _catatanCtrl = TextEditingController();
   final _tokenCtrl = TextEditingController();
 
-  String? _jenisUjianId, _mapelId, _kelasId, _sesiId;
+  String? _jenisUjianId, _mapelId, _kelasId, _sesiId, _jadwalId, _guruId;
   String? _tanggal;
   TimeOfDay? _jamMulai;
   TimeOfDay? _jamSelesai;
-  String? _jadwalId;
   List<dynamic> _jadwalSemua = [];
   List<String> _selectedSoal = [];
   bool _statusAktif = false;
   bool _loading = false;
 
-  List<DropdownItem> _mapelOpt = [], _kelasOpt = [], _jenisOpt = [], _sesiOpt = [];
+  List<DropdownItem> _mapelOpt = [], _kelasOpt = [], _jenisOpt = [], _sesiOpt = [], _guruOpt = [];
   List<Map<String, dynamic>> _bankSoal = [];
 
   @override
@@ -55,12 +54,33 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       if (sl is List) _selectedSoal = sl.map((e) => e.toString()).toList();
       _statusAktif = init['status'] == 'aktif';
       _jadwalId = init['jadwal_id']?.toString();
+      _guruId = init['guru_id']?.toString();
     } else {
       _tokenCtrl.text = _genToken();
+      _guruId = Api.user?.id; // pemilik = pembuat (guru) — admin bisa ganti di dropdown
     }
     _loadOptions();
     _loadBankSoal();
     _loadJadwal();
+    _loadGuru();
+  }
+
+  Future<void> _loadGuru() async {
+    // hanya admin yang perlu memilih guru pengampu (guru biasa = dirinya sendiri)
+    if (Api.role != 'admin') return;
+    try {
+      final rows = await Api.client
+          .from('profiles')
+          .select('id,nama')
+          .eq('role', 'guru')
+          .order('nama');
+      if (!mounted) return;
+      setState(() {
+        _guruOpt = (rows as List)
+            .map((r) => DropdownItem('${r['id']}', '${r['nama'] ?? '-'}'))
+            .toList();
+      });
+    } catch (_) {}
   }
 
   String _genToken() {
@@ -177,7 +197,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'jenis_ujian_id': _jenisUjianId,
         'mapel_id': _mapelId,
         'kelas_id': _kelasId,
-        'guru_id': Api.user?.id,
+        'guru_id': _guruId ?? Api.user?.id,
         'tanggal': _tanggal,
         'sesi_id': _sesiId,
         'alokasi_menit': num.tryParse(_menitCtrl.text.trim()) ?? 90,
@@ -188,6 +208,10 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'waktu_mulai': _gabung(_tanggal, _jamMulai),
         'waktu_selesai': _gabung(_tanggal, _jamSelesai),
       };
+      // status: baru → ikut switch; edit → JANGAN sentuh bila sudah 'selesai'
+      final wasSelesai = widget.initial?['status'] == 'selesai';
+      if (!wasSelesai) data['status'] = _statusAktif ? 'aktif' : 'draft';
+
       if (widget.ujianId != null) {
         await Api.client.from('ujian').update(data).eq('id', widget.ujianId!);
       } else {
@@ -255,6 +279,32 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                           .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
                       onChanged: (v) => setState(() => _kelasId = v),
                     ),
+                    // ── Guru pengampu (khusus admin; guru biasa = dirinya) ──
+                    if (Api.role == 'admin' && _guruOpt.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _guruId,
+                        decoration: const InputDecoration(
+                          labelText: 'Guru Pengampu *',
+                          helperText: 'ujian ini jadi milik guru tsb → dialah yg isi kunci, koreksi esai & lihat rekap',
+                        ),
+                        items: [const DropdownMenuItem(value: null, child: Text('— pilih guru —')), ..._guruOpt
+                            .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
+                        onChanged: (v) => setState(() => _guruId = v),
+                      ),
+                    ],
+                    // ── Saklar status: langsung aktif / simpan draft ──
+                    const SizedBox(height: 8),
+                    if (widget.initial?['status'] != 'selesai')
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        value: _statusAktif,
+                        onChanged: (v) => setState(() => _statusAktif = v),
+                        title: const Text('Aktifkan ujian', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                        subtitle: Text(_statusAktif ? 'Siswa bisa melihat & masuk ujian ini' : 'Tersimpan sebagai DRAF (belum terlihat siswa)',
+                            style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
+                        activeColor: AppTheme.secondary,
+                      ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: _sesiId,
