@@ -61,13 +61,13 @@ class UjianDocxParser {
       (f) => f.name == 'word/document.xml',
       orElse: () => throw const FormatException('bukan docx'),
     );
-    final xml = utf8.decode(docFile.readBytes() ?? const <int>[]);
+    final xml = utf8.decode(_bytes(docFile.content));
     final u = UjianDocx();
 
     final rels = <String, String>{};
     for (final f in archive.files) {
       if (f.name == 'word/_rels/document.xml.rels') {
-        final rx = utf8.decode(f.readBytes() ?? const <int>[]);
+        final rx = utf8.decode(_bytes(f.content));
         for (final m in RegExp(r'Id="([^"]+)"[^>]*Target="([^"]+)"').allMatches(rx)) {
           var t = m.group(2)!;
           if (t.startsWith('../')) t = t.substring(3);
@@ -77,7 +77,7 @@ class UjianDocxParser {
     }
     for (final f in archive.files) {
       if (f.name.startsWith('word/media/')) {
-        u.images[f.name.substring('word/'.length)] = f.readBytes() ?? Uint8List(0);
+        u.images[f.name.substring('word/'.length)] = _bytes(f.content);
       }
     }
 
@@ -523,4 +523,13 @@ class UjianDocxParser {
       .replaceAll('&quot;', '"')
       .replaceAll('&apos;', "'")
       .replaceAll(RegExp(r'_x[0-9A-Fa-f]{4}_'), '');
+}
+
+Uint8List _bytes(dynamic c) {
+  if (c == null) return Uint8List(0);
+  try {
+    return Uint8List.fromList(List<int>.from(c as Iterable));
+  } catch (_) {
+    return Uint8List(0);
+  }
 }

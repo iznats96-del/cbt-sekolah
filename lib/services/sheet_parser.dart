@@ -78,11 +78,11 @@ class SheetParser {
   // ---------- DOCX: tabel (baris = baris tabel) + gambar embed PNG ----------
   static List<ImportSheet> _parseDocx(Archive archive) {
     final docFile = archive.firstWhere((f) => f.name == 'word/document.xml');
-    final xml = utf8.decode(docFile.readBytes() ?? const <int>[]);
+    final xml = utf8.decode(_bytes(docFile.content));
     final rels = <String, String>{};
     for (final f in archive.files) {
       if (f.name == 'word/_rels/document.xml.rels') {
-        final rx = utf8.decode(f.readBytes() ?? const <int>[]);
+        final rx = utf8.decode(_bytes(f.content));
         for (final m in RegExp(r'Id="([^"]+)"[^>]*Target="([^"]+)"').allMatches(rx)) {
           var t = m.group(2)!;
           if (t.startsWith('../')) t = t.substring(3);
@@ -93,7 +93,7 @@ class SheetParser {
     final images = <String, Uint8List>{};
     for (final f in archive.files) {
       if (f.name.startsWith('word/media/')) {
-        images[f.name.substring('word/'.length)] = f.readBytes() ?? Uint8List(0);
+        images[f.name.substring('word/'.length)] = _bytes(f.content);
       }
     }
     final out = <List<String>>[];
@@ -138,7 +138,7 @@ class SheetParser {
     final sheetFiles = <String>[];
     for (final f in archive) {
       if (f.name == 'xl/sharedStrings.xml') {
-        shared = utf8.decode(f.readBytes() ?? Uint8List(0));
+        shared = utf8.decode(_bytes(f.content));
       } else if (f.name.startsWith('xl/worksheets/sheet') && f.name.endsWith('.xml')) {
         sheetFiles.add(f.name);
       }
@@ -147,7 +147,7 @@ class SheetParser {
     final names = <String>[];
     for (final f in archive) {
       if (f.name == 'xl/workbook.xml') {
-        final wb = utf8.decode(f.readBytes() ?? Uint8List(0));
+        final wb = utf8.decode(_bytes(f.content));
         names.addAll(RegExp(r'<sheet [^>]*name="([^"]*)"')
             .allMatches(wb)
             .map((m) => m.group(1) ?? '')
@@ -167,7 +167,7 @@ class SheetParser {
     sheetFiles.sort((a, b) => int.parse(RegExp(r'\d+').firstMatch(a)!.group(0)!).compareTo(int.parse(RegExp(r'\d+').firstMatch(b)!.group(0)!)));
     for (var s = 0; s < sheetFiles.length; s++) {
       final file = archive.firstWhere((f) => f.name == sheetFiles[s]);
-      final xml = utf8.decode(file.readBytes() ?? Uint8List(0));
+      final xml = utf8.decode(_bytes(file.content));
       final rows = <List<String>>[];
       for (final rm in RegExp(r'<row[^>]*>([\s\S]*?)<\/row>').allMatches(xml)) {
         final cells = <int, String>{};
@@ -628,5 +628,13 @@ class MapelMapper {
       }
     }
     return out;
+  }
+}
+Uint8List _bytes(dynamic c) {
+  if (c == null) return Uint8List(0);
+  try {
+    return Uint8List.fromList(List<int>.from(c as Iterable));
+  } catch (_) {
+    return Uint8List(0);
   }
 }
