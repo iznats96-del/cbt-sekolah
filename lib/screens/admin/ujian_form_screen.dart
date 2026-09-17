@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -20,7 +18,6 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   final _namaCtrl = TextEditingController();
   final _menitCtrl = TextEditingController(text: '90');
   final _catatanCtrl = TextEditingController();
-  final _tokenCtrl = TextEditingController();
 
   String? _jenisUjianId, _mapelId, _kelasId, _sesiId;
   String? _tanggal;
@@ -43,7 +40,6 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       _namaCtrl.text = init['nama']?.toString() ?? '';
       _menitCtrl.text = '${init['alokasi_menit'] ?? 90}';
       _catatanCtrl.text = init['catatan']?.toString() ?? '';
-      _tokenCtrl.text = init['token']?.toString() ?? '';
       _jenisUjianId = init['jenis_ujian_id']?.toString();
       _mapelId = init['mapel_id']?.toString();
       _kelasId = init['kelas_id']?.toString();
@@ -55,18 +51,10 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       if (sl is List) _selectedSoal = sl.map((e) => e.toString()).toList();
       _statusAktif = init['status'] == 'aktif';
       _jadwalId = init['jadwal_id']?.toString();
-    } else {
-      _tokenCtrl.text = _genToken();
     }
     _loadOptions();
     _loadBankSoal();
     _loadJadwal();
-  }
-
-  String _genToken() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    final r = Random();
-    return List.generate(6, (_) => chars[r.nextInt(chars.length)]).join();
   }
 
   String _fmtTod(TimeOfDay t) =>
@@ -181,7 +169,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'tanggal': _tanggal,
         'sesi_id': _sesiId,
         'alokasi_menit': num.tryParse(_menitCtrl.text.trim()) ?? 90,
-        'token': _tokenCtrl.text.trim().isEmpty ? _genToken() : _tokenCtrl.text.trim(),
+        'token': '',
         'soal_list': _selectedSoal,
         'catatan': _catatanCtrl.text.trim().isEmpty ? null : _catatanCtrl.text.trim(),
         'jadwal_id': _jadwalId,
@@ -349,23 +337,10 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _menitCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Alokasi (menit)'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextFormField(
-                            controller: _tokenCtrl,
-                            decoration: const InputDecoration(labelText: 'Token'),
-                          ),
-                        ),
-                      ],
+                    TextFormField(
+                      controller: _menitCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Alokasi (menit)'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

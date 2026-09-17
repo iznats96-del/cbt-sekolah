@@ -29,7 +29,6 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
   bool _kelLoading = false;
   final _judulCtrl = TextEditingController();
   final _waktuCtrl = TextEditingController(text: '60');
-  final _tokenCtrl = TextEditingController();
   String? _fileName;
 
   Future<void> _loadKelas() async {
@@ -110,7 +109,6 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
         _kelSelectedId = _guessKelas(doc.kelas);
         _judulCtrl.text = doc.judul;
         _waktuCtrl.text = '${doc.waktuMenit ?? 60}';
-        _tokenCtrl.text = '';
         _parsing = false;
       });
     } catch (e) {
@@ -189,7 +187,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
         'kelas_id': _kelSelectedId ?? '',
         'judul': _judulCtrl.text.trim(),
         'waktu': _waktuCtrl.text.trim(),
-        'token': _tokenCtrl.text.trim(),
+        'token': '',
         'jenis_ujian': 'Penilaian Sumatif',
         'guru': doc.guru,
         'items': items,
@@ -210,7 +208,6 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
               Text('Mapel: ${map['mapel']}'),
               Text('Kelas: ${map['kelas']}'),
               Text('Soal masuk: ${map['soal_count']}'),
-              Text('Token: ${map['token']}'),
               const SizedBox(height: 8),
               const Text('Status DRAFT — atur tanggal/sesi lalu aktifkan di menu Ujian.',
                   style: TextStyle(fontSize: 12, color: Colors.grey)),
@@ -351,24 +348,10 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                     const SizedBox(height: 12),
                     TextField(controller: _judulCtrl, decoration: const InputDecoration(labelText: 'Judul Ujian')),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _waktuCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(labelText: 'Alokasi (menit)'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: TextField(
-                            controller: _tokenCtrl,
-                            textCapitalization: TextCapitalization.characters,
-                            decoration: const InputDecoration(labelText: 'Token (kosong=auto)'),
-                          ),
-                        ),
-                      ],
+                    TextField(
+                      controller: _waktuCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Alokasi (menit)'),
                     ),
                     if (doc.guru.isNotEmpty) ...[
                       const SizedBox(height: 12),

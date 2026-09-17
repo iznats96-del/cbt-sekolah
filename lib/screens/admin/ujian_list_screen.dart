@@ -119,41 +119,6 @@ class _UjianListScreenState extends State<UjianListScreen> {
     }
   }
 
-  Future<void> _publishToken(Map<String, dynamic> u) async {
-    final token = u['token']?.toString() ?? '';
-    if (token.isEmpty) {
-      _snack('Ujian belum punya token.');
-      return;
-    }
-    _snack('Token: $token');
-    await showDialog(
-      context: context,
-      builder: (c) => Dialog(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.key, color: AppTheme.accent, size: 48),
-              const SizedBox(height: 12),
-              const Text('Token Ujian', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              SelectableText(token,
-                  style: const TextStyle(
-                      fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: 6)),
-              const SizedBox(height: 12),
-              const Text('Berikan token ini kepada siswa untuk masuk ujian.',
-                  textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 12)),
-              const SizedBox(height: 16),
-              FilledButton(
-                  onPressed: () => Navigator.pop(c), child: const Text('Tutup')),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _snack(String m, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -288,7 +253,6 @@ class _UjianListScreenState extends State<UjianListScreen> {
                   '${_hariNm[((u['jadwal_mapel'] as Map)['hari'] as num?)?.toInt() ?? 0]} '
                   '${((u['jadwal_mapel'] as Map)['jam_mulai'] ?? '').toString().substring(0, 4)}–'
                   '${((u['jadwal_mapel'] as Map)['jam_selesai'] ?? '').toString().substring(0, 4)} (hanya buka pada jam itu)'),
-            if (u['token'] != null) _info(Icons.key, 'Token: ${u['token']}'),
             const Divider(height: 20),
             Row(
               children: [
@@ -315,8 +279,6 @@ class _UjianListScreenState extends State<UjianListScreen> {
                       case 'kunci':
                         Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) => KunciJawabanScreen(ujian: u)));
-                      case 'token':
-                        _publishToken(u);
                       case 'esai':
                         Navigator.of(context).push(MaterialPageRoute(
                             builder: (_) => KoreksiEsaiScreen(ujian: u)));
@@ -346,12 +308,6 @@ class _UjianListScreenState extends State<UjianListScreen> {
                             leading: Icon(Icons.vpn_key_outlined,
                                 color: AppTheme.secondary),
                             title: Text('Isi Kunci Jawaban'))),
-                    const PopupMenuItem(
-                        value: 'token',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.key),
-                            title: Text('Lihat Token'))),
                     const PopupMenuItem(
                       value: 'esai',
                       child: ListTile(
@@ -861,7 +817,6 @@ class _DuplikatSheet extends StatefulWidget {
 class _DuplikatSheetState extends State<_DuplikatSheet> {
   List<dynamic> _rombel = [];
   final Set<String> _pick = {};
-  final _tokenCtrl = TextEditingController();
   bool _load = true;
   bool _run = false;
   String? _err;
@@ -896,10 +851,6 @@ class _DuplikatSheetState extends State<_DuplikatSheet> {
     final made = <String>[];
     for (final kid in _pick) {
       final k = _rombel.firstWhere((r) => '${r['id']}' == kid);
-      final kNm = '${k['nama']}'.replaceAll(' ', '').toUpperCase();
-      final tok = _tokenCtrl.text.trim().isNotEmpty
-          ? _tokenCtrl.text.trim().toUpperCase()
-          : '${b['token'] ?? 'TKN'}-$kNm';
       try {
         final r = await Api.client.from('ujian').insert({
           'nama': '${b['nama']} — ${k['nama']}',
@@ -910,7 +861,7 @@ class _DuplikatSheetState extends State<_DuplikatSheet> {
           'tanggal': b['tanggal'],
           'sesi_id': b['sesi_id'],
           'alokasi_menit': b['alokasi_menit'],
-          'token': tok,
+          'token': '',
           'soal_list': b['soal_list'],
           'status': 'draft',
           'waktu_mulai': b['waktu_mulai'],
@@ -929,7 +880,6 @@ class _DuplikatSheetState extends State<_DuplikatSheet> {
 
   @override
   void dispose() {
-    _tokenCtrl.dispose();
     super.dispose();
   }
 
@@ -953,17 +903,8 @@ class _DuplikatSheetState extends State<_DuplikatSheet> {
                         style:
                             const TextStyle(fontSize: 12, color: Colors.grey)),
                     const Text(
-                        'Tiap rombel dapat ujian sendiri — soal sama, token bedaper rombel, status DRAFT. Atur jam tiap kelas lalu Aktifkan.',
+                        'Tiap rombel dapat ujian sendiri — soal sama, status DRAFT. Atur jam tiap kelas lalu Aktifkan.',
                         style: TextStyle(fontSize: 11.5, color: Colors.grey)),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _tokenCtrl,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        labelText: 'Token seragam (kosong = auto ${b['token'] ?? ''}-NAMA_ROMBEL)',
-                      ),
-                    ),
                     const SizedBox(height: 8),
                     Expanded(
                       child: ListView(
