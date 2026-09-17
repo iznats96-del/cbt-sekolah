@@ -129,12 +129,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       _snack('Pilih mata pelajaran', error: true);
       return;
     }
-  Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_mapelId == null) {
-      _snack('Pilih mata pelajaran', error: true);
-      return;
-    }
     // Additional check for jodoh questions
     if (_jenis == 'jodoh') {
       bool allFilled = true;

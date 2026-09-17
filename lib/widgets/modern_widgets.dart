@@ -691,16 +691,6 @@ Future<void> showToast({
 
 enum ToastType { success, error, warning, info }
 
-// ==================== COPY CLIPBOARD WITH ANIMATION ====================
-Future<bool> copyToClipboard(String text, {String? message}) async {
-  final result = await Clipboard.setData(ClipboardData(text: text));
-  final hasContent = await Clipboard.hasStrings();
-  return hasContent;
-}
-
-// ==================== TOAST NOTIFICATION ====================
-enum ToastType { success, error, info, warning }
-
 void showToast({
   required BuildContext context,
   required String message,
@@ -713,9 +703,7 @@ void showToast({
     ToastType.warning => Colors.orange,
     ToastType.info => AppTheme.primary,
   };
-
   if (!context.mounted) return;
-  
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Row(
@@ -741,6 +729,13 @@ void showToast({
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
     ),
   );
+}
+
+// ==================== COPY CLIPBOARD WITH ANIMATION ====================
+Future<bool> copyToClipboard(String text, {String? message}) async {
+  final result = await Clipboard.setData(ClipboardData(text: text));
+  final hasContent = await Clipboard.hasStrings();
+  return hasContent;
 }
 
 // ==================== ANIMATED SLIDE IN ====================
