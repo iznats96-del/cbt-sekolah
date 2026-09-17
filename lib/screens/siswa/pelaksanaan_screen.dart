@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../services/kiosk.dart';
+import '../../services/jawaban_store.dart';
 
 class PelaksanaanScreen extends StatefulWidget {
   final Map<String, dynamic> ujian;
@@ -24,11 +25,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   int _idx = 0;
   bool _loading = true;
   bool _submitting = false;
-  bool _kirimGagal = false;
   String? _error;
   int _juangPaused = 0;
   bool _kiosk = false;
   bool _showPalette = false;
+
+  // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
+  late final JawabanStore _store = JawabanStore(widget.pesertaId);
+  final Set<String> _belumKirim = {}; // soalId yang berubah & belum disinkron ke server
+  Timer? _flushTimer;
+  bool _sinkron = true; // semua jawaban tersimpan di server?
 
   @override
   void initState() {
@@ -45,6 +51,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    _flushTimer?.cancel();
     Kiosk.alarmStop();
     Kiosk.setSecure(false);
     Kiosk.exitKiosk();
@@ -71,6 +78,25 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       }
       final sisa = data['sisa_detik'];
       if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
+      // ===== RESUME dari LOCAL: kalau HP sempat mati, ambil jawaban tersimpan di HP =====
+      try {
+        final lokal = await _store.loadAll();
+        for (final e in lokal.entries) {
+          final soId = e.key;
+          final v = e.value;
+          // pakai lokal kalau ada isi, atau server kosong
+          if ((v['jawaban'] ?? '').toString().isNotEmpty ||
+              (_jawaban[soId] ?? '').isEmpty) {
+            _jawaban[soId] = (v['jawaban'] ?? '').toString();
+            _ragu[soId] = v['ragu'] == true;
+          }
+        }
+        // jawaban lokal yang belum ada di server -> tandai perlu dikirim
+        final synced = await _store.getSynced();
+        for (final e in lokal.entries) {
+          if (!synced.contains(e.key)) _belumKirim.add(e.key);
+        }
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _kiosk = true;
@@ -80,6 +106,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       Kiosk.enterKiosk();
       Kiosk.onIntrusion(_onIntrusion);
       _startTimer();
+      _startFlush(); // flush berkala tiap 2 menit (bukan tiap tap)
       _cekDeviceOwner();
     } catch (e) {
       if (!mounted) return;
@@ -156,18 +183,52 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     } catch (_) {}
   }
 
+  // ===== SIMPAN LOKAL (instan, gak ada internet) =====
+  Future<void> _simpanLokal() async {
+    await _store.saveAll(_jawaban, _ragu);
+  }
+
+  /// Dipanggil tiap murid tap jawaban: SIMPAN LOKAL SAJA (gak kirim server).
   Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
-    try {
-      await Api.client.rpc('simpan_jawaban', params: {
-        'p_peserta': widget.pesertaId,
-        'p_soal': soalId,
-        'p_jawaban': _jawaban[soalId] ?? '',
-        'p_ragu': _ragu[soalId] ?? false,
-      });
-      if (mounted && _kirimGagal) setState(() => _kirimGagal = false);
-    } catch (_) {
-      if (flush && mounted) setState(() => _kirimGagal = true);
+    _belumKirim.add(soalId);
+    if (mounted) setState(() => _sinkron = false);
+    await _simpanLokal();
+    // flush=true hanya dipakai saat submit (paksa kirim)
+    if (flush) await _flushKeServer();
+  }
+
+  /// Kirim jawaban yang BELUM tersinkron ke server (batch, hemat request).
+  Future<void> _flushKeServer() async {
+    if (_belumKirim.isEmpty) return;
+    final ids = _belumKirim.toList();
+    for (final id in ids) {
+      try {
+        await Api.client.rpc('simpan_jawaban', params: {
+          'p_peserta': widget.pesertaId,
+          'p_soal': id,
+          'p_jawaban': _jawaban[id] ?? '',
+          'p_ragu': _ragu[id] ?? false,
+        });
+        _belumKirim.remove(id);
+      } catch (_) {
+        // gagal -> biarkan di antrian, dicoba flush berikutnya
+      }
+      await Future.delayed(const Duration(milliseconds: 60)); // jeda kecil antar-request
     }
+    try {
+      final synced = await _store.getSynced();
+      synced.addAll(ids.where((i) => !_belumKirim.contains(i)));
+      await _store.markSynced(synced);
+    } catch (_) {}
+    if (mounted) setState(() => _sinkron = _belumKirim.isEmpty);
+  }
+
+  /// Flush otomatis tiap 2 menit (ringan, gak rate-limit).
+  void _startFlush() {
+    _flushTimer?.cancel();
+    _flushTimer = Timer.periodic(const Duration(minutes: 2), (_) async {
+      if (_belumKirim.isNotEmpty) await _flushKeServer();
+    });
   }
 
   Future<void> _submit({bool auto = false}) async {
@@ -175,37 +236,57 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     setState(() => _submitting = true);
     _timer?.cancel();
     Kiosk.alarmStop();
-    try {
-      for (final s in _soal) {
-        await _saveJawaban(s['id'].toString(), flush: true);
-      }
-      await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
-      Map<String, dynamic> rekap = {};
+    // 1) pastikan SEMUA jawaban kekirim (retry sampai _belumKirim kosong)
+    for (int attempt = 0; attempt < 6; attempt++) {
+      await _flushKeServer();
+      if (_belumKirim.isEmpty) break;
+      await Future.delayed(const Duration(seconds: 2));
+    }
+    // 2) kumpulkan dengan retry (jangan keluar sebelum server konfirmasi)
+    bool okKumpul = false;
+    for (int attempt = 0; attempt < 5; attempt++) {
       try {
-        final ans = await Api.client
-            .from('jawaban_siswa')
-            .select('soal_id,ragu_ragu')
-            .eq('peserta_ujian_id', widget.pesertaId);
-        rekap = {
-          'jawab': ans.length,
-          'ragu': ans.where((a) => a['ragu_ragu'] == true).length,
-        };
-      } catch (_) {}
-      if (!mounted) return;
-      _kiosk = false;
-      await Kiosk.exitKiosk();
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
-        builder: (_) => _SelesaiScreen(
-            title: auto ? 'Waktu habis' : 'Ujian selesai', rekap: rekap),
-      ));
-    } catch (e) {
+        await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
+        okKumpul = true;
+        break;
+      } catch (e) {
+        final s = e.toString();
+        // "sudah dikumpulkan" = sebenarnya sukses (idempoten)
+        if (s.contains('sudah dikumpulkan') || s.contains('Tidak sedang')) { okKumpul = true; break; }
+        if (attempt < 4) await Future.delayed(Duration(seconds: 2 + attempt * 2));
+      }
+    }
+    if (!okKumpul) {
       if (!mounted) return;
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengumpulkan: $e'), backgroundColor: AppTheme.danger),
+        const SnackBar(
+            content: Text('Jaringan bermasalah — jawaban TERSIMPAN di server. Tap "Kumpulkan" lagi saat sinyal pulih.'),
+            backgroundColor: AppTheme.danger, duration: Duration(seconds: 8)),
       );
-      if (!auto) _startTimer();
+      return;
     }
+    Map<String, dynamic> rekap = {};
+    try {
+      final ans = await Api.client
+          .from('jawaban_siswa')
+          .select('soal_id,ragu_ragu')
+          .eq('peserta_ujian_id', widget.pesertaId);
+      rekap = {
+        'jawab': ans.length,
+        'ragu': ans.where((a) => a['ragu_ragu'] == true).length,
+      };
+    } catch (_) {}
+    // ujian benar-benar selesai & tersinkron -> bersihkan local storage
+    try { await _store.clear(); } catch (_) {}
+    _flushTimer?.cancel();
+    if (!mounted) return;
+    _kiosk = false;
+    await Kiosk.exitKiosk();
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+      builder: (_) => _SelesaiScreen(
+          title: auto ? 'Waktu habis' : 'Ujian selesai', rekap: rekap),
+    ));
   }
 
   String _fmt(int d) {
@@ -489,12 +570,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               ),
             ),
           ],
-          if (_kirimGagal)
+          if (!_sinkron)
             Container(
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: AppTheme.danger.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.danger.withOpacity(0.2))),
-              child: Row(children: [Icon(Icons.cloud_off, size: 14, color: AppTheme.danger), const SizedBox(width: 8), const Expanded(child: Text('Gagal simpan - akan dicoba lagi', style: TextStyle(fontSize: 12, color: AppTheme.danger)))]),
+              decoration: BoxDecoration(color: AppTheme.accent.withOpacity(0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.accent.withOpacity(0.25))),
+              child: Row(children: const [Icon(Icons.save_outlined, size: 14, color: AppTheme.accent), SizedBox(width: 8), Expanded(child: Text('Tersimpan di HP — mengirim ke server otomatis', style: TextStyle(fontSize: 12, color: AppTheme.accent)))]),
             ),
         ],
       ),
