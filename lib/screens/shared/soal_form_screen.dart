@@ -129,20 +129,14 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       _snack('Pilih mata pelajaran', error: true);
       return;
     }
-    if (_jenis == 'pg') {
-      bool allFilled = true;
-      for (final o in _opsi) {
-        if (o.text.trim().isEmpty) allFilled = false;
-      }
-      if (!allFilled) {
-        _snack('Semua opsi PG wajib diisi (kosongkan bila tidak perlu).', error: true);
-        return;
-      }
-      if (_kunciIdx == null) {
-        _snack('Tandai jawaban benar pada opsi.', error: true);
-        return;
-      }
-    } else if (_jenis == 'jodoh') {
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (_mapelId == null) {
+      _snack('Pilih mata pelajaran', error: true);
+      return;
+    }
+    // Additional check for jodoh questions
+    if (_jenis == 'jodoh') {
       bool allFilled = true;
       for (int i = 0; i < _jodohLeft.length; i++) {
         if (_jodohLeft[i].text.trim().isEmpty || _jodohRight[i].text.trim().isEmpty) {
@@ -155,8 +149,22 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         return;
       }
       // Check that at least one pair is matched
-      if (_jodohPairs.values.where((v) => v != null).length == 0) {
-        _snack(' minimal 1 pasangan dikunci.', error: true);
+      int matchedCount = _jodohPairs.values.where((v) => v != null && v >= 0).length;
+      if (matchedCount == 0) {
+        _snack('Minimal 1 pasangan dikunci.', error: true);
+        return;
+      }
+    } else if (_jenis == 'pg') {
+      bool allFilled = true;
+      for (final o in _opsi) {
+        if (o.text.trim().isEmpty) allFilled = false;
+      }
+      if (!allFilled) {
+        _snack('Semua opsi PG wajib diisi (kosongkan bila tidak perlu).', error: true);
+        return;
+      }
+      if (_kunciIdx == null) {
+        _snack('Tandai jawaban benar pada opsi.', error: true);
         return;
       }
     } else {
