@@ -303,7 +303,7 @@ class ModernBottomSheet {
             begin: const Offset(0, 1),
             end: Offset.zero,
           ).animate(CurvedAnimation(
-            parent: ModalRoute.of(context)?.animation ?? ANimatedBuilder(),
+            parent: ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation,
             curve: Curves.easeOutCubic,
           )),
           child: Container(
@@ -691,46 +691,6 @@ Future<void> showToast({
 
 enum ToastType { success, error, warning, info }
 
-void showToast({
-  required BuildContext context,
-  required String message,
-  ToastType type = ToastType.info,
-  Duration duration = const Duration(seconds: 3),
-}) {
-  final color = switch (type) {
-    ToastType.success => AppTheme.secondary,
-    ToastType.error => AppTheme.danger,
-    ToastType.warning => Colors.orange,
-    ToastType.info => AppTheme.primary,
-  };
-  if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          Icon(
-            switch (type) {
-              ToastType.success => Icons.check_circle,
-              ToastType.error => Icons.error_outline,
-              ToastType.warning => Icons.warning_amber_rounded,
-              ToastType.info => Icons.info_outline,
-            },
-            color: Colors.white,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(message, style: const TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-      backgroundColor: color.withOpacity(0.9),
-      duration: duration,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-    ),
-  );
-}
-
 // ==================== COPY CLIPBOARD WITH ANIMATION ====================
 Future<bool> copyToClipboard(String text, {String? message}) async {
   final result = await Clipboard.setData(ClipboardData(text: text));
@@ -773,14 +733,4 @@ class FadeIn extends AnimatedWidget {
       child: child,
     );
   }
-}
-
-// Helper class for animations
-class ANimatedBuilder implements Listenable {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  void dispatchNotification(NotificationHandler handler) {}
 }

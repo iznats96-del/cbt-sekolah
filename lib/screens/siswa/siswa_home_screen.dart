@@ -177,7 +177,7 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> with SingleTickerProv
               _ujianList.any((u) => u['status'] == 'aktif')
                   ? ScaleTransition(
                       scale: Tween(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-                        parent: _DefaultAnimationController(), curve: Curves.elasticOut),
+                        parent: kAlwaysCompleteAnimation, curve: Curves.elasticOut),
                       ),
                       child: Container(
                         margin: const EdgeInsets.only(bottom: 20),
@@ -327,7 +327,7 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> with SingleTickerProv
 
     return SlideIn(
       animation: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-        parent: _DefaultAnimationController(),
+        parent: kAlwaysCompleteAnimation,
         curve: Interval(0.2 + (index * 0.1).clamp(0.0, 0.8), 1.0 - (index * 0.1).clamp(0.0, 0.2), curve: Curves.easeOut),
       )),
       child: RippleWrapper(
@@ -382,14 +382,4 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> with SingleTickerProv
       ),
     );
   }
-}
-
-// Helper class
-class DefaultAnimationController implements Listenable {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  void dispatchNotification(NotificationHandler handler) {}
 }

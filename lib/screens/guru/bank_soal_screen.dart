@@ -108,7 +108,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> with SingleTickerProvid
       backgroundColor: Colors.transparent,
       builder: (context) => SlideTransition(
         position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(CurvedAnimation(parent: ModalRoute.of(context)?.animation ?? DefaultCurve(), curve: Curves.easeOutCubic)),
+            .animate(CurvedAnimation(parent: ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation, curve: Curves.easeOutCubic)),
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
@@ -169,7 +169,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> with SingleTickerProvid
       backgroundColor: Colors.transparent,
       builder: (context) => SlideTransition(
         position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-            .animate(CurvedAnimation(parent: ModalRoute.of(context)?.animation ?? DefaultCurve(), curve: Curves.easeOutCubic)),
+            .animate(CurvedAnimation(parent: ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation, curve: Curves.easeOutCubic)),
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
@@ -379,7 +379,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> with SingleTickerProvid
             alignment: Alignment.topCenter,
             child: const Text(''),
             animation: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-              parent: ModalRoute.of(context)?.animation ?? DefaultCurve(),
+              parent: ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation,
               curve: Curves.easeOut,
             )),
           ),
@@ -663,22 +663,3 @@ class ChipFilter extends StatelessWidget {
   }
 }
 
-class DefaultCurve implements Listenable {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  void dispatchNotification(NotificationHandler handler) {}
-}
-
-class DefaultCurve2 implements Animation<double> {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  bool isDisposed() => false;
-  @override
-  double get value => throw UnimplementedError();
-}

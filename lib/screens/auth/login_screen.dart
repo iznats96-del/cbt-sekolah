@@ -181,7 +181,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 children: [
                   // Logo with pulse animation
                   FadeIn(
-                    animation: CurveAnimation(parent: CurvedAnimation(curve: Curves.elasticOut), parent: _DefaultAnimationController()),
+                    animation: CurvedAnimation(parent: _pulseController, curve: Curves.elasticOut),
                     child: ScaleTransition(
                       scale: _scaleAnimation,
                       child: Container(
@@ -382,12 +382,3 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
   }
 }
 
-// Helper class for default animation controller
-class _DefaultAnimationController implements Listenable {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  void dispatchNotification(NotificationHandler handler) {}
-}

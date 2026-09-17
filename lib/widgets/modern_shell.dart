@@ -338,7 +338,7 @@ class SlideAppBar extends StatelessWidget implements PreferredSizeWidget {
             alignment: Alignment.topCenter,
             child: const Text(''),
             animation: Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-              parent: ModalRoute.of(context)?.animation ?? DefaultAnimationController(),
+              parent: ModalRoute.of(context)?.animation ?? kAlwaysCompleteAnimation,
               curve: Curves.easeOut,
             )),
           ),
@@ -400,36 +400,3 @@ class FadeInTransition extends AnimatedWidget {
   }
 }
 
-// Helper classes
-class _DefaultAnimationController implements Listenable {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  void dispatchNotification(NotificationHandler handler) {}
-}
-
-class DefaultAnimationController implements Listenable {
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  void dispatchNotification(NotificationHandler handler) {}
-}
-
-class AlwaysStoppedAnimation<T> implements Animation<T> {
-  final T value;
-  
-  const AlwaysStoppedAnimation(this.value);
-  
-  @override
-  void addListener(listener) {}
-  @override
-  void removeListener(listener) {}
-  @override
-  bool isDisposed() => false;
-  @override
-  T get value => throw UnimplementedError();
-}
