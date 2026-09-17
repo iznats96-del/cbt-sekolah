@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/modern_widgets.dart';
 import '../shared/soal_form_screen.dart';
+import '../admin/import_ujian_screen.dart';
 
 class BankSoalScreen extends StatefulWidget {
   const BankSoalScreen({super.key});
@@ -455,6 +456,16 @@ class _BankSoalScreenState extends State<BankSoalScreen> with SingleTickerProvid
             label: 'Tambah Soal',
             icon: Icons.add,
             onPressed: _add,
+          ),
+          FabMenuItem(
+            label: 'Import Ujian',
+            icon: Icons.upload_file,
+            onPressed: () async {
+              final ok = await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportUjianScreen()),
+              );
+              if (ok == true) _load();
+            },
           ),
           if (_filterMapel != null)
             FabMenuItem(

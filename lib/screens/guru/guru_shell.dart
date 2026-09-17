@@ -7,6 +7,7 @@ import 'jadwal_screen.dart';
 import 'nilai_screen.dart';
 import 'presensi_screen.dart';
 import 'pengumuman_screen.dart';
+import '../admin/import_ujian_screen.dart';
 
 class GuruShell extends StatefulWidget {
   const GuruShell({super.key});
@@ -189,6 +190,19 @@ class _GuruHome extends StatelessWidget {
               icon: Icons.fact_check_outlined, 
               label: 'Presensi', 
               color: const Color(0xFFD9534F)),
+            _MiniCard(
+              onTap: () async {
+                final result = await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ImportUjianScreen()),
+                );
+                if (result == true) {
+                  // Reload current page if on Bank Soal or Jadwal
+                  if (_index == 1 || _index == 2) setState(() {});
+                }
+              },
+              icon: Icons.upload_file, 
+              label: 'Import Soal', 
+              color: AppTheme.accent),
           ],
         ),
       ],
