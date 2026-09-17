@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../shared/soal_form_screen.dart';
+import '../admin/import_ujian_screen.dart';
 
 class BankSoalScreen extends StatefulWidget {
   const BankSoalScreen({super.key});
@@ -112,6 +113,18 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
         title: const Text('Bank Soal'),
+        actions: [
+          IconButton(
+            tooltip: 'Import soal dari naskah .docx',
+            icon: const Icon(Icons.upload_file_outlined),
+            onPressed: () async {
+              final ok = await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportUjianScreen()),
+              );
+              if (ok == true) { _load(); _loadMapel(); }
+            },
+          ),
+        ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(46),
           child: Container(
