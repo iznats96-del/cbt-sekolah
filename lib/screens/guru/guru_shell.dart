@@ -8,6 +8,7 @@ import 'nilai_screen.dart';
 import 'presensi_screen.dart';
 import 'pengumuman_screen.dart';
 import '../admin/import_ujian_screen.dart';
+import 'rekap_nilai_full_screen.dart';
 
 class GuruShell extends StatefulWidget {
   const GuruShell({super.key});
@@ -24,7 +25,7 @@ class _GuruShellState extends State<GuruShell> {
     _GuruHome(),
     BankSoalScreen(),
     JadwalScreen(),
-    NilaiScreen(),
+    RekapNilaiFullScreen(), // NEW dedicated rekap page!
     PresensiScreen(),
     PengumumanScreen(),
   ];
