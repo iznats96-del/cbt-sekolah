@@ -102,12 +102,58 @@ class DataMasterScreen extends StatelessWidget {
       table: 'mata_pelajaran',
       displayField: 'nama',
       columns: ['kode'],
+      extraActions: (ctx, row) => [
+        IconButton(
+          icon: const Icon(Icons.delete_forever_outlined, color: AppTheme.danger),
+          tooltip: 'Hapus mapel + semua ujian/soalnya',
+          onPressed: () => _hapusMapelCascade(ctx, row),
+        ),
+      ],
       fields: const [
         CrudField('nama', label: 'Nama Mapel', required: true),
         CrudField('kode', label: 'Kode Mapel'),
         CrudField('kkm', label: 'KKM', type: 'number'),
       ],
     );
+  }
+
+  /// Hapus mapel SEKALIGUS ujian, soal, peserta, jawaban yang terkait (admin/cascade).
+  Future<void> _hapusMapelCascade(BuildContext ctx, Map<String, dynamic> row) async {
+    final ok = await showDialog<bool>(
+      context: ctx,
+      builder: (c) => AlertDialog(
+        title: const Text('Hapus Mapel + Semua Ujian?'),
+        content: Text(
+            'Hapus "${row['nama']}" akan MENGHAPUS PERMANEN:\n\n'
+            '• semua UJIAN yang pakai mapel ini\n'
+            '• semua SOAL (bank soal) mapel ini\n'
+            '• semua PESERTA + JAWABAN + NILAI ujian tsb\n'
+            '• jadwal pelajaran mapel ini\n\n'
+            'Tindakan ini tidak bisa dibatalkan. Lanjutkan?',
+            style: const TextStyle(fontSize: 13)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Hapus Semua')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res = await Api.client.rpc('admin_hapus_mapel', params: {'p_mapel': row['id']});
+      final m = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+        content: Text('Terhapus: ${m['ujian_dihapus'] ?? 0} ujian, ${m['soal_dihapus'] ?? 0} soal'),
+        backgroundColor: AppTheme.secondary,
+      ));
+    } catch (e) {
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text('Gagal hapus mapel: $e'), backgroundColor: AppTheme.danger));
+    }
   }
 
   Widget _kelas() {

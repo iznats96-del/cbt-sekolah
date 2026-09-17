@@ -140,8 +140,37 @@ class _CrudScreenState extends State<CrudScreen> {
       await _crud.delete(row['id'] as String);
       _load();
     } catch (e) {
-      _showSnack('Gagal hapus: $e', error: true);
+      final s = e.toString();
+      // Foreign key: data masih dipakai tabel lain (mis. mapel dipakai ujian)
+      if (s.contains('23503') || s.contains('foreign key')) {
+        final tbl = _referencedBy(s);
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (c) => AlertDialog(
+              title: const Text('Tidak bisa dihapus'),
+              content: Text(
+                  '"${row[widget.displayField]}" masih dipakai data lain'
+                  '${tbl != null ? ' ($tbl)' : ''}.\n\n'
+                  'Hapus/pindahkan dulu data terkait, baru data ini bisa dihapus.'),
+              actions: [
+                FilledButton(
+                    onPressed: () => Navigator.pop(c),
+                    child: const Text('Mengerti')),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+      _showSnack('Gagal hapus: $s', error: true);
     }
+  }
+
+  /// Ambil nama tabel dari pesan error FK PostgREST ("on table \"ujian\"").
+  String? _referencedBy(String err) {
+    final m = RegExp(r'on table "([^"]+)"').firstMatch(err);
+    return m?.group(1);
   }
 
   void _showSnack(String msg, {bool error = false}) {
