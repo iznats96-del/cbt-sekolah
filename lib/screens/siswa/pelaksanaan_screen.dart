@@ -35,6 +35,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   final Set<String> _belumKirim = {}; // soalId yang berubah & belum disinkron ke server
   Timer? _flushTimer;
   bool _sinkron = true; // semua jawaban tersimpan di server?
+  // controller essay per-soal (JANGAN bikin baru tiap build -> bikin cursor ngaco)
+  final Map<String, TextEditingController> _essayCtrl = {};
+
+  TextEditingController _ctrlFor(String soalId) {
+    return _essayCtrl.putIfAbsent(soalId, () {
+      final c = TextEditingController(text: _jawaban[soalId] ?? '');
+      c.selection = TextSelection.collapsed(offset: c.text.length);
+      return c;
+    });
+  }
 
   @override
   void initState() {
@@ -52,6 +62,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     _flushTimer?.cancel();
+    for (final c in _essayCtrl.values) { c.dispose(); }
     Kiosk.alarmStop();
     Kiosk.setSecure(false);
     Kiosk.exitKiosk();
@@ -608,13 +619,15 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
             Row(children: [Icon(Icons.edit_note, size: 18, color: AppTheme.primary), SizedBox(width: 8), Text('Jawaban Essay', style: TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary))]),
             const SizedBox(height: 12),
             TextField(
-              controller: TextEditingController(text: _jawaban[curId] ?? ''),
+              controller: _ctrlFor(curId),
               maxLines: 6,
               minLines: 4,
+              textInputAction: TextInputAction.newline,
               onChanged: (v) {
+                // simpan lokal TANPA setState (biar keyboard/cursor tidak lompat)
                 _jawaban[curId] = v;
-                _saveJawaban(curId);
-                setState(() {});
+                _belumKirim.add(curId);
+                _simpanLokal();
               },
               decoration: InputDecoration(
                 hintText: 'Ketik jawaban lengkap Anda di sini...',

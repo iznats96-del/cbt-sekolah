@@ -104,42 +104,33 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
   }
 
   Future<void> _start(Map<String, dynamic> u) async {
-    final tokenCtrl = TextEditingController();
-    final token = await showDialog<String>(
+    // ===== TANPA TOKEN: cukup konfirmasi, langsung mengerjakan =====
+    final lanjut = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: const Text('Masukkan Token'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Token diberikan pengawas ujian untuk: ${u['nama']}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: tokenCtrl,
-              textCapitalization: TextCapitalization.characters,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 20, letterSpacing: 6),
-              decoration: const InputDecoration(hintText: '••••••'),
-            ),
-          ],
-        ),
+        title: const Text('Mulai Ujian?'),
+        content: Text(
+            '${u['nama']}\n\n'
+            '• ${u['mapel'] ?? ''}\n'
+            '• ${u['alokasi_menit'] ?? '?'} menit • ${u['jumlah_soal'] ?? '?'} soal\n\n'
+            'Waktu mulai berjalan begitu kamu masuk. Pastikan siap.',
+            style: const TextStyle(fontSize: 13, height: 1.5)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
           FilledButton(
-              onPressed: () => Navigator.pop(c, tokenCtrl.text.trim().toUpperCase()),
-              child: const Text('Masuk')),
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Kerjakan')),
         ],
       ),
     );
-    if (token == null || token.isEmpty) return;
+    if (lanjut != true) return;
 
-    // verifikasi TOKEN di SERVER + registrasi peserta otomatis
+    // registrasi peserta di SERVER (token kosong -> sistem tanpa token)
     try {
       final pesertaId =
           await Api.client.rpc('cek_token_ujian', params: {
         'p_ujian': u['id'],
-        'p_token': token,
+        'p_token': '',
       });
       if (!mounted) return;
       Navigator.of(context).push(MaterialPageRoute(
@@ -150,11 +141,13 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
       ));
     } catch (e) {
       final msg = e.toString();
-      _snack(msg.contains('Salah token')
-          ? 'Token salah! Minta token ke pengawas.'
-          : msg.contains('Sudah mengerjakan')
-              ? 'Kamu sudah mengerjakan ujian ini.'
-              : 'Gagal: ${_clean(msg)}', error: true);
+      _snack(msg.contains('Sudah mengerjakan')
+          ? 'Kamu sudah mengerjakan ujian ini.'
+          : msg.contains('luar jadwal') || msg.contains('tidak tersedia')
+              ? 'Ujian belum dibuka sesuai jadwal.'
+              : msg.contains('Bukan kelas')
+                  ? 'Ujian ini untuk kelas lain.'
+                  : 'Gagal: ${_clean(msg)}', error: true);
     }
   }
 

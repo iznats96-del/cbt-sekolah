@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import 'rekap_detail_screen.dart';
 
 /// Rekap hasil ujian per rombel (X/XI/XII — TKJ / TSM / AKA) — admin & guru.
 class RekapNilaiScreen extends StatefulWidget {
@@ -320,7 +321,15 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
         ? (h!['pelanggaran'] as num).toInt()
         : 0;
     final nisTxt = (s['nis'] ?? '').toString();
-    return Padding(
+    final pesertaId = '${p['id'] ?? ''}';
+    return InkWell(
+      onTap: pesertaId.isEmpty
+          ? null
+          : () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => RekapDetailScreen(
+                    ujian: _selected ?? const {}, pesertaId: pesertaId),
+              )),
+      child: Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
@@ -375,6 +384,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
