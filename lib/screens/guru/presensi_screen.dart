@@ -43,34 +43,27 @@ class _PresensiScreenState extends State<PresensiScreen> {
 
   Future<void> _absen(Map<String, dynamic> s, String status) async {
     try {
-      final today = DateTime.now().toIso8601String().split('T').first;
-      // cek existing
-      final existing = await Api.client
-          .from('kehadiran')
-          .select()
-          .eq('siswa_id', s['id'])
-          .eq('tanggal', today);
-      if (existing.isNotEmpty) {
-        await Api.client
-            .from('kehadiran')
-            .update({'status': status})
-            .eq('id', existing.first['id']);
-      } else {
-        await Api.client.from('kehadiran').insert({
-          'siswa_id': s['id'],
-          'tanggal': today,
-          'status': status,
-          'guru_id': Api.user?.id,
-        });
-      }
+      // pakai RPC atomik (anti-duplikat, 1x panggil)
+      final res = await Api.client.rpc('catat_hadir', params: {
+        'p_nis': '${s['nis'] ?? ''}',
+        'p_status': status,
+      });
+      final m = Map<String, dynamic>.from(res as Map);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${s['nama']}: $status')),
+        SnackBar(
+            content: Text(
+                '${m['nama'] ?? s['nama']}: $status${m['baru'] == false ? ' (diperbarui)' : ''}')),
       );
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal: $e'), backgroundColor: AppTheme.danger),
+        SnackBar(
+            content: Text(msg.contains('tidak terdaftar')
+                ? 'NIS tidak terdaftar'
+                : 'Gagal: $e'),
+            backgroundColor: AppTheme.danger),
       );
     }
   }

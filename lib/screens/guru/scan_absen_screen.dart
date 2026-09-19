@@ -4,6 +4,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import 'presensi_screen.dart';
+import 'rekap_absen_screen.dart';
 
 /// Absen barcode (Opsi A): guru scan QR NIS milik murid.
 /// QR murid = NIS (bisa dari layar "Kartu Saya" murid / kartu cetak).
@@ -32,66 +33,61 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
     super.dispose();
   }
 
-  String _today() {
-    final n = DateTime.now();
-    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
-  }
-
-  Future<void> _prosesNis(String raw) async {
+  Future<void> _prosesNis(String raw, {String status = 'hadir'}) async {
     final nis = raw.trim();
     if (nis.isEmpty || _busy) return;
     setState(() => _busy = true);
     try {
-      // 1. cari murid berdasar NIS
-      final rows = await Api.client
-          .from('siswa')
-          .select('id,nama,nis,kelas(nama)')
-          .eq('nis', nis)
-          .limit(1);
-      if (rows.isEmpty) {
-        _hasil('NIS $nis tidak terdaftar', AppTheme.danger);
-        return;
-      }
-      final s = Map<String, dynamic>.from(rows.first as Map);
-      final kelas = s['kelas'] is Map ? '${(s['kelas'] as Map)['nama'] ?? ''}' : '';
+      // 1x panggil RPC atomik (anti-duplikat di server)
+      final res = await Api.client.rpc('catat_hadir',
+          params: {'p_nis': nis, 'p_status': status});
+      final m = Map<String, dynamic>.from(res as Map);
+      final nama = '${m['nama'] ?? nis}';
+      final baru = m['baru'] == true;
 
-      // 2. upsert kehadiran hari ini -> hadir
-      final today = _today();
-      final ex = await Api.client
-          .from('kehadiran')
-          .select('id')
-          .eq('siswa_id', '${s['id']}')
-          .eq('tanggal', today)
-          .limit(1);
-      if ((ex as List).isNotEmpty) {
-        await Api.client.from('kehadiran').update(
-            {'status': 'hadir', 'guru_id': Api.user?.id}).eq(
-            'id', '${(ex as List).first['id']}');
-      } else {
-        await Api.client.from('kehadiran').insert({
-          'siswa_id': '${s['id']}',
-          'tanggal': today,
-          'status': 'hadir',
-          'guru_id': Api.user?.id,
-        });
-      }
+      // cari kelas murid untuk tampilan (opsional, gagal pun tak masalah)
+      String kelas = '';
+      try {
+        final rows = await Api.client
+            .from('siswa')
+            .select('kelas(nama)')
+            .eq('nis', nis)
+            .limit(1);
+        if ((rows as List).isNotEmpty) {
+          final k = (rows.first as Map)['kelas'];
+          if (k is Map) kelas = '${k['nama'] ?? ''}';
+        }
+      } catch (_) {}
 
       setState(() {
-        _riwayat.insert(0, {
-          'nama': '${s['nama']}',
-          'nis': '${s['nis']}',
-          'kelas': kelas,
-        });
-        _hadirHariIni++;
+        // riwayat sesi: kalau NIS sudah ada, pindah ke atas (jangan dobel)
+        _riwayat.removeWhere((r) => r['nis'] == nis);
+        _riwayat.insert(0, {'nama': nama, 'nis': nis, 'kelas': kelas});
+        _hadirHariIni = _riwayat.length;
       });
-      _hasil('${s['nama']} • HADIR', AppTheme.secondary);
+      _hasil(
+          baru ? '$nama • HADIR ✓' : '$nama • sudah tercatat (diperbarui)',
+          baru ? AppTheme.secondary : AppTheme.primary);
     } catch (e) {
-      _hasil('Gagal: $e', AppTheme.danger);
+      final s = e.toString();
+      _hasil(
+          s.contains('tidak terdaftar')
+              ? 'NIS $nis tidak terdaftar'
+              : s.contains('Hanya guru')
+                  ? 'Akses ditolak'
+                  : 'Gagal: ${_clean(s)}',
+          AppTheme.danger);
     } finally {
       // jeda biar 1 scan = 1 catat (gak dobel)
       await Future.delayed(const Duration(milliseconds: 1200));
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  String _clean(String s) {
+    final m = RegExp(r'"message":"([^"]+)"').firstMatch(s) ??
+        RegExp(r': (.+)$').firstMatch(s);
+    return m?.group(1) ?? s;
   }
 
   void _hasil(String m, Color c) {
@@ -114,6 +110,13 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
       appBar: AppBar(
         title: const Text('Scan Absen'),
         actions: [
+          IconButton(
+            tooltip: 'Rekap per kelas & jurusan',
+            icon: const Icon(Icons.insert_chart_outlined),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RekapAbsenScreen()),
+            ),
+          ),
           IconButton(
             tooltip: _torch ? 'Matikan lampu' : 'Nyalakan lampu',
             icon: Icon(_torch ? Icons.flash_on : Icons.flash_off),
