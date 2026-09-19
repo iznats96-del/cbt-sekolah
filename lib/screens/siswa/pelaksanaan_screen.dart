@@ -386,33 +386,51 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF1F5F9),
-        body: Column(
+        body: Stack(
           children: [
-            _buildHeader(progress, isLowTime, isCriticalTime, answeredCount),
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: Colors.white,
-              valueColor: AlwaysStoppedAnimation(isLowTime ? AppTheme.danger : AppTheme.primary),
+            Column(
+              children: [
+                _buildHeader(progress, isLowTime, isCriticalTime, answeredCount),
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 4,
+                  backgroundColor: Colors.white,
+                  valueColor: AlwaysStoppedAnimation(isLowTime ? AppTheme.danger : AppTheme.primary),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildQuestionCard(current, curId, jenis, opsiList),
+                        const SizedBox(height: 16),
+                        _buildOptions(curId, jenis, opsiList),
+                        const SizedBox(height: 16),
+                        _buildRaguChip(curId),
+                        const SizedBox(height: 24),
+                      ],
+                    ),
+                  ),
+                ),
+                _buildBottomNav(),
+              ],
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildQuestionCard(current, curId, jenis, opsiList),
-                    const SizedBox(height: 16),
-                    _buildOptions(curId, jenis, opsiList),
-                    const SizedBox(height: 16),
-                    _buildRaguChip(curId),
-                    const SizedBox(height: 24),
-                  ],
+            // ===== FLOATING daftar soal (gede, tap luar buat tutup) =====
+            if (_showPalette) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: () => setState(() => _showPalette = false),
+                  child: Container(color: Colors.black.withOpacity(0.45)),
                 ),
               ),
-            ),
-            _buildBottomNav(),
-            if (_showPalette) _buildPalette(),
+              Positioned(
+                left: 14,
+                right: 14,
+                bottom: 14,
+                child: _buildPalette(),
+              ),
+            ],
           ],
         ),
       ),
@@ -781,75 +799,101 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   Widget _buildPalette() {
-    return Container(
-      height: 148,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: const Color(0xFFE2E8F0))),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -4))],
-      ),
-      child: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(2)),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-            child: Row(
-              children: [
-                const Text('Navigasi Soal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                const Spacer(),
-                _buildLegendDot(AppTheme.secondary, 'Dijawab'),
-                const SizedBox(width: 12),
-                _buildLegendDot(AppTheme.accent, 'Ragu'),
-                const SizedBox(width: 12),
-                _buildLegendDot(Colors.grey[400]!, 'Kosong'),
-              ],
-            ),
-          ),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 48,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 1,
-              ),
-              itemCount: _soal.length,
-              itemBuilder: (context, i) {
-                final id = _soal[i]['id'].toString();
-                final answered = _jawaban[id] != null && _jawaban[id]!.isNotEmpty;
-                final ragu = _ragu[id] ?? false;
-                final isCurrent = i == _idx;
-                Color bg;
-                if (answered) bg = AppTheme.secondary;
-                else if (ragu) bg = AppTheme.accent;
-                else bg = Colors.grey[300]!;
-                return InkWell(
-                  onTap: () => setState(() {
-                    _idx = i;
-                    _showPalette = false;
-                  }),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: isCurrent ? AppTheme.primary : bg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: isCurrent ? AppTheme.primary : Colors.transparent, width: 2),
-                      boxShadow: isCurrent ? [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 8)] : null,
+    final answeredCount = _jawaban.values.where((v) => v != null && v!.isNotEmpty).length;
+    final maxH = MediaQuery.of(context).size.height * 0.62;
+    return Material(
+      elevation: 16,
+      borderRadius: BorderRadius.circular(24),
+      color: Colors.white,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Daftar Soal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      ],
                     ),
-                    alignment: Alignment.center,
-                    child: Text('${i + 1}', style: TextStyle(color: isCurrent || answered || ragu ? Colors.white : const Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 14)),
                   ),
-                );
-              },
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('$answeredCount/${_soal.length} terjawab',
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    tooltip: 'Tutup',
+                    icon: const Icon(Icons.close, size: 24),
+                    onPressed: () => setState(() => _showPalette = false),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+              child: Row(
+                children: [
+                  _buildLegendDot(AppTheme.secondary, 'Dijawab'),
+                  const SizedBox(width: 14),
+                  _buildLegendDot(AppTheme.accent, 'Ragu'),
+                  const SizedBox(width: 14),
+                  _buildLegendDot(Colors.grey[400]!, 'Kosong'),
+                ],
+              ),
+            ),
+            Flexible(
+              child: GridView.builder(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 72,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1,
+                ),
+                itemCount: _soal.length,
+                itemBuilder: (context, i) {
+                  final id = _soal[i]['id'].toString();
+                  final answered = _jawaban[id] != null && _jawaban[id]!.isNotEmpty;
+                  final ragu = _ragu[id] ?? false;
+                  final isCurrent = i == _idx;
+                  Color bg;
+                  if (answered) bg = AppTheme.secondary;
+                  else if (ragu) bg = AppTheme.accent;
+                  else bg = Colors.grey[300]!;
+                  return InkWell(
+                    onTap: () => setState(() {
+                      _idx = i;
+                      _showPalette = false;
+                    }),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isCurrent ? AppTheme.primary : bg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: isCurrent ? AppTheme.primary : Colors.transparent, width: 2),
+                        boxShadow: isCurrent ? [BoxShadow(color: AppTheme.primary.withOpacity(0.35), blurRadius: 10)] : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text('${i + 1}', style: TextStyle(color: isCurrent || answered || ragu ? Colors.white : const Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 17)),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -858,9 +902,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+        const SizedBox(width: 5),
+        Text(label, style: const TextStyle(fontSize: 12.5, color: Color(0xFF64748B))),
       ],
     );
   }
