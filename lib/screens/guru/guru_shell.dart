@@ -6,6 +6,7 @@ import 'jadwal_screen.dart';
 import 'nilai_screen.dart';
 import 'presensi_screen.dart';
 import 'pengumuman_screen.dart';
+import 'scan_absen_screen.dart';
 
 class GuruShell extends StatefulWidget {
   const GuruShell({super.key});
@@ -16,13 +17,14 @@ class GuruShell extends StatefulWidget {
 
 class _GuruShellState extends State<GuruShell> {
   int _index = 0;
-  static const _titles = ['Guru', 'Soal', 'Jadwal', 'Nilai'];
+  static const _titles = ['Guru', 'Soal', 'Jadwal', 'Nilai', 'Absen'];
 
   static const _pages = [
     _GuruHome(),
     BankSoalScreen(),
     JadwalScreen(),
     NilaiScreen(),
+    ScanAbsenScreen(),
     PresensiScreen(),
     PengumumanScreen(),
   ];
@@ -55,6 +57,10 @@ class _GuruShellState extends State<GuruShell> {
               icon: Icon(Icons.grade_outlined),
               selectedIcon: Icon(Icons.grade),
               label: 'Nilai'),
+          NavigationDestination(
+              icon: Icon(Icons.qr_code_scanner_outlined),
+              selectedIcon: Icon(Icons.qr_code_scanner),
+              label: 'Absen'),
         ],
       ),
     );

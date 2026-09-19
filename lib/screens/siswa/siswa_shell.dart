@@ -4,6 +4,7 @@ import '../home.dart';
 import 'siswa_home_screen.dart';
 import 'hasil_siswa_screen.dart';
 import 'pengumuman_siswa_screen.dart';
+import 'kartu_saya_screen.dart';
 
 class SiswaShell extends StatefulWidget {
   const SiswaShell({super.key});
@@ -14,12 +15,13 @@ class SiswaShell extends StatefulWidget {
 
 class _SiswaShellState extends State<SiswaShell> {
   int _index = 0;
-  static const _titles = ['Beranda', 'Hasil', 'Info'];
+  static const _titles = ['Beranda', 'Hasil', 'Info', 'Kartu'];
 
   static const _pages = [
     SiswaHomeScreen(),
     HasilSiswaScreen(),
     PengumumanSiswaScreen(),
+    KartuSayaScreen(),
   ];
 
   @override
@@ -46,6 +48,10 @@ class _SiswaShellState extends State<SiswaShell> {
               icon: Icon(Icons.campaign_outlined),
               selectedIcon: Icon(Icons.campaign),
               label: 'Info'),
+          NavigationDestination(
+              icon: Icon(Icons.qr_code_2_outlined),
+              selectedIcon: Icon(Icons.qr_code_2),
+              label: 'Kartu'),
         ],
       ),
     );
