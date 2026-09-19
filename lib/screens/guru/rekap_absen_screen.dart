@@ -3,7 +3,37 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 
-/// Rekap absen harian: per KELAS (siapa hadir / belum) + ringkasan per JURUSAN.
+const _namaHari = [
+  'Senin',
+  'Selasa',
+  'Rabu',
+  'Kamis',
+  'Jumat',
+  'Sabtu',
+  'Minggu'
+];
+const _namaBulan = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember'
+];
+
+String _dstr(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+String _pendek(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+
+/// Rekap absen: HARIAN (per kelas + per jurusan + siapa belum),
+/// MINGGUAN & BULANAN (per hari + total per kelas).
 class RekapAbsenScreen extends StatefulWidget {
   const RekapAbsenScreen({super.key});
 
@@ -13,12 +43,45 @@ class RekapAbsenScreen extends StatefulWidget {
 
 class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
   List<Map<String, dynamic>> _siswa = [];
-  Map<String, String> _hadir = {}; // siswa_id -> status
+  // siswa_id -> {yyyy-MM-dd: status}
+  Map<String, Map<String, String>> _hadir = {};
   bool _loading = true;
   String _q = '';
-  String get _today {
-    final n = DateTime.now();
-    return '${n.day.toString().padLeft(2, '0')}/${n.month.toString().padLeft(2, '0')}/${n.year}';
+  int _mode = 0; // 0=harian, 1=mingguan, 2=bulanan
+  DateTime _anchor = DateTime.now();
+
+  DateTime get _day =>
+      DateTime(_anchor.year, _anchor.month, _anchor.day);
+
+  DateTime get _start {
+    if (_mode == 1) return _day.subtract(Duration(days: _day.weekday - 1));
+    if (_mode == 2) return DateTime(_day.year, _day.month, 1);
+    return _day;
+  }
+
+  DateTime get _end {
+    if (_mode == 1) return _start.add(const Duration(days: 6));
+    if (_mode == 2) return DateTime(_day.year, _day.month + 1, 0);
+    return _day;
+  }
+
+  String get _label {
+    if (_mode == 1) return 'Minggu ${_pendek(_start)} – ${_pendek(_end)}';
+    if (_mode == 2) return '${_namaBulan[_day.month - 1]} ${_day.year}';
+    return '${_namaHari[_day.weekday - 1]}, ${_pendek(_day)}';
+  }
+
+  void _geser(int dir) {
+    setState(() {
+      if (_mode == 1) {
+        _anchor = _anchor.add(Duration(days: 7 * dir));
+      } else if (_mode == 2) {
+        _anchor = DateTime(_anchor.year, _anchor.month + dir, 1);
+      } else {
+        _anchor = _anchor.add(Duration(days: dir));
+      }
+    });
+    _load();
   }
 
   @override
@@ -30,19 +93,23 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final tgl = DateTime.now().toIso8601String().split('T').first;
       final res = await Future.wait([
         Api.client
             .from('siswa')
             .select('id,nama,nis,kelas(nama,jurusan(nama,singkatan))')
             .order('nama'),
-        Api.client.from('kehadiran').select('siswa_id,status').eq('tanggal', tgl),
+        Api.client
+            .from('kehadiran')
+            .select('siswa_id,tanggal,status')
+            .gte('tanggal', _dstr(_start))
+            .lte('tanggal', _dstr(_end)),
       ]);
       if (!mounted) return;
-      final had = <String, String>{};
+      final had = <String, Map<String, String>>{};
       for (final r in (res[1] as List)) {
         final m = Map<String, dynamic>.from(r as Map);
-        had['${m['siswa_id']}'] = '${m['status'] ?? ''}';
+        (had['${m['siswa_id']}'] ??= {})['${m['tanggal']}'] =
+            '${m['status'] ?? ''}';
       }
       setState(() {
         _siswa = List<Map<String, dynamic>>.from(res[0] as List);
@@ -63,16 +130,24 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
   String _jurusanOf(Map<String, dynamic> s) {
     final k = s['kelas'];
     final j = (k is Map) ? k['jurusan'] : null;
-    if (j is Map && '${j['singkatan'] ?? ''}'.isNotEmpty) return '${j['singkatan']}';
+    if (j is Map && '${j['singkatan'] ?? ''}'.isNotEmpty) {
+      return '${j['singkatan']}';
+    }
     return '';
   }
 
-  bool _isHadir(Map<String, dynamic> s) => _hadir['${s['id']}'] == 'hadir';
+  String _stTgl(Map<String, dynamic> s, String tgl) =>
+      _hadir['${s['id']}']?[tgl] ?? '';
+
+  bool _isHadir(Map<String, dynamic> s) =>
+      _stTgl(s, _dstr(_day)) == 'hadir';
+
+  // ================= HARIAN =================
 
   List<Map<String, dynamic>> get _filtered {
     final q = _q.trim().toLowerCase();
     final list = q.isEmpty
-        ? _siswa
+        ? List<Map<String, dynamic>>.from(_siswa)
         : _siswa.where((s) {
             final nama = '${s['nama'] ?? ''}'.toLowerCase();
             final nis = '${s['nis'] ?? ''}'.toLowerCase();
@@ -86,41 +161,7 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
     return list;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text('Rekap Absen • $_today')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-                  child: TextField(
-                    onChanged: (v) => setState(() => _q = v),
-                    decoration: InputDecoration(
-                      hintText: 'Cari nama / NIS...',
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.search, size: 18),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ),
-                _ringkasan(),
-                Expanded(child: _daftarKelas()),
-              ],
-            ),
-    );
-  }
-
   Widget _ringkasan() {
-    // agregat per jurusan
     final agg = <String, List<int>>{}; // singkatan -> [hadir, total]
     int hadirAll = 0;
     for (final s in _siswa) {
@@ -139,8 +180,9 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Hadir $hadirAll/${_siswa.length} murid hari ini',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+          Text('Hadir $hadirAll/${_siswa.length} murid',
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -148,7 +190,8 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
             children: [
               for (final k in keys)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
@@ -156,9 +199,12 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
                   ),
                   child: Column(
                     children: [
-                      Text(k, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      Text(k,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 13)),
                       Text('${agg[k]![0]}/${agg[k]![1]} hadir',
-                          style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
+                          style: const TextStyle(
+                              fontSize: 11.5, color: Colors.grey)),
                     ],
                   ),
                 ),
@@ -225,8 +271,7 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
                               color: AppTheme.danger)),
                     ),
                   ),
-                  for (final s in belum)
-                    _row(s, false),
+                  for (final s in belum) _row(s, false),
                   const Divider(height: 16),
                 ],
                 const Align(
@@ -250,7 +295,7 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
   }
 
   Widget _row(Map<String, dynamic> s, bool hadir) {
-    final st = _hadir['${s['id']}'] ?? '';
+    final st = _stTgl(s, _dstr(_day));
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -280,6 +325,254 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
                 style: TextStyle(fontSize: 11, color: Colors.grey[600])),
         ],
       ),
+    );
+  }
+
+  // ================= MINGGUAN / BULANAN =================
+
+  List<DateTime> get _days {
+    final out = <DateTime>[];
+    for (var d = _start; !d.isAfter(_end); d = d.add(const Duration(days: 1))) {
+      out.add(d);
+    }
+    return out;
+  }
+
+  int _hadirPada(DateTime d) {
+    final t = _dstr(d);
+    int n = 0;
+    for (final s in _siswa) {
+      if (_hadir['${s['id']}']?[t] == 'hadir') n++;
+    }
+    return n;
+  }
+
+  Widget _periode() {
+    final days = _days;
+    // total per kelas: catat hadir + murid unik
+    final byKelas = <String, List<Map<String, dynamic>>>{};
+    for (final s in _siswa) {
+      final k = _kelasOf(s);
+      (byKelas[k.isEmpty ? '(tanpa kelas)' : k] ??= []).add(s);
+    }
+    final kkeys = byKelas.keys.toList()..sort();
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_label,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 4),
+                  Text(
+                      '${_days.length} hari • ${_siswa.length} murid',
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey[600])),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final d in days) _hariRow(d),
+          const SizedBox(height: 6),
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 6, top: 4),
+            child: Text('TOTAL PER KELAS',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                    letterSpacing: 1)),
+          ),
+          for (final k in kkeys) _kelasTotal(k, byKelas[k]!),
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _hariRow(DateTime d) {
+    final h = _hadirPada(d);
+    final t = _siswa.length;
+    final pct = t == 0 ? 0.0 : h / t;
+    final isToday = _dstr(d) == _dstr(DateTime.now());
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${_namaHari[d.weekday - 1]}, ${_pendek(d)}${isToday ? ' • hari ini' : ''}',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13.5,
+                        color: isToday ? AppTheme.primary : null),
+                  ),
+                ),
+                Text('$h/$t',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13.5)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: pct,
+                minHeight: 8,
+                backgroundColor: const Color(0xFFE2E8F0),
+                valueColor: AlwaysStoppedAnimation<Color>(
+                    pct >= 0.8
+                        ? AppTheme.secondary
+                        : pct >= 0.4
+                            ? AppTheme.accent
+                            : AppTheme.danger),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kelasTotal(String nama, List<Map<String, dynamic>> list) {
+    int catat = 0;
+    final unik = <String>{};
+    final days = _days.map(_dstr).toSet();
+    for (final s in list) {
+      final m = _hadir['${s['id']}'] ?? {};
+      for (final e in m.entries) {
+        if (e.value == 'hadir' && days.contains(e.key)) {
+          catat++;
+          unik.add('${s['id']}');
+        }
+      }
+    }
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        dense: true,
+        leading: CircleAvatar(
+          backgroundColor: AppTheme.primary.withOpacity(0.12),
+          child: Text('${unik.length}',
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.primary,
+                  fontSize: 13)),
+        ),
+        title: Text(nama,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+        subtitle: Text('$catat catat hadir • ${unik.length}/${list.length} murid pernah hadir',
+            style: const TextStyle(fontSize: 11.5)),
+      ),
+    );
+  }
+
+  // ================= SHELL =================
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6FA),
+      appBar: AppBar(title: const Text('Rekap Absen')),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                // mode + navigasi tanggal
+                Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Column(
+                    children: [
+                      SegmentedButton<int>(
+                        segments: const [
+                          ButtonSegment(
+                              value: 0,
+                              label: Text('Harian'),
+                              icon: Icon(Icons.today, size: 16)),
+                          ButtonSegment(
+                              value: 1,
+                              label: Text('Mingguan'),
+                              icon: Icon(Icons.date_range, size: 16)),
+                          ButtonSegment(
+                              value: 2,
+                              label: Text('Bulanan'),
+                              icon: Icon(Icons.calendar_month, size: 16)),
+                        ],
+                        selected: {_mode},
+                        onSelectionChanged: (s) {
+                          setState(() => _mode = s.first);
+                          _load();
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.chevron_left),
+                            onPressed: () => _geser(-1),
+                          ),
+                          Expanded(
+                            child: Text(_label,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chevron_right),
+                            onPressed: () => _geser(1),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() => _anchor = DateTime.now());
+                              _load();
+                            },
+                            child: const Text('Hari ini'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (_mode == 0)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                    child: TextField(
+                      onChanged: (v) => setState(() => _q = v),
+                      decoration: InputDecoration(
+                        hintText: 'Cari nama / NIS...',
+                        isDense: true,
+                        prefixIcon: const Icon(Icons.search, size: 18),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_mode == 0) _ringkasan(),
+                Expanded(
+                    child: _mode == 0 ? _daftarKelas() : _periode()),
+              ],
+            ),
     );
   }
 }
