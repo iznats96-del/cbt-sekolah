@@ -163,6 +163,14 @@ class _ImportScreenState extends State<ImportScreen> {
       final updated = m['updated'] ?? 0;
       final skipped = m['skipped'] ?? 0;
       final imported = m['imported'] ?? 0;
+      // nomor peserta langsung terbit saat import (TKJ-1-2627-01 + username + password)
+      Map<String, dynamic> nm = {};
+      if (widget.isSiswa) {
+        try {
+          final nr = await Api.client.rpc('admin_isi_nomor_kosong');
+          if (nr is Map) nm = Map<String, dynamic>.from(nr);
+        } catch (_) {/* nomor tetap aman: diisi saat terbit ujian */}
+      }
       if (!mounted) return;
       showDialog(
         context: context,
@@ -178,9 +186,14 @@ class _ImportScreenState extends State<ImportScreen> {
                 if (skipped is int && skipped > 0)
                   Text('Dilewati: $skipped', style: const TextStyle(color: Colors.orange)),
                 const SizedBox(height: 8),
+                if ((nm['diisi'] ?? 0) is int && (nm['diisi'] as int) > 0)
+                  Text('Nomor peserta terbit: ${nm['diisi']} (cth ${nm['contoh'] ?? ''})',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                 if (pw_is_default(_pwCtrl))
                   const Text('Password awal siswa = NIS mereka.',
                       style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Username = NIS • password + nomor lihat di Daftar Akun.',
+                    style: TextStyle(fontSize: 11, color: Colors.grey)),
               ] else
                 Text('$imported mata pelajaran tersimpan/diperbarui.'),
             ],

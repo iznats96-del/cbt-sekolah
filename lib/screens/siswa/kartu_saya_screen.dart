@@ -27,7 +27,7 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
     try {
       final rows = await Api.client
           .from('siswa')
-          .select('id,nama,nis,kelas(nama)')
+          .select('id,nama,nis,nomor_peserta,kelas(nama)')
           .eq('profile_id', Api.user?.id ?? '')
           .limit(1);
       List<Map<String, dynamic>> nomor = [];
@@ -127,6 +127,36 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
             ),
           ),
         ),
+        if (_nomor.isEmpty && '${_siswa?['nomor_peserta'] ?? ''}'.isNotEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.confirmation_number_outlined,
+                      size: 20, color: AppTheme.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('NOMOR PESERTA',
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                                letterSpacing: 1)),
+                        Text('${_siswa?['nomor_peserta']}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: AppTheme.primary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         if (_nomor.isNotEmpty)
           Card(
             child: Padding(

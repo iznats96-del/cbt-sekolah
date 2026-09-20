@@ -111,7 +111,7 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
         buf.writeln('\n== $k ==');
         lastK = k;
       }
-      buf.writeln('${r['nis']}  ${r['nama']}  ${r['pw'] ?? '(belum tercatat)'}');
+      buf.writeln('${r['nomor'] ?? '-'}  ${r['nis']}  ${r['nama']}  ${r['pw'] ?? '(belum tercatat)'}');
     }
     await Clipboard.setData(ClipboardData(text: buf.toString()));
     if (!mounted) return;
@@ -238,7 +238,7 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
           title: Text('${r['nama']}',
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           subtitle: Text(
-              'NIS  ${r['nis']}  •  login: ${r['nis']}@cbt.local',
+              '${r['nomor'] ?? '—'}  •  NIS  ${r['nis']}  •  login: ${r['nis']}@cbt.local',
               style: const TextStyle(
                   fontSize: 11, fontFeatures: [FontFeature.tabularFigures()])),
           trailing: Container(
