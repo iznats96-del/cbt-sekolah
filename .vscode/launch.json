@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "CBT - Chrome (paling cepat, tanpa APK)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "deviceId": "chrome",
+      "args": ["--web-renderer", "canvaskit"]
+    },
+    {
+      "name": "CBT - Android Debug (auto build debug, bukan release)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "CBT - Widget Preview (panel VS Code, tanpa device)",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/previews/app_previews.dart"
+    }
+  ]
+}

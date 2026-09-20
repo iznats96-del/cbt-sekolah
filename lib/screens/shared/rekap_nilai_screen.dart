@@ -321,6 +321,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
         ? (h!['pelanggaran'] as num).toInt()
         : 0;
     final nisTxt = (s['nis'] ?? '').toString();
+    final nomorTxt = (p['nomor_peserta'] ?? '').toString();
     final pesertaId = '${p['id'] ?? ''}';
     return InkWell(
       onTap: pesertaId.isEmpty
@@ -334,7 +335,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
       child: Row(
         children: [
           SizedBox(
-              width: 24,
+              width: 30,
               child: Text('$no',
                   style: TextStyle(fontSize: 11, color: Colors.grey[500]))),
           Expanded(
@@ -344,6 +345,21 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
                 Text('${s['nama'] ?? '?'}',
                     style: const TextStyle(
                         fontSize: 12.5, fontWeight: FontWeight.w600)),
+                if (nomorTxt.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(top: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(nomorTxt,
+                        style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primary)),
+                  ),
                 Text('$nisTxt${nisTxt.isNotEmpty ? ' • ' : ''}${_statusLabel(status)}',
                     style:
                         TextStyle(fontSize: 10.5, color: Colors.grey[600])),

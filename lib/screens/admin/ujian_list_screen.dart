@@ -8,10 +8,8 @@ import 'import_ujian_screen.dart';
 import '../shared/kunci_jawaban_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
 import '../shared/koreksi_esai_screen.dart';
+import '../shared/cetak_peserta_screen.dart';
 import 'daftar_akun_screen.dart';
-import '../shared/rekap_nilai_screen.dart';
-import 'daftar_akun_screen.dart';
-import '../shared/rekap_nilai_screen.dart';
 import 'ujian_form_screen.dart';
 
 class UjianListScreen extends StatefulWidget {
@@ -284,6 +282,8 @@ class _UjianListScreenState extends State<UjianListScreen> {
                             builder: (_) => KoreksiEsaiScreen(ujian: u)));
                       case 'nomor':
                         _terbitkanNomor(u);
+                      case 'cetak':
+                        _cetakPeserta(u);
                       case 'duplikat':
                         _duplikatRombel(u);
                       case 'akun':
@@ -329,7 +329,14 @@ class _UjianListScreenState extends State<UjianListScreen> {
                             dense: true, contentPadding: EdgeInsets.zero,
                             leading: Icon(Icons.format_list_numbered,
                                 color: AppTheme.secondary),
-                            title: Text('Terbitkan Nomor Peserta'))),
+                            title: Text('Terbitkan Nomor (TKJ-1-2627-01)'))),
+                    const PopupMenuItem(
+                        value: 'cetak',
+                        child: ListTile(
+                            dense: true, contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.print_outlined,
+                                color: AppTheme.primary),
+                            title: Text('Cetak Kartu + Nominatif'))),
                     const PopupMenuItem(
                         value: 'duplikat',
                         child: ListTile(
@@ -361,11 +368,35 @@ class _UjianListScreenState extends State<UjianListScreen> {
       final res = await Api.client.rpc('terbitkan_nomor_peserta',
           params: {'p_ujian': u['id']});
       final m = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
-      _snack('Nomor peserta: ${m['tambah'] ?? 0} baru terbit • total ${m['total'] ?? 0} terdaftar');
+      _snack('Nomor ${m['format'] ?? 'KODE-S-YYZZ-NN'}: ${m['total'] ?? 0} peserta • cth ${m['contoh'] ?? ''}');
       _load();
+      if (!mounted) return;
+      // langsung tawarkan cetak setelah terbit
+      final cetak = await showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: const Text('Nomor terbit — cetak?'),
+          content: Text(
+              'Contoh: ${m['contoh'] ?? '-'}\nFormat TKJ-1-2627-01 = Jurusan-Semester(1 Ganjil/2 Genap)-Tahun-Urut abjad per jurusan.\n\nBuka layar cetak (kartu + nominatif PDF)?',
+              style: const TextStyle(fontSize: 13, height: 1.5)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Nanti')),
+            FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Cetak')),
+          ],
+        ),
+      );
+      if (cetak == true && mounted) {
+        Navigator.of(context).push(MaterialPageRoute(
+            builder: (_) => CetakPesertaScreen(ujian: u)));
+      }
     } catch (e) {
       _snack('Gagal menerbitkan nomor: $e', error: true);
     }
+  }
+
+  void _cetakPeserta(Map<String, dynamic> u) {
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => CetakPesertaScreen(ujian: u)));
   }
 
   Future<void> _duplikatRombel(Map<String, dynamic> base) async {

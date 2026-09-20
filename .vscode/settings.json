@@ -1,0 +1,8 @@
+{
+  "dart.previewFlutterUiGuides": true,
+  "dart.previewFlutterUiGuidesCustomTracking": true,
+  "editor.rulers": [100],
+  "dart.flutterHotReloadOnSave": "all",
+  // Widget Preview (Flutter 3.32+ / Dart-Code)
+  "dart.widgetPreview.enabled": true
+}

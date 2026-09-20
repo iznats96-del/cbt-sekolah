@@ -14,6 +14,7 @@ class KartuSayaScreen extends StatefulWidget {
 
 class _KartuSayaScreenState extends State<KartuSayaScreen> {
   Map<String, dynamic>? _siswa;
+  List<Map<String, dynamic>> _nomor = [];
   bool _loading = true;
 
   @override
@@ -26,13 +27,30 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
     try {
       final rows = await Api.client
           .from('siswa')
-          .select('nama,nis,kelas(nama)')
+          .select('id,nama,nis,kelas(nama)')
           .eq('profile_id', Api.user?.id ?? '')
           .limit(1);
+      List<Map<String, dynamic>> nomor = [];
+      if (rows.isNotEmpty) {
+        final sid = '${(rows.first as Map)['id'] ?? ''}';
+        if (sid.isNotEmpty) {
+          try {
+            final pr = await Api.client
+                .from('peserta_ujian')
+                .select('nomor_peserta,ujian(nama)')
+                .eq('siswa_id', sid)
+                .not('nomor_peserta', 'is', null)
+                .order('nomor_peserta')
+                .limit(20);
+            nomor = List<Map<String, dynamic>>.from(pr);
+          } catch (_) {}
+        }
+      }
       if (!mounted) return;
       setState(() {
         _siswa =
             rows.isNotEmpty ? Map<String, dynamic>.from(rows.first) : null;
+        _nomor = nomor;
         _loading = false;
       });
     } catch (_) {
@@ -109,6 +127,66 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
             ),
           ),
         ),
+        if (_nomor.isNotEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.confirmation_number_outlined,
+                          size: 18, color: AppTheme.primary),
+                      SizedBox(width: 8),
+                      Text('NOMOR PESERTA UJIAN',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                              letterSpacing: 1)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                      'TKJ-1-2627-01 = Jurusan-Semester(1 Ganjil/2 Genap)-Tahun-Urut abjad per jurusan',
+                      style: TextStyle(fontSize: 11, color: Colors.grey)),
+                  const SizedBox(height: 8),
+                  for (final n in _nomor)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
+                              children: [
+                                Text('${n['nomor_peserta']}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: AppTheme.primary)),
+                                Text(
+                                    '${(n['ujian'] is Map ? (n['ujian'] as Map)['nama'] : '') ?? ''}',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }
