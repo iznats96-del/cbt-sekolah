@@ -36,7 +36,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
       final rows = await Api.client
           .from('ujian')
           .select(
-              '*,mata_pelajaran(nama,kkm),kelas(nama),jenis_ujian(nama)')
+              '*,mata_pelajaran(nama,kkm),kelas!ujian_kelas_id_fkey(nama),jenis_ujian(nama)')
           .order('tanggal', ascending: false);
       if (!mounted) return;
       setState(() {

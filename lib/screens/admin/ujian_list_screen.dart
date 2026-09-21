@@ -39,7 +39,7 @@ class _UjianListScreenState extends State<UjianListScreen> {
       final rows = await Api.client
           .from('ujian')
           .select(
-              '*,mata_pelajaran(nama),kelas(nama),jenis_ujian(nama),sesi(nama)')
+              '*,mata_pelajaran(nama),kelas!ujian_kelas_id_fkey(nama),jenis_ujian(nama),sesi(nama)')
           .order('tanggal', ascending: false);
       if (!mounted) return;
       setState(() {
