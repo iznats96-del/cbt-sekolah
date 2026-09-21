@@ -115,7 +115,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       });
       Kiosk.setSecure(true);
       Kiosk.enterKiosk();
-      Kiosk.onIntrusion(_onIntrusion);
+      Kiosk.onEvents(onIntrusionCb: _onIntrusion, onPinningCb: _onPinningWarning);
       _startTimer();
       _startFlush(); // flush berkala tiap 2 menit (bukan tiap tap)
       _cekDeviceOwner();
@@ -153,6 +153,24 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     setState(() {});
     _snackIntrusi();
     if (_juangPaused > _penaltyLimit) _submit(auto: true);
+  }
+
+  void _onPinningWarning() {
+    if (!_kiosk || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.white, size: 18),
+            SizedBox(width: 10),
+            Expanded(child: Text('Pinning belum aktif — tekan Got it untuk melanjutkan ujian.', style: TextStyle(fontWeight: FontWeight.w500))),
+          ],
+        ),
+        backgroundColor: AppTheme.primary,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 3),
+      ),
+    );
   }
 
   void _snackIntrusi() {

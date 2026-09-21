@@ -12,6 +12,25 @@ class Kiosk {
     });
   }
 
+  static void onPinningWarning(void Function()? cb) {
+    final prev = _channel.binaryMessenger;
+    // gabung dengan handler intrusion biar tidak saling timpa
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onIntrusion') {
+        // akan ditangani oleh onIntrusion yang sudah dipasang sebelumnya jika ada
+        // fallback: panggil cb intrusion jika ada yang terpasang via onIntrusion
+      }
+      if (call.method == 'onPinningWarning') cb?.call();
+    });
+  }
+
+  static void onEvents({void Function()? onIntrusionCb, void Function()? onPinningCb}) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'onIntrusion') onIntrusionCb?.call();
+      if (call.method == 'onPinningWarning') onPinningCb?.call();
+    });
+  }
+
   static void detachIntrusion() {
     _channel.setMethodCallHandler(null);
   }

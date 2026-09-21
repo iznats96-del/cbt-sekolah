@@ -102,17 +102,17 @@ class MainActivity : FlutterActivity() {
             override fun run() {
                 if (isKioskLocked && !isInLockTask()) {
                     try {
-                        // paksa pinning lagi kalau user pilih No thanks
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                             startLockTask()
                         }
                     } catch (_: Exception) {}
-                    reportIntrusion()
+                    // No thanks = cuma peringatan, tanpa alarm bising
+                    try { ch?.invokeMethod("onPinningWarning", null) } catch (_: Exception) {}
                 }
-                if (isKioskLocked) handler.postDelayed(this, 1000)
+                if (isKioskLocked) handler.postDelayed(this, 1200)
             }
         }
-        handler.postDelayed(lockTaskEnforcer!!, 800)
+        handler.postDelayed(lockTaskEnforcer!!, 1000)
     }
 
     private fun stopLockTaskEnforcer() {
