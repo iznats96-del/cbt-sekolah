@@ -271,8 +271,9 @@ class MainActivity : FlutterActivity() {
                 } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
+        // hanya pakai LockTask kalau sudah device owner — kalau tidak, pinning dialog "App is pinned" akan muncul dan mengganggu
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && isDeviceOwner()) {
                 startLockTask()
             }
         } catch (_: Exception) {}
