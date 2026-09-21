@@ -180,13 +180,15 @@ class MainActivity : FlutterActivity() {
 
     override fun onMultiWindowModeChanged(isInMultiWindowMode: Boolean) {
         super.onMultiWindowModeChanged(isInMultiWindowMode)
-        if (isKioskLocked && isInMultiWindowMode) {
+        if (isInMultiWindowMode) {
+            // blok split/floating sebelum ujian juga, apalagi saat ujian
             handler.post {
                 try {
                     val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                     am.moveTaskToFront(taskId, 0)
                 } catch (_: Exception) {}
             }
+            if (isKioskLocked) reportIntrusion()
         }
     }
 
