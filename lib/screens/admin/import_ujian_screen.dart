@@ -200,7 +200,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
       showDialog(
         context: context,
         builder: (c) => AlertDialog(
-          title: const Text('Ujian Berhasil Diimpor 🎉'),
+          title: const Text('Ujian Berhasil Diimpor '),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

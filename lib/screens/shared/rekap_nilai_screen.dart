@@ -369,7 +369,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
           if (pel > 0)
             Padding(
               padding: const EdgeInsets.only(right: 6),
-              child: Text('⚠$pel',
+              child: Text('$pel',
                   style:
                       const TextStyle(fontSize: 10.5, color: AppTheme.danger)),
             ),

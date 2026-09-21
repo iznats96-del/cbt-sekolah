@@ -87,7 +87,7 @@ class _UjianListScreenState extends State<UjianListScreen> {
               .length;
           if (tanpaKunci > 0) {
             extraWarn =
-                '\n\n⚠ $tanpaKunci soal PG belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
+                '\n\n$tanpaKunci soal PG belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
           }
         }
       } catch (_) {}

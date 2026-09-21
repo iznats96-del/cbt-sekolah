@@ -119,8 +119,8 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(diniliai > 0
-                ? 'Kunci tersimpan ✅ — $diniliai peserta dinilai ulang'
-                : 'Kunci jawaban tersimpan ✅'),
+                ? 'Kunci tersimpan — $diniliai peserta dinilai ulang'
+                : 'Kunci jawaban tersimpan'),
             backgroundColor: AppTheme.secondary),
       );
     } catch (e) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
@@ -190,13 +191,30 @@ class DataMasterScreen extends StatelessWidget {
       displayField: 'nama',
       extraSelect: 'kelas(nama)',
       colRender: {
+        'nomor_peserta': (row) {
+          final n = row['nomor_peserta']?.toString() ?? '';
+          return n.isEmpty ? 'Nomor: -' : 'Nomor: $n';
+        },
         'kelas_id': (row) {
           final k = row['kelas'];
           return k is Map && k['nama'] != null ? 'Kelas: ${k['nama']}' : '';
         },
       },
-      columns: ['nis', 'kelas_id'],
+      columns: ['nomor_peserta', 'nis', 'kelas_id'],
       extraActions: (ctx, row) => [
+        IconButton(
+          icon: const Icon(Icons.copy_outlined, color: AppTheme.primary),
+          tooltip: 'Salin nomor peserta',
+          onPressed: () {
+            final n = row['nomor_peserta']?.toString() ?? '';
+            if (n.isNotEmpty) {
+              Clipboard.setData(ClipboardData(text: n));
+              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                  content: Text('Nomor tersalin'),
+                  backgroundColor: AppTheme.secondary));
+            }
+          },
+        ),
         IconButton(
           icon: const Icon(Icons.vpn_key_outlined, color: AppTheme.secondary),
           tooltip: 'Password akun',
@@ -207,6 +225,7 @@ class DataMasterScreen extends StatelessWidget {
         ),
       ],
       fields: const [
+        CrudField('nomor_peserta', label: 'Nomor Peserta', readOnly: true, hint: 'auto TKJ-1-2627-01'),
         CrudField('nis', label: 'NIS', required: true),
         CrudField('nisn', label: 'NISN'),
         CrudField('nama', label: 'Nama Siswa', required: true),

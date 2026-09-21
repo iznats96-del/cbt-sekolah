@@ -66,7 +66,7 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
         _hadirHariIni = _riwayat.length;
       });
       _hasil(
-          baru ? '$nama • HADIR ✓' : '$nama • sudah tercatat (diperbarui)',
+          baru ? '$nama • HADIR' : '$nama • sudah tercatat (diperbarui)',
           baru ? AppTheme.secondary : AppTheme.primary);
     } catch (e) {
       final s = e.toString();

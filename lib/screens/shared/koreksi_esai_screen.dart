@@ -193,7 +193,7 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
     setState(() => _saving = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(fail == null
-            ? 'Nilai esai tersimpan — nilai akhir terhitung ulang ✅'
+            ? 'Nilai esai tersimpan — nilai akhir terhitung ulang'
             : 'Sebagian gagal ($fail) — pastikan login sebagai guru pemilik ujian'),
         backgroundColor: fail == null ? AppTheme.secondary : AppTheme.danger));
     _refreshNilai();

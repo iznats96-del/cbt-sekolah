@@ -117,7 +117,7 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Daftar tersalin ke clipboard ✅'),
+            content: Text('Daftar tersalin ke clipboard'),
             backgroundColor: AppTheme.secondary));
   }
 

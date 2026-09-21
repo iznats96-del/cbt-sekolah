@@ -509,7 +509,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   children: [
                     Text('${widget.ujian['nama'] ?? 'UJIAN'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
-                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab${_juangPaused > 0 ? ' • ⚠ keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withOpacity(_juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
+                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab${_juangPaused > 0 ? ' • keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withOpacity(_juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
                   ],
                 ),
               ),

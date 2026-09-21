@@ -110,7 +110,7 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                         if (pelanggaran > 0)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
-                            child: Text('⚠ $pelanggaran pelanggaran keluar layar',
+                            child: Text('$pelanggaran pelanggaran keluar layar',
                                 style: const TextStyle(
                                     fontSize: 12, color: AppTheme.danger)),
                           ),
