@@ -12,6 +12,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.graphics.Rect
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -25,6 +27,7 @@ class MainActivity : FlutterActivity() {
     private var volumeObserver: ContentObserver? = null
     private val handler = Handler(Looper.getMainLooper())
     private var volumeEnforcer: Runnable? = null
+    private var immersiveEnforcer: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +51,37 @@ class MainActivity : FlutterActivity() {
                 or View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                 or View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
         window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
+        // blok gesture nav (Android 10+): seluruh layar jadi exclusion
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                window.decorView.post {
+                    val w = window.decorView.width
+                    val h = window.decorView.height
+                    if (w > 0 && h > 0) {
+                        val rect = Rect(0, 0, w, h)
+                        window.decorView.systemGestureExclusionRects = listOf(rect)
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun startImmersiveEnforcer() {
+        stopImmersiveEnforcer()
+        immersiveEnforcer = object : Runnable {
+            override fun run() {
+                if (isKioskLocked) {
+                    applyImmersive()
+                    handler.postDelayed(this, 500)
+                }
+            }
+        }
+        handler.post(immersiveEnforcer!!)
+    }
+
+    private fun stopImmersiveEnforcer() {
+        immersiveEnforcer?.let { handler.removeCallbacks(it) }
+        immersiveEnforcer = null
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -93,6 +127,7 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         if (isKioskLocked) {
             applyImmersive()
+            startImmersiveEnforcer()
         }
     }
 
@@ -106,6 +141,36 @@ class MainActivity : FlutterActivity() {
                 } catch (_: Exception) {}
             }, 300)
         }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (isKioskLocked) {
+            reportIntrusion()
+            handler.postDelayed({
+                try {
+                    val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    am.moveTaskToFront(taskId, 0)
+                } catch (_: Exception) {}
+            }, 200)
+        }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (isKioskLocked) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_BACK,
+                KeyEvent.KEYCODE_HOME,
+                KeyEvent.KEYCODE_APP_SWITCH,
+                KeyEvent.KEYCODE_MENU,
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_SEARCH -> {
+                    // blok tombol fisik / 3-button nav
+                    return true
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onBackPressed() {
@@ -189,6 +254,7 @@ class MainActivity : FlutterActivity() {
     private fun enterKioskMode(): Boolean {
         isKioskLocked = true
         applyImmersive()
+        startImmersiveEnforcer()
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         try {
             val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
@@ -197,6 +263,12 @@ class MainActivity : FlutterActivity() {
                 dpm.setStatusBarDisabled(admin, true)
                 dpm.setKeyguardDisabled(admin, true)
                 dpm.setCameraDisabled(admin, true)
+                try {
+                    dpm.setLockTaskPackages(admin, arrayOf(packageName))
+                } catch (_: Exception) {}
+                try {
+                    dpm.setLockTaskFeatures(admin, DevicePolicyManager.LOCK_TASK_FEATURE_NONE)
+                } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
         try {
@@ -211,6 +283,7 @@ class MainActivity : FlutterActivity() {
     private fun exitKioskMode() {
         isKioskLocked = false
         stopVolumeEnforcer()
+        stopImmersiveEnforcer()
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         try {
@@ -335,6 +408,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         if (!isKioskLocked) stopAlarm()
         stopVolumeEnforcer()
+        stopImmersiveEnforcer()
         super.onDestroy()
     }
 }

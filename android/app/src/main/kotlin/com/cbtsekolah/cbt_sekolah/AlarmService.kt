@@ -85,7 +85,7 @@ class AlarmService : Service() {
         }
         return builder
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("⚠️ UJIAN BERLANGSUNG - JANGAN TUTUP")
+            .setContentTitle("UJIAN BERLANGSUNG - JANGAN TUTUP")
             .setContentText("Kembali ke aplikasi untuk mematikan alarm. Volume dipaksa maksimal.")
             .setContentIntent(pi)
             .setOngoing(true)
