@@ -97,12 +97,20 @@ class MainActivity : FlutterActivity() {
             }, 250)
         }
         if (isKioskLocked && !hasFocus) {
+            // tutup overlay/floating/chat head yang coba nimpa CBT
+            try { sendBroadcast(Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)) } catch (_: Exception) {}
             handler.postDelayed({
                 try {
                     val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
                     am.moveTaskToFront(taskId, 0)
                 } catch (_: Exception) {}
-            }, 500)
+            }, 300)
+            handler.postDelayed({
+                try {
+                    val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                    am.moveTaskToFront(taskId, 0)
+                } catch (_: Exception) {}
+            }, 800)
             reportIntrusion()
         }
     }
