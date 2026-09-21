@@ -312,6 +312,44 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
     );
   }
 
+  Future<void> _resetPeserta(Map<String, dynamic> p) async {
+    final s = p['siswa'] as Map? ?? const {};
+    final nama = '${s['nama'] ?? '?'}';
+    final pid = '${p['id'] ?? ''}';
+    if (pid.isEmpty) return;
+    final mode = await showDialog<String>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: Text('Reset: $nama'),
+        content: const Text(
+            'Pilih jenis reset per murid (bukan reset soal):\n\n'
+            '• Ulang = hapus semua jawaban dan nilai, kembalikan ke BELUM (murid bisa masuk lagi dari awal)\n'
+            '• Buka = kembalikan ke MENGIKUTI tanpa hapus jawaban (lanjut mengerjakan, timer ikut server)\n'
+            '• Hapus pelanggaran = nol-kan pelanggaran saja',
+            style: TextStyle(fontSize: 12, height: 1.4)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(c, 'hapus_pelanggaran'), child: const Text('Hapus pelanggaran')),
+          TextButton(onPressed: () => Navigator.pop(c, 'buka'), child: const Text('Buka')),
+          FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () => Navigator.pop(c, 'ulang'),
+              child: const Text('Ulang')),
+        ],
+      ),
+    );
+    if (mode == null) return;
+    try {
+      await Api.client.rpc('admin_reset_peserta', params: {'p_peserta': pid, 'p_mode': mode});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Reset $mode berhasil'), backgroundColor: AppTheme.secondary));
+      _pilih(_selected!);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal reset: $e'), backgroundColor: AppTheme.danger));
+    }
+  }
+
   Widget _siswaRow(int no, Map<String, dynamic> p) {
     final s = (p['siswa'] as Map?) ?? const {};
     final h = (p['hasil_ujian'] as Map?) ;
@@ -398,6 +436,17 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
                           ? AppTheme.secondary
                           : AppTheme.danger),
             ),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'reset') _resetPeserta(p);
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'reset', child: Text('Reset per murid')),
+            ],
+            icon: const Icon(Icons.more_vert, size: 16, color: Colors.grey),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),

@@ -19,7 +19,8 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   final _menitCtrl = TextEditingController(text: '90');
   final _catatanCtrl = TextEditingController();
 
-  String? _jenisUjianId, _mapelId, _kelasId, _sesiId;
+  String? _jenisUjianId, _mapelId, _sesiId;
+  List<String> _kelasIds = [];
   String? _tanggal;
   TimeOfDay? _jamMulai;
   TimeOfDay? _jamSelesai;
@@ -31,6 +32,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
 
   List<DropdownItem> _mapelOpt = [], _kelasOpt = [], _jenisOpt = [], _sesiOpt = [];
   List<Map<String, dynamic>> _bankSoal = [];
+  List<Map<String, dynamic>> _kelasRaw = [];
 
   @override
   void initState() {
@@ -42,7 +44,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       _catatanCtrl.text = init['catatan']?.toString() ?? '';
       _jenisUjianId = init['jenis_ujian_id']?.toString();
       _mapelId = init['mapel_id']?.toString();
-      _kelasId = init['kelas_id']?.toString();
+      if (init['kelas_id'] != null) _kelasIds = [init['kelas_id'].toString()];
       _sesiId = init['sesi_id']?.toString();
       _tanggal = init['tanggal']?.toString().split('T').first;
       _jamMulai = _timeFromIso(init['waktu_mulai']?.toString());
@@ -51,6 +53,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       if (sl is List) _selectedSoal = sl.map((e) => e.toString()).toList();
       _statusAktif = init['status'] == 'aktif';
       _jadwalId = init['jadwal_id']?.toString();
+      if (widget.ujianId != null) _loadKelasTerpilih();
     }
     _loadOptions();
     _loadBankSoal();
@@ -75,6 +78,18 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     if (t != null) setState(() => mulai ? _jamMulai = t : _jamSelesai = t);
   }
 
+  Future<void> _loadKelasTerpilih() async {
+    try {
+      final rows = await Api.client
+          .from('ujian_kelas')
+          .select('kelas_id')
+          .eq('ujian_id', widget.ujianId!);
+      if (!mounted) return;
+      final ids = (rows as List).map((e) => '${e['kelas_id']}').toList();
+      if (ids.isNotEmpty) setState(() => _kelasIds = ids);
+    } catch (_) {}
+  }
+
   Future<void> _loadOptions() async {
     try {
       final r = await Future.wait([
@@ -83,16 +98,35 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         fetchDropdown('jenis_ujian', 'nama', 'id'),
         fetchDropdown('sesi', 'nama', 'id'),
       ]);
+      // simpan raw kelas utk label multi-pilih
+      final kelasRows = await Api.client.from('kelas').select('id,nama,jurusan(singkatan)').order('nama');
       if (!mounted) return;
       setState(() {
         _mapelOpt = r[0];
         _kelasOpt = r[1];
         _jenisOpt = r[2];
         _sesiOpt = r[3];
+        _kelasRaw = List<Map<String, dynamic>>.from(kelasRows);
       });
     } catch (e) {
       if (mounted) _snack('Gagal muat opsi: $e', error: true);
     }
+  }
+
+  String _kelasLabel(String id) {
+    final k = _kelasRaw.firstWhere((e) => '${e['id']}' == id, orElse: () => <String, dynamic>{});
+    if (k.isEmpty) return id.substring(0, 6);
+    final j = k['jurusan'];
+    final js = j is Map && j['singkatan'] != null ? ' • ${j['singkatan']}' : '';
+    return '${k['nama']}$js';
+  }
+
+  Future<void> _pickKelas() async {
+    final res = await showDialog<List<String>>(
+      context: context,
+      builder: (c) => _KelasMultiPicker(all: _kelasRaw, selected: _kelasIds),
+    );
+    if (res != null) setState(() => _kelasIds = res);
   }
 
   Future<void> _loadJadwal() async {
@@ -153,7 +187,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (_mapelId == null) return _err('Pilih mata pelajaran');
-    if (_kelasId == null) return _err('Pilih kelas');
+    if (_kelasIds.isEmpty) return _err('Pilih minimal 1 kelas');
     if (_jenisUjianId == null) return _err('Pilih jenis ujian');
     if (_tanggal == null) return _err('Pilih tanggal ujian');
     if (_selectedSoal.isEmpty) return _err('Pilih minimal 1 soal');
@@ -164,7 +198,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'nama': _namaCtrl.text.trim(),
         'jenis_ujian_id': _jenisUjianId,
         'mapel_id': _mapelId,
-        'kelas_id': _kelasId,
+        'kelas_id': _kelasIds.first,
         'guru_id': Api.user?.id,
         'tanggal': _tanggal,
         'sesi_id': _sesiId,
@@ -176,10 +210,17 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'waktu_mulai': _gabung(_tanggal, _jamMulai),
         'waktu_selesai': _gabung(_tanggal, _jamSelesai),
       };
+      String uid = widget.ujianId ?? '';
       if (widget.ujianId != null) {
         await Api.client.from('ujian').update(data).eq('id', widget.ujianId!);
       } else {
-        await Api.client.from('ujian').insert(data);
+        final ins = await Api.client.from('ujian').insert(data).select('id');
+        if ((ins as List).isNotEmpty) uid = '${ins.first['id']}';
+      }
+      if (_kelasIds.isNotEmpty && uid.isNotEmpty) {
+        try {
+          await Api.client.rpc('ujian_set_kelas', params: {'p_ujian': uid, 'p_kelas': _kelasIds});
+        } catch (_) {}
       }
       if (!mounted) return;
       Navigator.pop(context, true);
@@ -236,12 +277,36 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                       onChanged: (v) => setState(() => _mapelId = v),
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: _kelasId,
-                      decoration: const InputDecoration(labelText: 'Kelas *'),
-                      items: [const DropdownMenuItem(value: null, child: Text('— pilih —')), ..._kelasOpt
-                          .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
-                      onChanged: (v) => setState(() => _kelasId = v),
+                    InkWell(
+                      onTap: _pickKelas,
+                      borderRadius: BorderRadius.circular(10),
+                      child: InputDecorator(
+                        decoration: const InputDecoration(labelText: 'Kelas *', helperText: 'bisa pilih banyak rombel sekaligus'),
+                        child: _kelasIds.isEmpty
+                            ? const Text('— pilih kelas —', style: TextStyle(color: Colors.grey))
+                            : Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  for (final id in _kelasIds)
+                                    Chip(
+                                      label: Text(_kelasLabel(id), style: const TextStyle(fontSize: 11)),
+                                      deleteIcon: const Icon(Icons.close, size: 14),
+                                      onDeleted: () => setState(() => _kelasIds.remove(id)),
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: _pickKelas,
+                        icon: const Icon(Icons.groups_outlined, size: 16),
+                        label: Text(_kelasIds.isEmpty ? 'Pilih Kelas' : 'Ubah (${_kelasIds.length})'),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
@@ -482,6 +547,64 @@ class SoalPickerDialogState extends State<SoalPickerDialog> {
           onPressed: () => Navigator.pop(context, _sel.toList()),
           child: Text('Pilih (${_sel.length})'),
         ),
+      ],
+    );
+  }
+}
+
+class _KelasMultiPicker extends StatefulWidget {
+  final List<Map<String, dynamic>> all;
+  final List<String> selected;
+  const _KelasMultiPicker({required this.all, required this.selected});
+  @override
+  State<_KelasMultiPicker> createState() => _KelasMultiPickerState();
+}
+
+class _KelasMultiPickerState extends State<_KelasMultiPicker> {
+  late Set<String> _sel = widget.selected.toSet();
+  String _q = '';
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _q.trim().isEmpty
+        ? widget.all
+        : widget.all.where((k) => '${k['nama']}'.toLowerCase().contains(_q.toLowerCase()) || '${k['jurusan'] is Map ? (k['jurusan'] as Map)['singkatan'] ?? '' : ''}'.toLowerCase().contains(_q.toLowerCase())).toList();
+    return AlertDialog(
+      title: const Text('Pilih Kelas (banyak)'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 420,
+        child: Column(
+          children: [
+            TextField(onChanged: (v) => setState(() => _q = v), decoration: const InputDecoration(hintText: 'Cari rombel / jurusan', prefixIcon: Icon(Icons.search))),
+            const SizedBox(height: 8),
+            Align(alignment: Alignment.centerLeft, child: Text('${_sel.length} dipilih', style: const TextStyle(fontSize: 12, color: AppTheme.secondary))),
+            const SizedBox(height: 4),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (c, i) {
+                  final k = filtered[i];
+                  final id = '${k['id']}';
+                  final on = _sel.contains(id);
+                  final js = k['jurusan'] is Map ? '${(k['jurusan'] as Map)['singkatan'] ?? ''}' : '';
+                  return CheckboxListTile(
+                    value: on,
+                    dense: true,
+                    title: Text('${k['nama']}', style: const TextStyle(fontSize: 13)),
+                    subtitle: Text(js.isEmpty ? '' : js, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                    onChanged: (v) => setState(() {
+                      if (v == true) _sel.add(id); else _sel.remove(id);
+                    }),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+        FilledButton(onPressed: () => Navigator.pop(context, _sel.toList()), child: Text('Pilih (${_sel.length})')),
       ],
     );
   }

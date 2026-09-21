@@ -9,6 +9,7 @@ import '../../widgets/crud_screen.dart';
 import 'import_screen.dart';
 import 'jadwal_pelajaran_screen.dart';
 import 'kelas_rombel_screen.dart';
+import 'siswa_master_grouped_screen.dart';
 
 class DataMasterScreen extends StatelessWidget {
   const DataMasterScreen({super.key});
@@ -31,7 +32,8 @@ class DataMasterScreen extends StatelessWidget {
       (icon: Icons.menu_book_outlined, title: 'Mata Pelajaran', page: () => _mataPelajaran()),
       (icon: Icons.groups_outlined, title: 'Kelas / Rombel', page: () => const KelasRombelScreen()),
       (icon: Icons.person_outline, title: 'Guru', page: () => _guru()),
-      (icon: Icons.people_alt_outlined, title: 'Siswa', page: () => _siswa()),
+      (icon: Icons.people_alt_outlined, title: 'Siswa (Grouped)', page: () => const SiswaMasterGroupedScreen()),
+      (icon: Icons.people_alt_outlined, title: 'Siswa (Tabel)', page: () => _siswa()),
       (icon: Icons.business_outlined, title: 'Data Umum', page: () => _sekolah()),
       (icon: Icons.upload_file_outlined, title: 'Import Siswa (XLS/XLSX/CSV)', page: () => const ImportScreen(isSiswa: true)),
       (icon: Icons.upload_file_outlined, title: 'Import Mata Pelajaran', page: () => const ImportScreen(isSiswa: false)),
