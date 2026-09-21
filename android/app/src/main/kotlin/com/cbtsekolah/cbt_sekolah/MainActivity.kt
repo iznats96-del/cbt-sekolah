@@ -28,6 +28,7 @@ class MainActivity : FlutterActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private var volumeEnforcer: Runnable? = null
     private var immersiveEnforcer: Runnable? = null
+    private var lockTaskEnforcer: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,6 +83,41 @@ class MainActivity : FlutterActivity() {
     private fun stopImmersiveEnforcer() {
         immersiveEnforcer?.let { handler.removeCallbacks(it) }
         immersiveEnforcer = null
+    }
+
+    private fun isInLockTask(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                am.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE
+            } else {
+                false
+            }
+        } catch (_: Exception) { false }
+    }
+
+    private fun startLockTaskEnforcer() {
+        stopLockTaskEnforcer()
+        lockTaskEnforcer = object : Runnable {
+            override fun run() {
+                if (isKioskLocked && !isInLockTask()) {
+                    try {
+                        // paksa pinning lagi kalau user pilih No thanks
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            startLockTask()
+                        }
+                    } catch (_: Exception) {}
+                    reportIntrusion()
+                }
+                if (isKioskLocked) handler.postDelayed(this, 1000)
+            }
+        }
+        handler.postDelayed(lockTaskEnforcer!!, 800)
+    }
+
+    private fun stopLockTaskEnforcer() {
+        lockTaskEnforcer?.let { handler.removeCallbacks(it) }
+        lockTaskEnforcer = null
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -281,12 +317,13 @@ class MainActivity : FlutterActivity() {
                 } catch (_: Exception) {}
             }
         } catch (_: Exception) {}
-        // hanya pakai LockTask kalau sudah device owner — kalau tidak, pinning dialog "App is pinned" akan muncul dan mengganggu
+        // minta pinning — di HP biasa akan muncul Got it / No thanks, No thanks akan dipaksa ulang sampai Got it
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && isDeviceOwner()) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 startLockTask()
             }
         } catch (_: Exception) {}
+        startLockTaskEnforcer()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         return true
     }
@@ -295,6 +332,7 @@ class MainActivity : FlutterActivity() {
         isKioskLocked = false
         stopVolumeEnforcer()
         stopImmersiveEnforcer()
+        stopLockTaskEnforcer()
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         try {
@@ -420,6 +458,7 @@ class MainActivity : FlutterActivity() {
         if (!isKioskLocked) stopAlarm()
         stopVolumeEnforcer()
         stopImmersiveEnforcer()
+        stopLockTaskEnforcer()
         super.onDestroy()
     }
 }
