@@ -155,7 +155,11 @@ class _LoginScreenState extends State<LoginScreen> {
               padding: const EdgeInsets.all(24),
               child: Column(
                 children: [
-                  Icon(Icons.school_outlined, size: 64, color: Colors.white),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
+                    child: Image.asset('assets/images/logo_yp.png', width: 64, height: 64, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, size: 48, color: Color(0xFF1A6DB4))),
+                  ),
                   const SizedBox(height: 12),
                   Text(AppConfig.appName,
                       style: const TextStyle(

@@ -1,11 +1,11 @@
 {
-    "name": "cbt_sekolah",
-    "short_name": "cbt_sekolah",
+    "name": "CBT Sekolah - SMK YP 79 Majalaya",
+    "short_name": "CBT YP",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F4F6FA",
+    "theme_color": "#1A6DB4",
+    "description": "Computer Based Test SMK YP 79 Majalaya - Ujian online aman dan terintegrasi",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
