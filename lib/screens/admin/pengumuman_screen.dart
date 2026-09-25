@@ -11,6 +11,7 @@ class PengumumanScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return CrudScreen(
       title: 'Pengumuman',
+      showLogout: true,
       table: 'pengumuman',
       displayField: 'judul',
       columns: ['aktif'],

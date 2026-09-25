@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
 
 /// Editor kunci jawaban per ujian — dipakai GURU (dan admin).
 /// - PG   : tap pilihan yang benar -> bank_soal.kunci = {index, jawaban}
@@ -180,7 +181,7 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorState(message: _error!, onRetry: _load)
               : _soal.isEmpty
                   ? const Center(child: Text('Ujian ini belum punya soal'))
                   : Column(
@@ -189,7 +190,7 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
                             widget.ujian['status'] == 'aktif')
                           Container(
                             width: double.infinity,
-                            color: Colors.orange.withOpacity(0.2),
+                            color: Colors.orange.withValues(alpha: 0.2),
                             padding: const EdgeInsets.all(10),
                             child: Text(
                               widget.ujian['status'] == 'aktif'

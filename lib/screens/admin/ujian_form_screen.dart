@@ -63,6 +63,11 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   String _fmtTod(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+  String _jamSingkat(dynamic v) {
+    final s = (v ?? '').toString();
+    return s.length >= 5 ? s.substring(0, 5) : (s.isEmpty ? '—' : s);
+  }
+
   TimeOfDay? _timeFromIso(String? iso) {
     final d = DateTime.tryParse(iso ?? '');
     if (d == null) return null;
@@ -331,7 +336,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                           return DropdownMenuItem(
                               value: '${j['id']}',
                               child: Text(
-                                  '${hn[j['hari']] ?? '?'} ${(j['jam_mulai'] ?? '').toString().substring(0, 5)}-${(j['jam_selesai'] ?? '').toString().substring(0, 5)} · ${m is Map ? m['nama'] ?? '' : ''}',
+                                  '${hn[j['hari']] ?? '?'} ${_jamSingkat(j['jam_mulai'])}-${_jamSingkat(j['jam_selesai'])} · ${m is Map ? m['nama'] ?? '' : ''}',
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(fontSize: 12)));
                         }),
@@ -348,7 +353,6 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                       decoration: const InputDecoration(labelText: 'Tanggal Ujian *'),
                     ),
                     const SizedBox(height: 12),
-                                        const SizedBox(height: 12),
                     // ── Jendela jam ujian (sesuai jadwal pelajaran) ──
                     Container(
                       padding: const EdgeInsets.all(10),
@@ -471,7 +475,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
             FilledButton(
               onPressed: _loading ? null : _save,
               child: _loading
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Simpan Ujian'),
             ),
           ],

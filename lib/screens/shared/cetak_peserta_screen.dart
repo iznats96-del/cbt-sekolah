@@ -438,7 +438,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                                     leading: CircleAvatar(
                                       radius: 15,
                                       backgroundColor: AppTheme.primary
-                                          .withOpacity(0.12),
+                                          .withValues(alpha: 0.12),
                                       child: Text('${i + 1}',
                                           style: const TextStyle(
                                               fontSize: 11,
@@ -461,7 +461,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                                               vertical: 5),
                                       decoration: BoxDecoration(
                                         color: AppTheme.primary
-                                            .withOpacity(0.1),
+                                            .withValues(alpha: 0.1),
                                         borderRadius:
                                             BorderRadius.circular(8),
                                       ),

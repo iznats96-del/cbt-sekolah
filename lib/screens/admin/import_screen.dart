@@ -272,7 +272,7 @@ class _ImportScreenState extends State<ImportScreen> {
             const SizedBox(height: 12),
             Card(
               margin: EdgeInsets.zero,
-              color: AppTheme.danger.withOpacity(0.05),
+              color: AppTheme.danger.withValues(alpha: 0.05),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -306,24 +306,27 @@ class _ImportScreenState extends State<ImportScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(12),
-                      child: DataTable(
-                        headingRowHeight: 32,
-                        dataRowMinHeight: 32,
-                        columns: const [
-                          DataColumn(label: Text('NIS')),
-                          DataColumn(label: Text('Nama')),
-                          DataColumn(label: Text('Jk')),
-                          DataColumn(label: Text('Kelas')),
-                        ],
-                        rows: [
-                          for (final r in t.rows)
-                            DataRow(cells: [
-                              DataCell(Text(r['nis'] ?? '')),
-                              DataCell(Text(r['nama'] ?? '')),
-                              DataCell(Text(r['jk'] ?? '')),
-                              DataCell(Text((r['kelas']?.isNotEmpty ?? false) ? r['kelas']! : t.kelas)),
-                            ]),
-                        ],
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowHeight: 32,
+                          dataRowMinHeight: 32,
+                          columns: const [
+                            DataColumn(label: Text('NIS')),
+                            DataColumn(label: Text('Nama')),
+                            DataColumn(label: Text('Jk')),
+                            DataColumn(label: Text('Kelas')),
+                          ],
+                          rows: [
+                            for (final r in t.rows)
+                              DataRow(cells: [
+                                DataCell(Text(r['nis'] ?? '')),
+                                DataCell(Text(r['nama'] ?? '')),
+                                DataCell(Text(r['jk'] ?? '')),
+                                DataCell(Text((r['kelas']?.isNotEmpty ?? false) ? r['kelas']! : t.kelas)),
+                              ]),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -336,25 +339,28 @@ class _ImportScreenState extends State<ImportScreen> {
               margin: EdgeInsets.zero,
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: DataTable(
-                  headingRowHeight: 32,
-                  dataRowMinHeight: 32,
-                  columns: const [
-                    DataColumn(label: Text('Mata Pelajaran')),
-                    DataColumn(label: Text('Kode')),
-                    DataColumn(label: Text('Jurusan')),
-                    DataColumn(label: Text('KKM')),
-                  ],
-                  rows: [
-                    for (final m in _mapelRows)
-                      DataRow(cells: [
-                        DataCell(Text((m['nama'] ?? '') +
-                            ((m['img']?.isNotEmpty ?? false) ? '  (ada gambar)' : ''))),
-                        DataCell(Text(m['kode'] ?? '')),
-                        DataCell(Text(m['jurusan'] ?? '')),
-                        DataCell(Text(m['kkm'] ?? '')),
-                      ]),
-                  ],
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    headingRowHeight: 32,
+                    dataRowMinHeight: 32,
+                    columns: const [
+                      DataColumn(label: Text('Mata Pelajaran')),
+                      DataColumn(label: Text('Kode')),
+                      DataColumn(label: Text('Jurusan')),
+                      DataColumn(label: Text('KKM')),
+                    ],
+                    rows: [
+                      for (final m in _mapelRows)
+                        DataRow(cells: [
+                          DataCell(Text((m['nama'] ?? '') +
+                              ((m['img']?.isNotEmpty ?? false) ? '  (ada gambar)' : ''))),
+                          DataCell(Text(m['kode'] ?? '')),
+                          DataCell(Text(m['jurusan'] ?? '')),
+                          DataCell(Text(m['kkm'] ?? '')),
+                        ]),
+                    ],
+                  ),
                 ),
               ),
             ),

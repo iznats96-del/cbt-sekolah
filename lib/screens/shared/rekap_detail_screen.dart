@@ -104,7 +104,7 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary.withOpacity(0.12),
+                        color: AppTheme.primary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text('Nilai ${nilai ?? '—'}',
@@ -127,7 +127,7 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
-        decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+        decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
         child: Column(
           children: [
             Text(val, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 18)),
@@ -170,12 +170,12 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
           children: [
             Row(
               children: [
-                CircleAvatar(radius: 13, backgroundColor: warn.withOpacity(0.15),
+                CircleAvatar(radius: 13, backgroundColor: warn.withValues(alpha: 0.15),
                     child: Text('$no', style: TextStyle(fontSize: 11, color: warn, fontWeight: FontWeight.bold))),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: warn.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                  decoration: BoxDecoration(color: warn.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
                   child: Text('$jenis • $badge', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: warn)),
                 ),
               ],

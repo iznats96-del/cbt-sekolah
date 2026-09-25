@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
-import '../../services/api.dart';
 import '../home.dart';
+import '../../widgets/state_views.dart';
 import 'data_master_screen.dart';
 import 'bank_soal_screen.dart';
 import 'ujian_list_screen.dart';
-import 'hasil_screen.dart';
 import 'pengumuman_screen.dart';
 import 'daftar_akun_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
@@ -21,35 +20,24 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _index = 0;
-  static const _titles = [
-    'Beranda',
-    'Data Master',
-    'Bank Soal',
-    'Ujian',
-    'Pengumuman',
-    'Pengaturan',
-  ];
 
-  static const _pages = [
-    _AdminHome(),
-    DataMasterScreen(),
-    BankSoalScreen(),
-    UjianListScreen(),
-    PengumumanScreen(),
-    PengaturanScreen(),
-  ];
+  void _go(int i) => setState(() => _index = i);
 
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      _AdminHome(go: _go),
+      const DataMasterScreen(),
+      const BankSoalScreen(),
+      const UjianListScreen(),
+      const PengumumanScreen(),
+      const PengaturanScreen(),
+    ];
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_index]),
-        actions: const [LogoutButton()],
-      ),
-      body: _pages[_index],
+      body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _go,
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.home_outlined),
@@ -82,75 +70,97 @@ class _AdminShellState extends State<AdminShell> {
 }
 
 class _AdminHome extends StatelessWidget {
-  const _AdminHome();
-
-  Future<void> _loadProfile(BuildContext context) async {
-    // placeholder - ringkasan akan ditampilkan
-  }
+  final void Function(int index) go;
+  const _AdminHome({required this.go});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Selamat datang, Administrator',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text('Kelola data ujian, bank soal, dan peserta dari menu di bawah.',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.4,
-          children: const [
-            _FeatureCard(icon: Icons.people_outline, label: 'Siswa', color: Color(0xFF1A6DB4)),
-            _FeatureCard(icon: Icons.person_outline, label: 'Guru', color: Color(0xFF2E9B8F)),
-            _FeatureCard(icon: Icons.quiz_outlined, label: 'Bank Soal', color: Color(0xFFF4A940)),
-            _FeatureCard(icon: Icons.assignment_outlined, label: 'Ujian', color: Color(0xFFD9534F)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('CBT Sekolah'),
+        actions: const [LogoutButton()],
+      ),
+      body: ContentMaxWidth(
+        child: ListView(
+          padding: const EdgeInsets.all(12),
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                    foregroundColor: AppTheme.primary),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const RekapNilaiScreen())),
-                icon: const Icon(Icons.insert_chart_outlined, size: 18),
-                label: const Text('Rekap Nilai', style: TextStyle(fontSize: 12)),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.primary, AppTheme.secondary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Selamat datang, Administrator',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    SizedBox(height: 6),
+                    Text(
+                        'Kelola data ujian, bank soal, dan peserta dari menu di bawah.',
+                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                    foregroundColor: AppTheme.secondary),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                    builder: (_) => const DaftarAkunScreen())),
-                icon: const Icon(Icons.badge_outlined, size: 18),
-                label: const Text('Daftar Akun + Password',
-                    style: TextStyle(fontSize: 11)),
-              ),
-            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(builder: (context, c) {
+              final cols = (c.maxWidth / 200).floor().clamp(2, 4);
+              return GridView.count(
+                crossAxisCount: cols,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 1.5,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: [
+                  _FeatureCard(
+                      icon: Icons.people_outline,
+                      label: 'Siswa',
+                      color: AppTheme.primary,
+                      onTap: () => go(1)),
+                  _FeatureCard(
+                      icon: Icons.person_outline,
+                      label: 'Guru',
+                      color: AppTheme.secondary,
+                      onTap: () => go(1)),
+                  _FeatureCard(
+                      icon: Icons.quiz_outlined,
+                      label: 'Bank Soal',
+                      color: AppTheme.accent,
+                      onTap: () => go(2)),
+                  _FeatureCard(
+                      icon: Icons.assignment_outlined,
+                      label: 'Ujian',
+                      color: AppTheme.danger,
+                      onTap: () => go(3)),
+                  _FeatureCard(
+                      icon: Icons.insert_chart_outlined,
+                      label: 'Rekap Nilai',
+                      color: const Color(0xFF7C4DBC),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const RekapNilaiScreen()))),
+                  _FeatureCard(
+                      icon: Icons.badge_outlined,
+                      label: 'Daftar Akun + Password',
+                      color: const Color(0xFF2F6F4F),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const DaftarAkunScreen()))),
+                ],
+              );
+            }),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -159,26 +169,37 @@ class _FeatureCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback onTap;
   const _FeatureCard({
     required this.icon,
     required this.label,
     required this.color,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: color.withOpacity(0.1),
+      margin: EdgeInsets.zero,
+      color: color.withValues(alpha: 0.08),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {},
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 36, color: color),
-            const SizedBox(height: 8),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 32, color: color),
+              const SizedBox(height: 8),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
       ),
     );

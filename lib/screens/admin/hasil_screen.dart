@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
 
 class HasilScreen extends StatefulWidget {
   const HasilScreen({super.key});
@@ -57,7 +58,7 @@ class _HasilScreenState extends State<HasilScreen> {
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!));
+    if (_error != null) return ErrorState(message: _error!, onRetry: _load);
     if (_rows.isEmpty) {
       return const Center(
           child: Text('Belum ada hasil ujian', style: TextStyle(color: Colors.grey)));
@@ -78,7 +79,7 @@ class _HasilScreenState extends State<HasilScreen> {
             margin: EdgeInsets.zero,
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: AppTheme.primary.withOpacity(0.1),
+                backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
                 child: Text(
                   (siswa is Map ? siswa['nama'] : '')
                       .toString()

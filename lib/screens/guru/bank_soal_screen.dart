@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
+import '../home.dart';
 import '../shared/soal_form_screen.dart';
 import '../admin/import_ujian_screen.dart';
 
@@ -84,6 +86,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
               if (ok == true) _load();
             },
           ),
+          const LogoutButton(),
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -91,39 +94,21 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
         onPressed: _add,
         child: const Icon(Icons.add),
       ),
-      body: _buildBody(),
+      body: ContentMaxWidth(child: _buildBody()),
     );
   }
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline, color: AppTheme.danger, size: 40),
-            const SizedBox(height: 8),
-            Text(_error!, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            FilledButton(onPressed: _load, child: const Text('Muat Ulang')),
-          ]),
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _load);
     }
     final groups = _byMapel;
     if (groups.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.quiz_outlined, size: 56, color: Colors.grey),
-            const SizedBox(height: 12),
-            const Text('Belum ada soal', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            FilledButton(onPressed: _add, child: const Text('+ Buat Soal')),
-          ],
-        ),
+      return const EmptyState(
+        icon: Icons.quiz_outlined,
+        title: 'Belum ada soal',
+        subtitle: 'Buat soal dengan tombol + atau import naskah DOCX dari ikon upload.',
       );
     }
     final keys = groups.keys.toList()..sort();
@@ -147,7 +132,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               leading: CircleAvatar(
                 radius: 22,
-                backgroundColor: AppTheme.primary.withOpacity(0.12),
+                backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
                 child: const Icon(Icons.menu_book_outlined, color: AppTheme.primary, size: 22),
               ),
               title: Text(nama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
@@ -253,7 +238,7 @@ class _SoalPerMapelScreenState extends State<SoalPerMapelScreen> {
                     child: ListTile(
                       leading: CircleAvatar(
                         radius: 20,
-                        backgroundColor: _jenisColor(jenis).withOpacity(0.12),
+                        backgroundColor: _jenisColor(jenis).withValues(alpha: 0.12),
                         child: Text(_jenisLabel(jenis),
                             style: TextStyle(
                                 fontSize: 9.5,

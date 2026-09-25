@@ -269,7 +269,7 @@ class _JadwalPelajaranScreenState extends State<JadwalPelajaranScreen> {
                             margin: const EdgeInsets.symmetric(vertical: 4),
                             child: ListTile(
                               leading: CircleAvatar(
-                                backgroundColor: AppTheme.primary.withOpacity(0.12),
+                                backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
                                 child: Text('${(_hari[r['hari']] ?? '?').substring(0, 1)}',
                                     style: const TextStyle(
                                         color: AppTheme.primary,

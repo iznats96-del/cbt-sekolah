@@ -132,7 +132,7 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                       color: (dinilai && nilai >= 75
                               ? AppTheme.secondary
                               : dinilai ? AppTheme.danger : Colors.grey)
-                          .withOpacity(0.15),
+                          .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(

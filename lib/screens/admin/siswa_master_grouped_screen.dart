@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
+import '../../widgets/state_views.dart';
 
 class SiswaMasterGroupedScreen extends StatefulWidget {
   const SiswaMasterGroupedScreen({super.key});
@@ -136,7 +137,7 @@ class _SiswaMasterGroupedScreenState extends State<SiswaMasterGroupedScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
+              ? ErrorState(message: _error!, onRetry: _load)
               : Column(
                   children: [
                     Padding(
@@ -220,7 +221,7 @@ class _SiswaMasterGroupedScreenState extends State<SiswaMasterGroupedScreen> {
           width: 44,
           height: 44,
           alignment: Alignment.center,
-          decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
           child: Text(jurusan, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13)),
         ),
         title: Text(jurusan, style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -287,7 +288,7 @@ class _SiswaMasterGroupedScreenState extends State<SiswaMasterGroupedScreen> {
   Widget _mini(String t, Color c) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
       child: Text(t, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: c)),
     );
   }

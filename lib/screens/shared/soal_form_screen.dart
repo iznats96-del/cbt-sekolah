@@ -284,7 +284,9 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                               icon: _uploading
                                   ? const SizedBox(
                                       height: 14, width: 14,
-                                      child: CircularProgressIndicator(strokeWidth: 2))
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppTheme.primary))
                                   : const Icon(Icons.image_outlined, size: 18),
                               label: const Text('Pilih Gambar'),
                             ),
@@ -419,7 +421,7 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
             FilledButton(
               onPressed: _loading ? null : _save,
               child: _loading
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Simpan Soal'),
             ),
           ],

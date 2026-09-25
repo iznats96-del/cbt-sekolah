@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
+import '../../widgets/state_views.dart';
+import '../home.dart';
 import 'import_ujian_screen.dart';
 import '../shared/kunci_jawaban_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
@@ -13,7 +15,8 @@ import 'daftar_akun_screen.dart';
 import 'ujian_form_screen.dart';
 
 class UjianListScreen extends StatefulWidget {
-  const UjianListScreen({super.key});
+  final bool showLogout;
+  const UjianListScreen({super.key, this.showLogout = true});
 
   @override
   State<UjianListScreen> createState() => _UjianListScreenState();
@@ -143,38 +146,39 @@ class _UjianListScreenState extends State<UjianListScreen> {
             if (ok == true) _load();
           },
         ),
+        if (widget.showLogout) const LogoutButton(),
       ]),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         onPressed: _add,
         child: const Icon(Icons.add),
       ),
-      body: _buildBody(),
+      body: ContentMaxWidth(child: _buildBody()),
     );
   }
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) return Center(child: Text(_error!));
+    if (_error != null) {
+      return ErrorState(message: _error!, onRetry: _load);
+    }
     if (_ujian.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.calendar_today_outlined, size: 56, color: Colors.grey),
-            const SizedBox(height: 12),
-            const Text('Belum ada jadwal ujian', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            FilledButton(onPressed: _add, child: const Text('+ Buat Ujian')),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.calendar_today_outlined,
+        title: 'Belum ada jadwal ujian',
+        subtitle: 'Buat ujian manual atau import naskah DOCX lewat ikon upload.',
+        actionLabel: 'Buat Ujian',
+        onAction: _add,
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: _ujian.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) => _ujianCard(_ujian[i]),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.all(12),
+        itemCount: _ujian.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        itemBuilder: (context, i) => _ujianCard(_ujian[i]),
+      ),
     );
   }
 
@@ -224,7 +228,7 @@ class _UjianListScreenState extends State<UjianListScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
+                    color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(status.toUpperCase(),
@@ -249,8 +253,8 @@ class _UjianListScreenState extends State<UjianListScreen> {
               _info(Icons.date_range,
                   'Jadwal: '
                   '${_hariNm[((u['jadwal_mapel'] as Map)['hari'] as num?)?.toInt() ?? 0]} '
-                  '${((u['jadwal_mapel'] as Map)['jam_mulai'] ?? '').toString().substring(0, 4)}–'
-                  '${((u['jadwal_mapel'] as Map)['jam_selesai'] ?? '').toString().substring(0, 4)} (hanya buka pada jam itu)'),
+                  '${_hhmm((u['jadwal_mapel'] as Map)['jam_mulai'])}–'
+                  '${_hhmm((u['jadwal_mapel'] as Map)['jam_selesai'])} (hanya buka pada jam itu)'),
             const Divider(height: 20),
             Row(
               children: [
@@ -296,62 +300,40 @@ class _UjianListScreenState extends State<UjianListScreen> {
                   itemBuilder: (_) => [
                     const PopupMenuItem(
                         value: 'soal',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.playlist_add_check,
-                                color: AppTheme.secondary),
-                            title: Text('Kelola Soal'))),
+                        child: MenuRow(Icons.playlist_add_check, 'Kelola Soal',
+                            iconColor: AppTheme.secondary)),
                     const PopupMenuItem(
                         value: 'kunci',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.vpn_key_outlined,
-                                color: AppTheme.secondary),
-                            title: Text('Isi Kunci Jawaban'))),
+                        child: MenuRow(Icons.vpn_key_outlined, 'Isi Kunci Jawaban',
+                            iconColor: AppTheme.secondary)),
                     const PopupMenuItem(
-                      value: 'esai',
-                      child: ListTile(
-                          dense: true, contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.rate_review_outlined,
-                              color: AppTheme.secondary),
-                          title: Text('Koreksi Esai (nilai manual)'))),
-                  if (Api.role == 'admin')
-                    const PopupMenuItem(
-                        value: 'akun',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.badge_outlined,
-                                color: AppTheme.accent),
-                            title: Text('Daftar Akun + Password'))),
+                        value: 'esai',
+                        child: MenuRow(Icons.rate_review_outlined,
+                            'Koreksi Esai (nilai manual)',
+                            iconColor: AppTheme.secondary)),
+                    if (Api.role == 'admin')
+                      const PopupMenuItem(
+                          value: 'akun',
+                          child: MenuRow(Icons.badge_outlined,
+                              'Daftar Akun + Password',
+                              iconColor: AppTheme.accent)),
                     const PopupMenuItem(
                         value: 'nomor',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.format_list_numbered,
-                                color: AppTheme.secondary),
-                            title: Text('Terbitkan Nomor (TKJ-1-2627-01)'))),
+                        child: MenuRow(Icons.format_list_numbered,
+                            'Terbitkan Nomor (TKJ-1-2627-01)',
+                            iconColor: AppTheme.secondary)),
                     const PopupMenuItem(
                         value: 'cetak',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.print_outlined,
-                                color: AppTheme.primary),
-                            title: Text('Cetak Kartu + Nominatif'))),
+                        child: MenuRow(Icons.print_outlined,
+                            'Cetak Kartu + Nominatif')),
                     const PopupMenuItem(
                         value: 'duplikat',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.copy_all_outlined,
-                                color: AppTheme.primary),
-                            title: Text('Duplikat ke Banyak Rombel…'))),
+                        child: MenuRow(Icons.copy_all_outlined,
+                            'Duplikat ke Banyak Rombel')),
                     const PopupMenuItem(
                         value: 'hapus',
-                        child: ListTile(
-                            dense: true, contentPadding: EdgeInsets.zero,
-                            leading: Icon(Icons.delete_forever_outlined,
-                                color: AppTheme.danger),
-                            title: Text('Hapus Ujian',
-                                style: TextStyle(color: AppTheme.danger)))),
+                        child: MenuRow(Icons.delete_forever_outlined,
+                            'Hapus Ujian', danger: true)),
                   ],
                   icon: const Icon(Icons.more_vert),
                 ),
@@ -413,6 +395,11 @@ class _UjianListScreenState extends State<UjianListScreen> {
   }
 
   static const _hariNm = {1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu'};
+
+  String _hhmm(dynamic v) {
+    final s = (v ?? '').toString();
+    return s.length >= 5 ? s.substring(0, 5) : (s.isEmpty ? '—' : s);
+  }
 
   String _jam(String? iso) {
 
@@ -546,7 +533,7 @@ class _UjianListScreenState extends State<UjianListScreen> {
                             key: ValueKey('${ids[i]}-$i'),
                             direction: DismissDirection.endToStart,
                             background: Container(
-                                color: AppTheme.danger.withOpacity(0.15),
+                                color: AppTheme.danger.withValues(alpha: 0.15),
                                 alignment: Alignment.centerRight,
                                 padding:
                                     const EdgeInsets.only(right: 16),

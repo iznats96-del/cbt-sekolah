@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/state_views.dart';
 import '../home.dart';
 import 'siswa_home_screen.dart';
 import 'hasil_siswa_screen.dart';
@@ -31,7 +32,7 @@ class _SiswaShellState extends State<SiswaShell> {
         title: Text(_titles[_index]),
         actions: const [LogoutButton()],
       ),
-      body: _pages[_index],
+      body: ContentMaxWidth(child: _pages[_index]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

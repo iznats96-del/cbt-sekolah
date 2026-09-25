@@ -6,6 +6,7 @@ import '../../services/api.dart';
 
 import '../home.dart';
 import '../../widgets/crud_screen.dart';
+import '../../widgets/state_views.dart';
 import 'import_screen.dart';
 import 'jadwal_pelajaran_screen.dart';
 import 'kelas_rombel_screen.dart';
@@ -40,30 +41,31 @@ class DataMasterScreen extends StatelessWidget {
       (icon: Icons.date_range_outlined, title: 'Jadwal Pelajaran (Hari & Jam)', page: () => const JadwalPelajaranScreen()),
     ];
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
-          child: Text('DATA MASTER', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1)),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Data Master'),
+        actions: const [LogoutButton()],
+      ),
+      body: ContentMaxWidth(
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            ...items.map((item) => Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading:
+                        Icon(item.icon, color: Theme.of(context).colorScheme.primary),
+                    title: Text(item.title,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => item.page()),
+                    ),
+                  ),
+                )),
+          ],
         ),
-        ...items.map((item) => Card(
-              margin: const EdgeInsets.symmetric(vertical: 4),
-              child: ListTile(
-                leading: Icon(item.icon, color: Theme.of(context).colorScheme.primary),
-                title: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => item.page()),
-                ),
-              ),
-            )),
-        const Divider(height: 24),
-        const Padding(
-          padding: EdgeInsets.only(left: 4),
-          child: Text('TOP MENU', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.grey, letterSpacing: 1)),
-        ),
-      ],
+      ),
     );
   }
 
@@ -266,18 +268,6 @@ class DataMasterScreen extends StatelessWidget {
   }
 }
 
-class _PlaceholderPage extends StatelessWidget {
-  final String title;
-  const _PlaceholderPage({required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: const Center(child: Text('Fitur segera hadir')),
-    );
-  }
-}
 /// Dialog info/reset password akun siswa (khusus admin).
 class PasswordAkunDialog extends StatefulWidget {
   final Map<String, dynamic> siswa;

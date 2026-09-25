@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
+import '../home.dart';
 import '../shared/soal_form_screen.dart';
 
 class BankSoalScreen extends StatefulWidget {
@@ -114,6 +116,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
         title: const Text('Bank Soal'),
+        actions: const [LogoutButton()],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(46),
           child: Container(
@@ -152,27 +155,24 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
         onPressed: _add,
         child: const Icon(Icons.add),
       ),
-      body: _buildBody(),
+      body: ContentMaxWidth(child: _buildBody()),
     );
   }
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return Center(child: Text(_error!));
+      return ErrorState(message: _error!, onRetry: _load);
     }
     if (_soal.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.quiz_outlined, size: 56, color: Colors.grey),
-            const SizedBox(height: 12),
-            const Text('Belum ada soal', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            FilledButton(onPressed: _add, child: const Text('+ Buat Soal')),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.quiz_outlined,
+        title: 'Belum ada soal',
+        subtitle: _filterMapel != null
+            ? 'Tidak ada soal pada mapel terpilih.'
+            : 'Buat soal baru atau import naskah DOCX dari menu Ujian.',
+        actionLabel: 'Buat Soal',
+        onAction: _add,
       );
     }
     return RefreshIndicator(
@@ -193,8 +193,8 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: jenis == 'pg'
-                    ? AppTheme.primary.withOpacity(0.1)
-                    : AppTheme.accent.withOpacity(0.1),
+                    ? AppTheme.primary.withValues(alpha: 0.1)
+                    : AppTheme.accent.withValues(alpha: 0.1),
                 foregroundColor:
                     jenis == 'pg' ? AppTheme.primary : AppTheme.accent,
                 child: Text(jenis == 'pg' ? 'PG' : 'ES',

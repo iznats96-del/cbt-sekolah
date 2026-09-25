@@ -185,38 +185,39 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
       );
     }
     if (_ujian.isEmpty) {
-      return FutureBuilder<String>(
-        future: _diag(),
-        builder: (c, snap) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.rule_folder_outlined,
-                    size: 40, color: AppTheme.accent),
-                const SizedBox(height: 10),
-                const Text('Belum ada ujian aktif untukmu.\nTarik ke bawah utk muat ulang.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(height: 1.4)),
-                const SizedBox(height: 14),
-                Card(
-                  margin: EdgeInsets.zero,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: SelectableText(
-                      'DIAGNOSTIK\nlogin : ${Api.user?.email ?? '(belum login)'}\nrole  : ${Api.role ?? '-'}\ncepat : ${snap.data ?? '(cek)'}',
-                      style: const TextStyle(fontSize: 10.5, height: 1.5),
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.rule_folder_outlined,
+                  size: 40, color: AppTheme.accent),
+              const SizedBox(height: 10),
+              const Text('Belum ada ujian aktif untukmu.\nTarik ke bawah utk muat ulang.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(height: 1.4)),
+              const SizedBox(height: 14),
+              if (kDebugMode)
+                FutureBuilder<String>(
+                  future: _diag(),
+                  builder: (c, snap) => Card(
+                    margin: EdgeInsets.zero,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: SelectableText(
+                        'DIAGNOSTIK\nlogin : ${Api.user?.email ?? '(belum login)'}\nrole  : ${Api.role ?? '-'}\ncepat : ${snap.data ?? '(cek)'}',
+                        style: const TextStyle(fontSize: 10.5, height: 1.5),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                    onPressed: _load,
-                    icon: const Icon(Icons.refresh, size: 18),
-                    label: const Text('Cek Ulang')),
-              ],
-            ),
+              if (kDebugMode) const SizedBox(height: 10),
+              FilledButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('Cek Ulang')),
+            ],
           ),
         ),
       );

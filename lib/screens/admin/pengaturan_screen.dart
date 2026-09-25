@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../widgets/state_views.dart';
+import '../home.dart';
 
 class PengaturanScreen extends StatelessWidget {
   const PengaturanScreen({super.key});
@@ -9,9 +11,14 @@ class PengaturanScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      body: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
+      appBar: AppBar(
+        title: const Text('Pengaturan'),
+        actions: const [LogoutButton()],
+      ),
+      body: ContentMaxWidth(
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
           const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 8),
             child: Text('PENGATURAN',
@@ -64,12 +71,13 @@ class PengaturanScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.info_outline),
                   title: const Text('Tentang CBT Sekolah'),
-                  subtitle: const Text('Versi 1.0.0'),
+                  subtitle: const Text('Versi 1.1.0'),
                 ),
               ],
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

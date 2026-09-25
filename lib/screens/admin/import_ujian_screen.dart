@@ -277,7 +277,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
             const SizedBox(height: 12),
             Card(
               margin: EdgeInsets.zero,
-              color: AppTheme.danger.withOpacity(0.06),
+              color: AppTheme.danger.withValues(alpha: 0.06),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -297,7 +297,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
             for (final w in doc.warnings)
               Card(
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                color: Colors.orange.withOpacity(0.08),
+                color: Colors.orange.withValues(alpha: 0.08),
                 child: ListTile(
                   dense: true,
                   leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),

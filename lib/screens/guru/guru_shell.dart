@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_theme.dart';
+import '../../widgets/state_views.dart';
 import '../home.dart';
 import 'bank_soal_screen.dart';
 import 'jadwal_screen.dart';
 import 'nilai_screen.dart';
-import 'presensi_screen.dart';
-import 'pengumuman_screen.dart';
 import 'scan_absen_screen.dart';
 
 class GuruShell extends StatefulWidget {
@@ -17,29 +17,23 @@ class GuruShell extends StatefulWidget {
 
 class _GuruShellState extends State<GuruShell> {
   int _index = 0;
-  static const _titles = ['Guru', 'Soal', 'Jadwal', 'Nilai', 'Absen'];
 
-  static const _pages = [
-    _GuruHome(),
-    BankSoalScreen(),
-    JadwalScreen(),
-    NilaiScreen(),
-    ScanAbsenScreen(),
-    PresensiScreen(),
-    PengumumanScreen(),
-  ];
+  void _go(int i) => setState(() => _index = i);
 
   @override
   Widget build(BuildContext context) {
+    const pages = [
+      _GuruHome(),
+      BankSoalScreen(),
+      JadwalScreen(),
+      NilaiScreen(),
+      ScanAbsenScreen(),
+    ];
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_titles[_index]),
-        actions: const [LogoutButton()],
-      ),
-      body: _pages[_index],
+      body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        onDestinationSelected: _go,
         destinations: const [
           NavigationDestination(
               icon: Icon(Icons.home_outlined),
@@ -72,38 +66,81 @@ class _GuruHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Selamat datang, Guru',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 6),
-                Text('Kelola bank soal dan jadwal ujian Anda.',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: 1.5,
+    void push(Widget page) =>
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('CBT Guru'),
+        actions: const [LogoutButton()],
+      ),
+      body: ContentMaxWidth(
+        child: ListView(
+          padding: const EdgeInsets.all(12),
           children: [
-            _MiniCard(icon: Icons.quiz_outlined, label: 'Bank Soal', color: const Color(0xFF1A6DB4)),
-            _MiniCard(icon: Icons.event_outlined, label: 'Jadwal Ujian', color: const Color(0xFF2E9B8F)),
-            _MiniCard(icon: Icons.grade_outlined, label: 'Nilai', color: const Color(0xFFF4A940)),
-            _MiniCard(icon: Icons.fact_check_outlined, label: 'Presensi', color: const Color(0xFFD9534F)),
+            Card(
+              margin: EdgeInsets.zero,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.secondary, AppTheme.primary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text('Selamat datang, Guru',
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white)),
+                    SizedBox(height: 6),
+                    Text('Kelola bank soal, jadwal ujian, nilai, dan absensi Anda.',
+                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(builder: (context, c) {
+              final cols = (c.maxWidth / 200).floor().clamp(2, 4);
+              return GridView.count(
+                crossAxisCount: cols,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                childAspectRatio: 1.5,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                children: [
+                  _MiniCard(
+                      icon: Icons.quiz_outlined,
+                      label: 'Bank Soal',
+                      color: AppTheme.primary,
+                      onTap: () => push(const BankSoalScreen())),
+                  _MiniCard(
+                      icon: Icons.event_outlined,
+                      label: 'Jadwal Ujian',
+                      color: AppTheme.secondary,
+                      onTap: () => push(const JadwalScreen())),
+                  _MiniCard(
+                      icon: Icons.grade_outlined,
+                      label: 'Rekap Nilai',
+                      color: AppTheme.accent,
+                      onTap: () => push(const NilaiScreen())),
+                  _MiniCard(
+                      icon: Icons.fact_check_outlined,
+                      label: 'Absen QR',
+                      color: AppTheme.danger,
+                      onTap: () => push(const ScanAbsenScreen())),
+                ],
+              );
+            }),
           ],
         ),
-      ],
+      ),
     );
   }
 }
@@ -112,19 +149,37 @@ class _MiniCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _MiniCard({required this.icon, required this.label, required this.color});
+  final VoidCallback onTap;
+  const _MiniCard(
+      {required this.icon,
+      required this.label,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: color.withOpacity(0.1),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 32, color: color),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
+      margin: EdgeInsets.zero,
+      color: color.withValues(alpha: 0.08),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 32, color: color),
+              const SizedBox(height: 8),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ),
     );
   }

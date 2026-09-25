@@ -336,7 +336,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
+                  color: Colors.white.withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
@@ -344,7 +344,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               const SizedBox(height: 24),
               const Text('Menyiapkan Lingkungan Ujian', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              Text('Mode terkunci • Anti-curang aktif', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13)),
+              Text('Mode terkunci • Anti-curang aktif', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
             ],
           ),
         ),
@@ -439,7 +439,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               Positioned.fill(
                 child: GestureDetector(
                   onTap: () => setState(() => _showPalette = false),
-                  child: Container(color: Colors.black.withOpacity(0.45)),
+                  child: Container(color: Colors.black.withValues(alpha: 0.45)),
                 ),
               ),
               Positioned(
@@ -460,11 +460,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 12, bottom: 12, left: 16, right: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFF0F172A), AppTheme.primary.withOpacity(0.95)],
+          colors: [const Color(0xFF0F172A), AppTheme.primary.withValues(alpha: 0.95)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12, offset: const Offset(0, 4))],
       ),
       child: Column(
         children: [
@@ -475,7 +475,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 decoration: BoxDecoration(
                   color: _isOwner ? const Color(0xFF14532D) : const Color(0xFF78350F),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _isOwner ? const Color(0xFF22C55E) : const Color(0xFFF59E0B).withOpacity(0.5)),
+                  border: Border.all(color: _isOwner ? const Color(0xFF22C55E) : const Color(0xFFF59E0B).withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -501,7 +501,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 decoration: BoxDecoration(
                   color: critical ? AppTheme.danger : low ? const Color(0xFFFEF3C7) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  boxShadow: critical ? [BoxShadow(color: AppTheme.danger.withOpacity(0.4), blurRadius: 8)] : null,
+                  boxShadow: critical ? [BoxShadow(color: AppTheme.danger.withValues(alpha: 0.4), blurRadius: 8)] : null,
                 ),
                 child: Row(
                   children: [
@@ -527,7 +527,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   children: [
                     Text('${widget.ujian['nama'] ?? 'UJIAN'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
-                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab${_juangPaused > 0 ? ' • keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withOpacity(_juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
+                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab${_juangPaused > 0 ? ' • keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withValues(alpha: _juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
                   ],
                 ),
               ),
@@ -547,7 +547,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         SizedBox(
           width: 44,
           height: 44,
-          child: CircularProgressIndicator(value: progress, strokeWidth: 4, backgroundColor: Colors.white.withOpacity(0.2), valueColor: const AlwaysStoppedAnimation(Colors.white)),
+          child: CircularProgressIndicator(value: progress, strokeWidth: 4, backgroundColor: Colors.white.withValues(alpha: 0.2), valueColor: const AlwaysStoppedAnimation(Colors.white)),
         ),
         Text('${((progress) * 100).round()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
       ],
@@ -561,7 +561,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 4))],
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
@@ -581,7 +581,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               if (_ragu[curId] == true)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppTheme.accent.withOpacity(0.15), borderRadius: BorderRadius.circular(20)),
+                  decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(Icons.flag, size: 12, color: AppTheme.accent), const SizedBox(width: 4), Text('RAGU', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.accent))]),
                 ),
             ],
@@ -621,7 +621,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
             Container(
               margin: const EdgeInsets.only(top: 12),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: AppTheme.accent.withOpacity(0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.accent.withOpacity(0.25))),
+              decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.accent.withValues(alpha: 0.25))),
               child: Row(children: const [Icon(Icons.save_outlined, size: 14, color: AppTheme.accent), SizedBox(width: 8), Expanded(child: Text('Tersimpan di HP — mengirim ke server otomatis', style: TextStyle(fontSize: 12, color: AppTheme.accent)))]),
             ),
         ],
@@ -647,7 +647,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
     } else if (jenis == 'essay') {
       return Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12)]),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -686,7 +686,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: selected ? AppTheme.primary.withOpacity(0.08) : Colors.white,
+        color: selected ? AppTheme.primary.withValues(alpha: 0.08) : Colors.white,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           onTap: () {
@@ -699,7 +699,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: selected ? AppTheme.primary : const Color(0xFFE2E8F0), width: selected ? 2 : 1),
-              boxShadow: selected ? [BoxShadow(color: AppTheme.primary.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 2))] : null,
+              boxShadow: selected ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 2))] : null,
             ),
             child: Row(
               children: [
@@ -736,7 +736,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isRagu ? AppTheme.accent.withOpacity(0.12) : Colors.white,
+          color: isRagu ? AppTheme.accent.withValues(alpha: 0.12) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isRagu ? AppTheme.accent : const Color(0xFFE2E8F0)),
         ),
@@ -757,7 +757,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, -4))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, -4))],
         border: Border(top: BorderSide(color: const Color(0xFFE2E8F0))),
       ),
       child: SafeArea(
@@ -843,7 +843,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text('$answeredCount/${_soal.length} terjawab',
@@ -901,7 +901,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                         color: isCurrent ? AppTheme.primary : bg,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(color: isCurrent ? AppTheme.primary : Colors.transparent, width: 2),
-                        boxShadow: isCurrent ? [BoxShadow(color: AppTheme.primary.withOpacity(0.35), blurRadius: 10)] : null,
+                        boxShadow: isCurrent ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 10)] : null,
                       ),
                       alignment: Alignment.center,
                       child: Text('${i + 1}', style: TextStyle(color: isCurrent || answered || ragu ? Colors.white : const Color(0xFF475569), fontWeight: FontWeight.bold, fontSize: 17)),
@@ -933,7 +933,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       context: context,
       builder: (c) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.assignment_turned_in, color: AppTheme.primary)), const SizedBox(width: 12), const Text('Kumpulkan Ujian?')]),
+        title: Row(children: [Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.assignment_turned_in, color: AppTheme.primary)), const SizedBox(width: 12), const Text('Kumpulkan Ujian?')]),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -945,7 +945,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               Container(
                 margin: const EdgeInsets.only(top: 12),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: AppTheme.accent.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: Row(children: [Icon(Icons.warning_amber_rounded, color: AppTheme.accent, size: 18), const SizedBox(width: 8), Expanded(child: Text('$belum soal kosong', style: TextStyle(color: AppTheme.accent, fontWeight: FontWeight.w600, fontSize: 13)))]),
               ),
           ],
@@ -981,7 +981,7 @@ class _SelesaiScreen extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(color: (isTimeout ? AppTheme.danger : AppTheme.secondary).withOpacity(0.12), shape: BoxShape.circle),
+                decoration: BoxDecoration(color: (isTimeout ? AppTheme.danger : AppTheme.secondary).withValues(alpha: 0.12), shape: BoxShape.circle),
                 child: Icon(isTimeout ? Icons.timer_off_rounded : Icons.check_circle_rounded, size: 64, color: isTimeout ? AppTheme.danger : AppTheme.secondary),
               ),
               const SizedBox(height: 24),

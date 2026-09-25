@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../home.dart';
 import 'rekap_detail_screen.dart';
 
 /// Rekap hasil ujian per rombel (X/XI/XII — TKJ / TSM / AKA) — admin & guru.
@@ -120,6 +121,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
         title: const Text('Rekap Nilai per Rombel'),
+        actions: [if (!Navigator.of(context).canPop()) const LogoutButton()],
         bottom: (_ujian.isEmpty || _loadingUjian)
             ? null
             : PreferredSize(
@@ -138,7 +140,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
                         .map((u) => DropdownMenuItem(
                               value: u['id'].toString(),
                               child: Text(
-                                  '${u['nama']}\n'
+                                  '${u['nama']} — '
                                   '${u['mata_pelajaran'] is Map ? (u['mata_pelajaran'] as Map)['nama'] ?? '' : ''} • ${u['tanggal']?.toString().split('T').first}',
                                   overflow: TextOverflow.ellipsis,
                                   maxLines: 1,
@@ -304,7 +306,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(12)),
       child: Text(t,
           style: TextStyle(
@@ -389,7 +391,7 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppTheme.primary.withOpacity(0.1),
+                      color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(nomorTxt,
@@ -417,9 +419,9 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
                 color: nilai == null
-                    ? Colors.grey.withOpacity(0.12)
+                    ? Colors.grey.withValues(alpha: 0.12)
                     : (nilai >= _kkm ? AppTheme.secondary : AppTheme.danger)
-                        .withOpacity(0.15),
+                        .withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8)),
             child: Text(
               nilai != null

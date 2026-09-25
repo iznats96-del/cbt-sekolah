@@ -70,7 +70,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 12)],
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12)],
                 ),
                 child: Image.asset('assets/images/logo_yp.png', width: 72, height: 72, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, size: 48, color: Color(0xFF1A6DB4))),
               ),

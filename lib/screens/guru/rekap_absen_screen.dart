@@ -243,8 +243,8 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
               shape: const Border(),
               leading: CircleAvatar(
                 backgroundColor: hadir == list.length
-                    ? AppTheme.secondary.withOpacity(0.15)
-                    : AppTheme.accent.withOpacity(0.15),
+                    ? AppTheme.secondary.withValues(alpha: 0.15)
+                    : AppTheme.accent.withValues(alpha: 0.15),
                 child: Text('$hadir',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
@@ -313,7 +313,7 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppTheme.accent.withOpacity(0.15),
+                color: AppTheme.accent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(st,
@@ -466,7 +466,7 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
       child: ListTile(
         dense: true,
         leading: CircleAvatar(
-          backgroundColor: AppTheme.primary.withOpacity(0.12),
+          backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
           child: Text('${unik.length}',
               style: const TextStyle(
                   fontWeight: FontWeight.bold,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
 
 class DaftarAkunScreen extends StatefulWidget {
   const DaftarAkunScreen({super.key});
@@ -141,7 +142,7 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorState(message: _error!, onRetry: _load)
               : _rows.isEmpty
                   ? const Center(
                       child: Text('Belum ada akun siswa terdaftar',
@@ -244,7 +245,7 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
           trailing: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-                color: AppTheme.accent.withOpacity(0.15),
+                color: AppTheme.accent.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8)),
             child: Text('${r['pw'] ?? '—'}',
                 style: const TextStyle(

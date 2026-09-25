@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/app_theme.dart';
-import '../../services/api.dart';
 import '../admin/ujian_list_screen.dart';
 
 class JadwalScreen extends StatelessWidget {
@@ -9,6 +7,6 @@ class JadwalScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const UjianListScreen();
+    return const UjianListScreen(showLogout: true);
   }
 }

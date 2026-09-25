@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
 
 class PengumumanSiswaScreen extends StatefulWidget {
   const PengumumanSiswaScreen({super.key});
@@ -13,6 +14,7 @@ class PengumumanSiswaScreen extends StatefulWidget {
 class _PengumumanSiswaScreenState extends State<PengumumanSiswaScreen> {
   List<Map<String, dynamic>> _rows = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -21,6 +23,10 @@ class _PengumumanSiswaScreenState extends State<PengumumanSiswaScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final rows = await Api.client
           .from('pengumuman')
@@ -35,7 +41,7 @@ class _PengumumanSiswaScreenState extends State<PengumumanSiswaScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _rows = [];
+        _error = 'Gagal memuat pengumuman: $e';
         _loading = false;
       });
     }
@@ -43,37 +49,38 @@ class _PengumumanSiswaScreenState extends State<PengumumanSiswaScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _rows.isEmpty
-              ? const Center(
-                  child: Text('Belum ada pengumuman',
-                      style: TextStyle(color: Colors.grey)))
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: _rows.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 6),
-                    itemBuilder: (context, i) {
-                      final r = _rows[i];
-                      return Card(
-                        margin: EdgeInsets.zero,
-                        child: ListTile(
-                          leading: const Icon(Icons.campaign_outlined,
-                              color: AppTheme.accent),
-                          title: Text('${r['judul']}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: Text('${r['isi'] ?? ''}',
-                              maxLines: 3, overflow: TextOverflow.ellipsis),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-    );
+    return _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? ErrorState(message: _error!, onRetry: _load)
+            : _rows.isEmpty
+                ? const EmptyState(
+                    icon: Icons.campaign_outlined,
+                    title: 'Belum ada pengumuman',
+                    subtitle: 'Coba tarik ke bawah untuk memuat ulang.')
+                : RefreshIndicator(
+                    onRefresh: _load,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.all(12),
+                      itemCount: _rows.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 6),
+                      itemBuilder: (context, i) {
+                        final r = _rows[i];
+                        return Card(
+                          margin: EdgeInsets.zero,
+                          child: ListTile(
+                            leading: const Icon(Icons.campaign_outlined,
+                                color: AppTheme.accent),
+                            title: Text('${r['judul']}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600)),
+                            subtitle: Text('${r['isi'] ?? ''}',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                        );
+                      },
+                    ),
+                  );
   }
 }

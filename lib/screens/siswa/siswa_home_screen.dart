@@ -100,7 +100,7 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                  color: const Color(0xFF1A6DB4).withOpacity(0.25),
+                  color: const Color(0xFF1A6DB4).withValues(alpha: 0.25),
                   blurRadius: 12,
                   offset: const Offset(0, 6))
             ],
@@ -119,7 +119,7 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
+                                color: Colors.black.withValues(alpha: 0.15),
                                 blurRadius: 8)
                           ]),
                       child: const CircleAvatar(
@@ -273,9 +273,9 @@ Widget _chipWhite(IconData icon, String t) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.18),
+      color: Colors.white.withValues(alpha: 0.18),
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.white.withOpacity(0.35)),
+      border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,

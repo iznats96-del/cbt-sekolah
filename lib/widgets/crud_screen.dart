@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../services/api.dart';
+import '../screens/home.dart';
+import 'state_views.dart';
 
 /// Definisi kolom untuk form CRUD generik.
 class CrudField {
@@ -43,6 +45,7 @@ class CrudScreen extends StatefulWidget {
   final List<Widget> Function(BuildContext context, Map<String, dynamic> row)? extraActions;
   final String? extraSelect;
   final Map<String, String Function(Map<String, dynamic> row)>? colRender;
+  final bool showLogout;
   const CrudScreen({
     super.key,
     required this.title,
@@ -56,6 +59,7 @@ class CrudScreen extends StatefulWidget {
     this.extraActions,
     this.extraSelect,
     this.colRender,
+    this.showLogout = false,
   });
 
   @override
@@ -186,48 +190,30 @@ class _CrudScreenState extends State<CrudScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: widget.showLogout ? const [LogoutButton()] : null,
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         onPressed: () => _openForm(),
         child: const Icon(Icons.add),
       ),
-      body: _buildBody(),
+      body: ContentMaxWidth(child: _buildBody()),
     );
   }
 
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.danger),
-              const SizedBox(height: 12),
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _load, child: const Text('Muat Ulang')),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _load);
     }
     if (_rows.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.inbox_outlined, size: 56, color: Colors.grey),
-            const SizedBox(height: 12),
-            Text('Belum ada ${widget.title}',
-                style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 8),
-            FilledButton(onPressed: () => _openForm(), child: const Text('Tambah')),
-          ],
-        ),
+      return EmptyState(
+        icon: Icons.inbox_outlined,
+        title: 'Belum ada ${widget.title}',
+        actionLabel: 'Tambah',
+        onAction: () => _openForm(),
       );
     }
     return RefreshIndicator(
@@ -365,10 +351,13 @@ class _CrudFormDialogState extends State<_CrudFormDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.initial == null ? 'Tambah Data' : 'Edit Data'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: widget.fields.map(_buildField).toList(),
+      content: SizedBox(
+        width: 420,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: widget.fields.map(_buildField).toList(),
+          ),
         ),
       ),
       actions: [
@@ -378,10 +367,7 @@ class _CrudFormDialogState extends State<_CrudFormDialog> {
         FilledButton(
             onPressed: _loading ? null : _save,
             child: _loading
-                ? const SizedBox(
-                    height: 18,
-                    width: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                ? const ButtonSpinner()
                 : const Text('Simpan')),
       ],
     );

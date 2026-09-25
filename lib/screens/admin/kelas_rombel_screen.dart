@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/state_views.dart';
 import 'crud_kelas_screen.dart';
 
 /// Komponen Kelas/Rombel modern: kelompok tingkat X / XI / XII,
@@ -193,7 +194,7 @@ class _KelasRombelScreenState extends State<KelasRombelScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? ErrorState(message: _error!, onRetry: _load)
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(
@@ -206,7 +207,7 @@ class _KelasRombelScreenState extends State<KelasRombelScreen> {
                             initiallyExpanded: true,
                             shape: const Border(),
                             leading: CircleAvatar(
-                              backgroundColor: AppTheme.primary.withOpacity(0.12),
+                              backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
                               child: Text(t,
                                   style: const TextStyle(
                                       color: AppTheme.primary,

@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../home.dart';
 import 'presensi_screen.dart';
 import 'rekap_absen_screen.dart';
 
@@ -132,6 +133,7 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
               MaterialPageRoute(builder: (_) => const PresensiScreen()),
             ),
           ),
+          if (!Navigator.of(context).canPop()) const LogoutButton(),
         ],
       ),
       body: Column(
@@ -187,9 +189,9 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
               margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: _msgColor.withOpacity(0.12),
+                color: _msgColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _msgColor.withOpacity(0.3)),
+                border: Border.all(color: _msgColor.withValues(alpha: 0.3)),
               ),
               child: Text(_msg!,
                   style: TextStyle(
