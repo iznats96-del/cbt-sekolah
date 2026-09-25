@@ -58,12 +58,14 @@ jobs:
         with:
           name: cbt-sekolah-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 5
 
       - name: Upload Web artifact
         uses: actions/upload-artifact@v4
         with:
           name: cbt-sekolah-web
           path: build/web/
+          retention-days: 5
 
       - name: Release APK
         if: github.ref == 'refs/heads/main'
