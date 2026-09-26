@@ -53,3 +53,6 @@ app.*.map.json
 key.properties
 *.b64
 /supabase/.temp/
+
+# Local env (token/secret)
+.env

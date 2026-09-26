@@ -38,7 +38,7 @@ create or replace function public.terbitkan_nomor_peserta(p_ujian uuid)
 returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
-  u record; s record;
+  u record; ss record;
   n int := 0; v_contoh text := '';
   v_info jsonb;
   v_kelas uuid[];
@@ -51,15 +51,15 @@ begin
 
   v_kelas := public.ujian_kelas_ids(p_ujian);
   if v_kelas is not null and array_length(v_kelas,1) > 0 then
-    for s in select id from public.siswa where kelas_id = any(v_kelas) order by lower(nama) loop
+    for ss in select id from public.siswa where kelas_id = any(v_kelas) order by lower(nama) loop
       insert into public.peserta_ujian (ujian_id, siswa_id, status)
-      values (p_ujian, s.id, 'belum')
+      values (p_ujian, ss.id, 'belum')
       on conflict (ujian_id, siswa_id) do nothing;
     end loop;
   elsif u.kelas_id is not null then
-    for s in select id from public.siswa where kelas_id = u.kelas_id order by lower(nama) loop
+    for ss in select id from public.siswa where kelas_id = u.kelas_id order by lower(nama) loop
       insert into public.peserta_ujian (ujian_id, siswa_id, status)
-      values (p_ujian, s.id, 'belum')
+      values (p_ujian, ss.id, 'belum')
       on conflict (ujian_id, siswa_id) do nothing;
     end loop;
   end if;
