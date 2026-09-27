@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
-import '../../widgets/crud_screen.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
 import 'import_ujian_screen.dart';
@@ -26,6 +23,8 @@ class _UjianListScreenState extends State<UjianListScreen> {
   List<Map<String, dynamic>> _ujian = [];
   bool _loading = true;
   String? _error;
+  String _filter = 'semua';
+  String _query = '';
 
   @override
   void initState() {
@@ -171,13 +170,56 @@ class _UjianListScreenState extends State<UjianListScreen> {
         onAction: _add,
       );
     }
+    final visible = _ujian.where((u) {
+      final status = u['status']?.toString() ?? 'draft';
+      final text = '${u['nama'] ?? ''} ${u['mata_pelajaran'] is Map ? (u['mata_pelajaran'] as Map)['nama'] ?? '' : ''}'.toLowerCase();
+      return (_filter == 'semua' || status == _filter) &&
+          (_query.isEmpty || text.contains(_query.toLowerCase()));
+    }).toList();
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.all(12),
-        itemCount: _ujian.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, i) => _ujianCard(_ujian[i]),
+        children: [
+          TextField(
+            onChanged: (v) => setState(() => _query = v.trim()),
+            decoration: const InputDecoration(
+              hintText: 'Cari nama ujian atau mapel...',
+              prefixIcon: Icon(Icons.search),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              for (final item in const [
+                ('semua', 'Semua'),
+                ('draft', 'Draft'),
+                ('aktif', 'Aktif'),
+                ('selesai', 'Selesai'),
+              ])
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(item.$2),
+                    selected: _filter == item.$1,
+                    onSelected: (_) => setState(() => _filter = item.$1),
+                  ),
+                ),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          if (visible.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: Text('Tidak ada ujian yang cocok dengan filter.')),
+            ),
+          for (int i = 0; i < visible.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            _ujianCard(visible[i]),
+          ],
+        ],
       ),
     );
   }
@@ -231,7 +273,7 @@ class _UjianListScreenState extends State<UjianListScreen> {
                     color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Text(status.toUpperCase(),
+                   child: Text(_statusLabel(status),
                       style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: statusColor)),
                 ),
               ],
@@ -343,6 +385,19 @@ class _UjianListScreenState extends State<UjianListScreen> {
         ),
       ),
     );
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'aktif':
+        return 'SEDANG BERLANGSUNG';
+      case 'selesai':
+        return 'SELESAI';
+      case 'dibatalkan':
+        return 'DIBATALKAN';
+      default:
+        return 'DRAFT';
+    }
   }
 
   Future<void> _terbitkanNomor(Map<String, dynamic> u) async {

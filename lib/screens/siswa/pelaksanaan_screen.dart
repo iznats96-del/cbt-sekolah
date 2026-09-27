@@ -385,6 +385,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     final opsiList = opsi is List ? opsi : <dynamic>[];
     final progress = (_idx + 1) / _soal.length;
     final answeredCount = _jawaban.values.where((v) => v != null && v!.isNotEmpty).length;
+    final flaggedCount = _ragu.values.where((v) => v == true).length;
+    final unansweredCount = _soal.length - answeredCount;
     final isLowTime = _sisaDetik < 300;
     final isCriticalTime = _sisaDetik < 60;
 
@@ -408,7 +410,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
           children: [
             Column(
               children: [
-                _buildHeader(progress, isLowTime, isCriticalTime, answeredCount),
+                _buildHeader(progress, isLowTime, isCriticalTime, answeredCount, flaggedCount, unansweredCount),
                 LinearProgressIndicator(
                   value: progress,
                   minHeight: 4,
@@ -455,7 +457,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  Widget _buildHeader(double progress, bool low, bool critical, int answered) {
+  Widget _buildHeader(double progress, bool low, bool critical, int answered, int flagged, int unanswered) {
     return Container(
       padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 12, bottom: 12, left: 16, right: 16),
       decoration: BoxDecoration(
@@ -527,7 +529,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   children: [
                     Text('${widget.ujian['nama'] ?? 'UJIAN'}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
-                    Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab${_juangPaused > 0 ? ' • keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withValues(alpha: _juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
+                     Text('Soal ${_idx + 1} dari ${_soal.length} • $answered terjawab • $unanswered kosong${flagged > 0 ? ' • $flagged ragu' : ''}${_juangPaused > 0 ? ' • keluar x$_juangPaused' : ''}', style: TextStyle(color: Colors.white.withValues(alpha: _juangPaused > 0 ? 1 : 0.7), fontSize: 12, fontWeight: _juangPaused > 0 ? FontWeight.bold : FontWeight.normal)),
                   ],
                 ),
               ),
@@ -617,13 +619,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               ),
             ),
           ],
-          if (!_sinkron)
-            Container(
-              margin: const EdgeInsets.only(top: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: AppTheme.accent.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: AppTheme.accent.withValues(alpha: 0.25))),
-              child: Row(children: const [Icon(Icons.save_outlined, size: 14, color: AppTheme.accent), SizedBox(width: 8), Expanded(child: Text('Tersimpan di HP — mengirim ke server otomatis', style: TextStyle(fontSize: 12, color: AppTheme.accent)))]),
-            ),
+           Container(
+               margin: const EdgeInsets.only(top: 12),
+               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+               decoration: BoxDecoration(color: (_sinkron ? AppTheme.secondary : AppTheme.accent).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: (_sinkron ? AppTheme.secondary : AppTheme.accent).withValues(alpha: 0.25))),
+               child: Row(children: [Icon(_sinkron ? Icons.cloud_done_outlined : Icons.save_outlined, size: 14, color: _sinkron ? AppTheme.secondary : AppTheme.accent), const SizedBox(width: 8), Expanded(child: Text(_sinkron ? 'Jawaban tersimpan di server' : 'Tersimpan di HP — mengirim ke server otomatis', style: TextStyle(fontSize: 12, color: _sinkron ? AppTheme.secondary : AppTheme.accent)))]),
+             ),
         ],
       ),
     );

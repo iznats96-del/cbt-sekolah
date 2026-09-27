@@ -105,6 +105,8 @@ class _GuruHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            _TodayFocus(),
+            const SizedBox(height: 16),
             LayoutBuilder(builder: (context, c) {
               final cols = (c.maxWidth / 200).floor().clamp(2, 4);
               return GridView.count(
@@ -141,6 +143,27 @@ class _GuruHome extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TodayFocus extends StatelessWidget {
+  const _TodayFocus();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Fokus hari ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        SizedBox(height: 5),
+        Text('Siapkan soal, cek jadwal, lalu pantau nilai dan absensi dari shortcut di bawah.', style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4)),
+      ]),
     );
   }
 }

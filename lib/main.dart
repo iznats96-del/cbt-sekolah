@@ -28,6 +28,8 @@ class CbtApp extends StatelessWidget {
       title: 'CBT Sekolah',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       home: const SplashScreen(),
     );
   }

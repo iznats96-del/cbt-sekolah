@@ -9,6 +9,7 @@ import '../../core/config.dart';
 import '../../services/api.dart';
 import '../auth/login_screen.dart';
 import 'pelaksanaan_screen.dart';
+import '../../widgets/state_views.dart';
 
 class UjianBerandaList extends StatefulWidget {
   const UjianBerandaList({super.key});
@@ -169,21 +170,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
   Widget build(BuildContext context) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline, color: AppTheme.danger, size: 40),
-              const SizedBox(height: 8),
-              Text(_error!, textAlign: TextAlign.center),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: _load, child: const Text('Muat Ulang')),
-            ],
-          ),
-        ),
-      );
+      return ErrorState(message: _error!, onRetry: _load);
     }
     if (_ujian.isEmpty) {
       return Center(
@@ -195,7 +182,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
               const Icon(Icons.rule_folder_outlined,
                   size: 40, color: AppTheme.accent),
               const SizedBox(height: 10),
-              const Text('Belum ada ujian aktif untukmu.\nTarik ke bawah utk muat ulang.',
+              const Text('Belum ada ujian aktif untukmu.\nTarik ke bawah untuk memuat ulang.',
                   textAlign: TextAlign.center,
                   style: TextStyle(height: 1.4)),
               const SizedBox(height: 14),
@@ -228,16 +215,27 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
         for (int i = 0; i < _ujian.length; i++) ...[
           Builder(builder: (context) {
             final u = Map<String, dynamic>.from(_ujian[i] as Map);
-            return Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
+             return Card(
+               margin: EdgeInsets.zero,
+               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${u['nama'] ?? 'Ujian'}',
-                        style: const TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.bold)),
+                     Row(children: [
+                       Container(
+                         width: 8,
+                         height: 40,
+                         decoration: BoxDecoration(
+                           color: AppTheme.secondary,
+                           borderRadius: BorderRadius.circular(8),
+                         ),
+                       ),
+                       const SizedBox(width: 10),
+                       Expanded(child: Text('${u['nama'] ?? 'Ujian'}',
+                           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                       const Icon(Icons.lock_clock_outlined, color: AppTheme.secondary, size: 20),
+                     ]),
                     const SizedBox(height: 8),
                     if ((u['mapel'] ?? '').toString().isNotEmpty)
                       _row(Icons.menu_book_outlined, '${u['mapel']}'),

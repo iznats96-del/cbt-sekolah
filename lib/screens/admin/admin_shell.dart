@@ -113,6 +113,8 @@ class _AdminHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
+            _ControlCenter(),
+            const SizedBox(height: 16),
             LayoutBuilder(builder: (context, c) {
               final cols = (c.maxWidth / 200).floor().clamp(2, 4);
               return GridView.count(
@@ -161,6 +163,67 @@ class _AdminHome extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ControlCenter extends StatelessWidget {
+  const _ControlCenter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.dashboard_customize_outlined, color: AppTheme.primary),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Pusat kendali', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                SizedBox(height: 3),
+                Text('Akses cepat untuk persiapan ujian hari ini', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ]),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          const _ChecklistRow(Icons.people_outline, 'Pastikan data siswa dan kelas sudah lengkap'),
+          const _ChecklistRow(Icons.quiz_outlined, 'Cek soal dan kunci jawaban sebelum mengaktifkan ujian'),
+          const _ChecklistRow(Icons.assignment_turned_in_outlined, 'Pantau rekap nilai setelah ujian selesai'),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChecklistRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _ChecklistRow(this.icon, this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 9),
+      child: Row(children: [
+        Icon(icon, size: 18, color: AppTheme.secondary),
+        const SizedBox(width: 9),
+        Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5))),
+      ]),
     );
   }
 }
