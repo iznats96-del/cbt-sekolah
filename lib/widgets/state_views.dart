@@ -10,6 +10,9 @@ class ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final permissionError = message.contains('42501') ||
+        message.toLowerCase().contains('insufficient privilege') ||
+        message.toLowerCase().contains('permission denied');
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -26,10 +29,12 @@ class ErrorState extends StatelessWidget {
                   size: 36, color: AppTheme.danger),
             ),
             const SizedBox(height: 14),
-            const Text('Gagal memuat data',
+            Text(permissionError ? 'Akses belum tersinkron' : 'Gagal memuat data',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 6),
-            Text(message,
+            Text(permissionError
+                ? 'Izin database untuk akun ini belum aktif. Minta admin menjalankan migration terbaru, lalu coba lagi.'
+                : message,
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
