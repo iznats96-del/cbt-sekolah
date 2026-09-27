@@ -28,8 +28,9 @@ class CbtApp extends StatelessWidget {
       title: 'CBT Sekolah',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      // CBT Sekolah memakai tampilan terang agar tetap konsisten di web,
+      // Android, dan perangkat yang memakai dark mode sistem.
+      themeMode: ThemeMode.light,
       home: const SplashScreen(),
     );
   }

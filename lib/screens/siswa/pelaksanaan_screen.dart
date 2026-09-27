@@ -328,23 +328,23 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFFF4F8FC),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
+                 decoration: BoxDecoration(
+                   color: AppTheme.primary.withValues(alpha: 0.10),
                   shape: BoxShape.circle,
                 ),
-                child: const CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                 child: const CircularProgressIndicator(color: AppTheme.primary, strokeWidth: 3),
               ),
               const SizedBox(height: 24),
-              const Text('Menyiapkan Lingkungan Ujian', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
+               const Text('Menyiapkan Lingkungan Ujian', style: TextStyle(color: Color(0xFF17324D), fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              Text('Mode terkunci • Anti-curang aktif', style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+               Text('Mode terkunci • Anti-curang aktif', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
             ],
           ),
         ),
@@ -462,7 +462,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 12, bottom: 12, left: 16, right: 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [const Color(0xFF0F172A), AppTheme.primary.withValues(alpha: 0.95)],
+                   colors: [AppTheme.primary, AppTheme.secondary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -782,7 +782,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 icon: Icon(_showPalette ? Icons.close : Icons.grid_view, size: 18),
                 label: Text(_showPalette ? 'Tutup' : 'Daftar Soal'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
+                 backgroundColor: AppTheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
