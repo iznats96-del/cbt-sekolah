@@ -78,7 +78,7 @@ class DataMasterScreen extends StatelessWidget {
       columns: ['semester', 'is_active'],
       fields: const [
         CrudField('nama', label: 'Tahun Pelajaran', required: true, hint: 'contoh: 2025/2026'),
-        CrudField('semester', label: 'Semester', options: [
+        CrudField('semester', label: 'Semester', required: true, options: [
           DropdownItem('Ganjil', 'Ganjil'),
           DropdownItem('Genap', 'Genap'),
         ], type: 'select'),
@@ -95,7 +95,7 @@ class DataMasterScreen extends StatelessWidget {
       columns: ['singkatan'],
       fields: const [
         CrudField('nama', label: 'Nama Jurusan', required: true, hint: 'contoh: Teknik Komputer dan Jaringan'),
-        CrudField('singkatan', label: 'Singkatan', hint: 'contoh: TKJ'),
+        CrudField('singkatan', label: 'Singkatan', required: true, hint: 'contoh: TKJ'),
         CrudField('deskripsi', label: 'Deskripsi', type: 'textarea'),
       ],
     );
