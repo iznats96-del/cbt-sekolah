@@ -1,0 +1,16 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+[user]
+	name = iznats96-del
+	email = iznats96-del@users.noreply.github.com
+[credential]
+	helper = 
+[remote "origin"]
+	url = https://iznats96-del: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@github.com/iznats96-del/cbt-sekolah.git
+	fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+	remote = origin
+	merge = refs/heads/main

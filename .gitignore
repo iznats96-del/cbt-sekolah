@@ -56,3 +56,5 @@ key.properties
 
 # Local env (token/secret)
 .env
+.vercel
+.env*

@@ -27,7 +27,7 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
     try {
       final rows = await Api.client
           .from('siswa')
-          .select('id,nama,nis,nomor_peserta,kelas(nama)')
+          .select('id,nama,nis,nomor_peserta,foto_url,kelas(nama)')
           .eq('profile_id', Api.user?.id ?? '')
           .limit(1);
       List<Map<String, dynamic>> nomor = [];
@@ -87,8 +87,15 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                const Icon(Icons.badge_outlined,
-                    size: 40, color: AppTheme.primary),
+                CircleAvatar(
+                  radius: 48,
+                  backgroundImage: '${_siswa?['foto_url'] ?? ''}'.isNotEmpty
+                      ? NetworkImage('${_siswa?['foto_url']}')
+                      : null,
+                  child: '${_siswa?['foto_url'] ?? ''}'.isNotEmpty
+                      ? null
+                      : const Icon(Icons.person_outline, size: 48, color: AppTheme.primary),
+                ),
                 const SizedBox(height: 8),
                 const Text('KARTU ABSEN SAYA',
                     style: TextStyle(

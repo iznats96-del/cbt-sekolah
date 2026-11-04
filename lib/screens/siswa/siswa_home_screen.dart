@@ -5,6 +5,7 @@ import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import 'ujian_beranda_list.dart';
 import 'kartu_saya_screen.dart';
+import 'jadwal_saya_widget.dart';
 
 Widget _chip(IconData icon, String t) {
   return Container(
@@ -253,8 +254,9 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
+        const JadwalSayaWidget(),
         const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8),
+          padding: EdgeInsets.only(left: 4, bottom: 8, top: 16),
           child: Text('UJIAN TERSEDIA',
               style: TextStyle(
                   fontSize: 13,

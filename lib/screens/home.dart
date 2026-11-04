@@ -4,6 +4,7 @@ import '../services/api.dart';
 import 'admin/admin_shell.dart';
 import 'guru/guru_shell.dart';
 import 'siswa/siswa_shell.dart';
+import 'panitia/panitia_shell.dart';
 import 'auth/login_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -16,6 +17,8 @@ class HomeScreen extends StatelessWidget {
         return const AdminShell();
       case 'guru':
         return const GuruShell();
+      case 'panitia':
+        return const PanitiaShell();
       case 'siswa':
       default:
         return const SiswaShell();

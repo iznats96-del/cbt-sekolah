@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../admin/admin_shell.dart';
 import '../siswa/siswa_shell.dart';
 import '../guru/guru_shell.dart';
+import '../panitia/panitia_shell.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -131,6 +132,9 @@ class _LoginScreenState extends State<LoginScreen> {
       case 'guru':
         Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const GuruShell()));
+      case 'panitia':
+        Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const PanitiaShell()));
       case 'siswa':
       default:
         Navigator.of(context).pushReplacement(
