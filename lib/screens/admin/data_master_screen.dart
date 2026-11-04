@@ -117,7 +117,7 @@ class DataMasterScreen extends StatelessWidget {
       fields: const [
         CrudField('nama', label: 'Nama Mapel', required: true),
         CrudField('kode', label: 'Kode Mapel'),
-        CrudField('kkm', label: 'KKM', type: 'number'),
+        CrudField('kkm', label: 'KKM', required: true, type: 'number', hint: 'contoh: 75'),
       ],
     );
   }
@@ -169,7 +169,7 @@ class DataMasterScreen extends StatelessWidget {
       columns: ['tingkat'],
       fields: const [
         CrudField('nama', label: 'Nama Kelas', required: true, hint: 'contoh: X TKI 1'),
-        CrudField('tingkat', label: 'Tingkat', type: 'number'),
+        CrudField('tingkat', label: 'Tingkat', required: true, type: 'number', hint: '10, 11, 12'),
       ],
     );
   }
