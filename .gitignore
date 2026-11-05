@@ -58,3 +58,6 @@ key.properties
 .env
 .vercel
 .env*
+
+.vercel
+.env*
