@@ -42,17 +42,6 @@ jobs:
             echo "keystore decoded"
           fi
 
-      - name: Configure Gradle retries
-        run: |
-          mkdir -p android/gradle/wrapper
-          PROPS="android/gradle/wrapper/gradle-wrapper.properties"
-          if [ -f "$PROPS" ]; then
-            echo "" >> "$PROPS"
-            echo "systemProp.gradle.distribution.sha256sum.verify=true" >> "$PROPS"
-          fi
-          # Enable Gradle daemon retries for transient download failures
-          export GRADLE_OPTS="-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
-
       - name: Build APK (with retry)
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/cbt-release.keystore
