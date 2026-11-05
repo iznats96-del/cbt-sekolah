@@ -15,9 +15,8 @@ class FotoSiswaScreen extends StatefulWidget {
 }
 
 class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
-  List<Map<String, dynamic>> _siswaList = [];
-  List<Map<String, dynamic>> _kelasList = [];
-  String? _selectedKelasId;
+ List<Map<String, dynamic>> _siswaList = [];
+ String? _selectedKelasId;
   bool _loading = true;
   String? _error;
   bool _uploading = false;
@@ -35,26 +34,17 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
       _error = null;
     });
     try {
-      // Load kelas list for filter dropdown
-      final kelasRows = await Api.client
-          .from('kelas')
-          .select('id,nama,jurusan(singkatan)')
-          .order('nama');
-      final kelasList = List<Map<String, dynamic>>.from(kelasRows);
-
       // Load siswa with optional kelas filter
       var query = Api.client
           .from('siswa')
-          .select('id,nama,nis,foto_url,kelas_id,kelas(nama)')
-          .order('nis');
+          .select('id,nama,nis,foto_url,kelas_id,kelas(nama)');
       if (_selectedKelasId != null && _selectedKelasId!.isNotEmpty) {
         query = query.eq('kelas_id', _selectedKelasId!);
       }
-      final rows = await query;
+      final rows = await query.order('nis');
 
       if (!mounted) return;
       setState(() {
-        _kelasList = kelasList;
         _siswaList = List<Map<String, dynamic>>.from(rows);
         _loading = false;
       });
@@ -74,10 +64,6 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
         dialogTitle: 'Pilih foto untuk ${siswa['nama']}',
         type: FileType.image,
       );
-      if (result == null || result.isEmpty) {
-        setState(() => _uploading = false);
-        return;
-      }
       final file = result.first;
       final path = file.path!;
       final fileName =
@@ -148,7 +134,7 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _siswaList.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final s = _siswaList[i];
         final kelas = s['kelas'] is Map ? (s['kelas'] as Map)['nama'] : null;
