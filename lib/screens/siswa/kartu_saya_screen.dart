@@ -183,10 +183,6 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
                               letterSpacing: 1)),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                      'TKJ-1-2627-01 = Jurusan-Semester(1 Ganjil/2 Genap)-Tahun-Urut abjad per jurusan',
-                      style: TextStyle(fontSize: 11, color: Colors.grey)),
                   const SizedBox(height: 8),
                   for (final n in _nomor)
                     Container(

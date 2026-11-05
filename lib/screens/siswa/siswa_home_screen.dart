@@ -7,26 +7,6 @@ import 'ujian_beranda_list.dart';
 import 'kartu_saya_screen.dart';
 import 'jadwal_saya_widget.dart';
 
-Widget _chip(IconData icon, String t) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-        color: const Color(0xFFEAF3FB),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFCFE4F5))),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: AppTheme.primary),
-        const SizedBox(width: 4),
-        Text(t,
-            style: const TextStyle(
-                fontSize: 11, color: Color(0xFF0F3A5F), fontWeight: FontWeight.w600)),
-      ],
-    ),
-  );
-}
-
 class SiswaHomeScreen extends StatefulWidget {
   const SiswaHomeScreen({super.key});
 
@@ -51,7 +31,7 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
     try {
       final rows = await Api.client
           .from('siswa')
-          .select('nama,nis,nomor_peserta,aktive_ok,kelas(nama,jurusan(singkatan))')
+          .select('nama,nis,nomor_peserta,foto_url,aktive_ok,kelas(nama,jurusan(singkatan))')
           .eq('profile_id', Api.user?.id ?? '')
           .limit(1);
       if (rows.isNotEmpty) row = Map<String, dynamic>.from(rows.first as Map);
@@ -123,11 +103,18 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
                                 color: Colors.black.withValues(alpha: 0.15),
                                 blurRadius: 8)
                           ]),
-                      child: const CircleAvatar(
+                      child: CircleAvatar(
                         radius: 26,
-                        backgroundColor: Color(0xFFEAF3FB),
-                        child: Icon(Icons.person,
-                            size: 30, color: AppTheme.primary),
+                        backgroundColor: const Color(0xFFEAF3FB),
+                        backgroundImage:
+                            '${_siswaRow?['foto_url'] ?? ''}'.isNotEmpty
+                                ? NetworkImage('${_siswaRow?['foto_url']}')
+                                : null,
+                        child:
+                            '${_siswaRow?['foto_url'] ?? ''}'.isNotEmpty
+                                ? null
+                                : const Icon(Icons.person,
+                                    size: 30, color: AppTheme.primary),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -220,11 +207,6 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 4),
-                            const Text(
-                                'TKJ-1-2627-01 = Jurusan-Semester(1=Ganjil)-Tahun-Urut per jurusan',
-                                style: TextStyle(
-                                    fontSize: 10, color: Colors.grey)),
                             const SizedBox(height: 8),
                             SizedBox(
                               width: double.infinity,

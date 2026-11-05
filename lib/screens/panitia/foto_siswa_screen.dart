@@ -16,6 +16,8 @@ class FotoSiswaScreen extends StatefulWidget {
 
 class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
   List<Map<String, dynamic>> _siswaList = [];
+  List<Map<String, dynamic>> _kelasList = [];
+  String? _selectedKelasId;
   bool _loading = true;
   String? _error;
   bool _uploading = false;
@@ -33,19 +35,33 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.client
+      // Load kelas list for filter dropdown
+      final kelasRows = await Api.client
+          .from('kelas')
+          .select('id,nama,jurusan(singkatan)')
+          .order('nama');
+      final kelasList = List<Map<String, dynamic>>.from(kelasRows);
+
+      // Load siswa with optional kelas filter
+      var query = Api.client
           .from('siswa')
-          .select('id,nama,nis,foto_url,kelas(nama)')
+          .select('id,nama,nis,foto_url,kelas_id,kelas(nama)')
           .order('nis');
+      if (_selectedKelasId != null && _selectedKelasId!.isNotEmpty) {
+        query = query.eq('kelas_id', _selectedKelasId!);
+      }
+      final rows = await query;
+
       if (!mounted) return;
       setState(() {
+        _kelasList = kelasList;
         _siswaList = List<Map<String, dynamic>>.from(rows);
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Gagal memuat siswa: $e';
+        _error = 'Gagal memuat data: $e';
         _loading = false;
       });
     }
