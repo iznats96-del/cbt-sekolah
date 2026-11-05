@@ -42,13 +42,37 @@ jobs:
             echo "keystore decoded"
           fi
 
-      - name: Build APK
+      - name: Configure Gradle retries
+        run: |
+          mkdir -p android/gradle/wrapper
+          PROPS="android/gradle/wrapper/gradle-wrapper.properties"
+          if [ -f "$PROPS" ]; then
+            echo "" >> "$PROPS"
+            echo "systemProp.gradle.distribution.sha256sum.verify=true" >> "$PROPS"
+          fi
+          # Enable Gradle daemon retries for transient download failures
+          export GRADLE_OPTS="-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
+
+      - name: Build APK (with retry)
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/cbt-release.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEYSTORE_KEYPASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEYSTORE_ALIAS: ${{ secrets.KEYSTORE_ALIAS }}
-        run: flutter build apk --release --obfuscate --split-debug-info=debug
+          GRADLE_OPTS: "-Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000"
+        run: |
+          MAX_RETRIES=3
+          for i in $(seq 1 $MAX_RETRIES); do
+            echo "=== Attempt $i of $MAX_RETRIES ==="
+            if flutter build apk --release --obfuscate --split-debug-info=debug; then
+              echo "Build succeeded on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i failed, waiting 30s before retry..."
+            sleep 30
+          done
+          echo "All $MAX_RETRIES attempts failed"
+          exit 1
 
       - name: Build Web
         run: flutter build web --release
