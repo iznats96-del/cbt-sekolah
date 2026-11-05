@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config.dart';
 import 'screens/splash_screen.dart';
 import 'core/app_theme.dart';
+import 'services/api.dart';
 
 // Aktifkan DevicePreview hanya di Chrome/Web untuk lihat frame HP di VS Code
 // import 'package:device_preview/device_preview.dart'; // uncomment jika sudah `flutter pub add device_preview`
@@ -14,6 +15,8 @@ Future<void> main() async {
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
   );
+  // Start periodic health check for automatic failover circuit breaker
+  Api.startHealthCheck();
   runApp(const CbtApp());
   // Untuk frame HP di VS Code (Chrome), ganti baris di atas jadi:
   // runApp(DevicePreview(enabled: kIsWeb, builder: (_) => const CbtApp()));
