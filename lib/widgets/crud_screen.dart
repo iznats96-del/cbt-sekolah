@@ -320,6 +320,14 @@ class _CrudFormDialogState extends State<_CrudFormDialog> {
           data[f.key] = t.isEmpty ? null : int.tryParse(t) ?? double.tryParse(t);
           break;
         case 'select':
+          // Nilai select disimpan di _select (dropdown), bukan di _ctrl.
+          final sv = _select[f.key];
+          if (f.required && (sv == null || sv.isEmpty)) {
+            _show('${f.label} wajib diisi');
+            return;
+          }
+          data[f.key] = (sv == null || sv.isEmpty) ? null : sv;
+          break;
         case 'date':
         case 'text':
         case 'textarea':
@@ -395,7 +403,9 @@ class _CrudFormDialogState extends State<_CrudFormDialog> {
           padding: const EdgeInsets.only(bottom: 12),
           child: DropdownButtonFormField<String>(
             initialValue: _select[f.key]?.isEmpty == true ? null : _select[f.key],
-            decoration: InputDecoration(labelText: '${f.label} (opsional)'),
+            decoration: InputDecoration(
+                labelText: f.label,
+                helperText: f.required ? 'wajib' : 'opsional'),
             items: (f.options ?? [])
                 .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
                 .toList(),
@@ -433,8 +443,14 @@ class _CrudFormDialogState extends State<_CrudFormDialog> {
 /// Helper untuk mendapatkan daftar opsi dropdown dari tabel Supabase.
 Future<List<DropdownItem>> fetchDropdown(
     String table, String labelField, String valueField) async {
-  final rows = await Api.client.from(table).select('$valueField,$labelField').order(labelField);
-  return (rows as List<Map<String, dynamic>>)
-      .map((r) => DropdownItem('${r[valueField]}', '${r[labelField]}'))
+  final rows = await Api.client
+      .from(table)
+      .select('$valueField,$labelField')
+      .order(labelField);
+  return (rows as List)
+      .map((r) {
+        final m = Map<String, dynamic>.from(r as Map);
+        return DropdownItem('${m[valueField]}', '${m[labelField]}');
+      })
       .toList();
 }
