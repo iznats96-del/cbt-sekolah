@@ -4,7 +4,7 @@ class AppConfig {
   // ─── PRIMARY: Supabase Cloud ──────────────────────────────
   static const String supabaseUrl = 'https://yukqngrtgevveimhrwke.supabase.co';
   static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl1a3FuZ3J0Z2V2dmVpbWhyd2tlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzA2OTQxNzEsImV4cCI6MjA0NjI3MDE3MX0.YUow';
+      'sb_publishable_zw9bbTdmBoZqUvdW8ZV-2Q_Pr0sDrhp';
 
   // ─── FALLBACK: Cloudflare Tunnel → Node.js + PostgreSQL ───
   // Domain permanen via Cloudflare Named Tunnel (smkyp79.my.id)
