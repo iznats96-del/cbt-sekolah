@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show SocketException;
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -426,6 +427,80 @@ class Api {
       }
     }
     throw Exception('Unreachable');
+  }
+
+  // ─── STORAGE FAILOVER ───────────────────────────────────────
+  // Upload file to primary (Supabase storage); on transient fail → fallback
+  // GET public URL: if primary, use Supabase getPublicUrl; if fallback, construct URL
+
+  /// Upload a binary file to a storage bucket (Supabase primary → fallback)
+  static Future<void> routerStorageUpload(
+    String bucket,
+    String path,
+    Uint8List bytes, {
+    String contentType = 'application/octet-stream',
+    bool upsert = false,
+  }) async {
+    if (_circuitOpen) {
+      // Fallback: PUT to local storage endpoint
+      final res = await http
+          .put(
+            Uri.parse('${AppConfig.fallbackApiUrl}/storage/v1/bucket/$bucket/$path'),
+            headers: _fallbackHeaders(contentType: contentType),
+            body: bytes,
+          )
+          .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
+      if (res.statusCode != 200 && res.statusCode != 201) {
+        throw Exception('Fallback storage upload $bucket/$path: ${res.statusCode}');
+      }
+      debugPrint('[BackendRouter] ↪️ Fallback storage upload $bucket/$path');
+      return;
+    }
+
+    for (int attempt = 0; attempt <= AppConfig.maxRetries; attempt++) {
+      try {
+        await client.storage
+            .from(bucket)
+            .uploadBinary(
+              path,
+              bytes,
+              fileOptions: FileOptions(contentType: contentType, upsert: upsert),
+            )
+            .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
+        _recordSuccess();
+        return;
+      } catch (e) {
+        if (!_isTransientError(e)) rethrow;
+        if (attempt < AppConfig.maxRetries) {
+          await Future.delayed(Duration(milliseconds: 500 * (attempt + 1)));
+          continue;
+        }
+        _recordFailure('Storage upload $bucket/$path');
+        debugPrint(
+            '[BackendRouter] ↪️ Fallback storage upload $bucket/$path after primary failure');
+        // fallback
+        final res = await http
+            .put(
+              Uri.parse('${AppConfig.fallbackApiUrl}/storage/v1/bucket/$bucket/$path'),
+              headers: _fallbackHeaders(contentType: contentType),
+              body: bytes,
+            )
+            .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
+        if (res.statusCode != 200 && res.statusCode != 201) {
+          throw Exception('Fallback storage upload $bucket/$path: ${res.statusCode}');
+        }
+        return;
+      }
+    }
+    throw Exception('Unreachable');
+  }
+
+  /// Get public URL for a stored file (primary → fallback)
+  static String routerStorageGetPublicUrl(String bucket, String path) {
+    if (_circuitOpen) {
+      return '${AppConfig.fallbackApiUrl}/storage/v1/bucket/$bucket/$path';
+    }
+    return client.storage.from(bucket).getPublicUrl(path);
   }
 }
 

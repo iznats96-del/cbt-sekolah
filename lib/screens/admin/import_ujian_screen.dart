@@ -124,12 +124,14 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
     try {
       final ext = path.split('.').last.toLowerCase();
       final p = 'soal/import_${DateTime.now().millisecondsSinceEpoch}.$ext';
-      await Api.client.storage.from('soal').uploadBinary(
-        p, bytes,
-        fileOptions: FileOptions(
-            contentType: ext == 'png' ? 'image/png' : 'image/jpeg', upsert: true),
+      await Api.routerStorageUpload(
+        'soal',
+        p,
+        bytes,
+        contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+        upsert: true,
       );
-      return Api.client.storage.from('soal').getPublicUrl(p);
+      return Api.routerStorageGetPublicUrl('soal', p);
     } catch (_) {
       return null;
     }

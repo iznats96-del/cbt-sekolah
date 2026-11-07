@@ -102,14 +102,15 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
           'siswa_${siswa['id']}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
       final bytes = await File(path).readAsBytes();
-      final storage = Api.client.storage.from('foto_siswa');
-      await storage.uploadBinary(
+      await Api.routerStorageUpload(
+        'foto_siswa',
         fileName,
         bytes,
-        fileOptions: FileOptions(contentType: 'image/jpeg'),
+        contentType: 'image/jpeg',
+        upsert: true,
       );
       if (!mounted) return;
-      final url = Api.client.storage.from('foto_siswa').getPublicUrl(fileName);
+      final url = Api.routerStorageGetPublicUrl('foto_siswa', fileName);
 
       await Api.client
           .from('siswa')

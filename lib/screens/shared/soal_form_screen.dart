@@ -184,15 +184,14 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
     try {
       final ext = (f.extension ?? 'png').toLowerCase();
       final path = 'soal/${DateTime.now().millisecondsSinceEpoch}.${ext == "jpeg" ? "jpg" : ext}';
-      await Api.client.storage.from('soal').uploadBinary(
+      await Api.routerStorageUpload(
+        'soal',
         path,
         bytes,
-        fileOptions: FileOptions(
-          contentType: ext == 'png' ? 'image/png' : ext == 'gif' ? 'image/gif' : 'image/jpeg',
-          upsert: true,
-        ),
+        contentType: ext == 'png' ? 'image/png' : ext == 'gif' ? 'image/gif' : 'image/jpeg',
+        upsert: true,
       );
-      final url = Api.client.storage.from('soal').getPublicUrl(path);
+      final url = Api.routerStorageGetPublicUrl('soal', path);
       if (!mounted) return;
       setState(() {
         _gambarUrl = url;

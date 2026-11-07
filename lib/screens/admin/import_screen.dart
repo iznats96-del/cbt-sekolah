@@ -143,14 +143,14 @@ class _ImportScreenState extends State<ImportScreen> {
             try {
               final ext = img.split('.').last.toLowerCase();
               final path = 'mapel/${DateTime.now().millisecondsSinceEpoch}_${(m['nama'] ?? 'mapel').toString().hashCode}.$ext';
-              await Api.client.storage.from('soal').uploadBinary(
+              await Api.routerStorageUpload(
+                'soal',
                 path,
                 _imgStore[img]!,
-                fileOptions: FileOptions(
-                    contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
-                    upsert: true),
+                contentType: ext == 'png' ? 'image/png' : 'image/jpeg',
+                upsert: true,
               );
-              row['logo_url'] = Api.client.storage.from('soal').getPublicUrl(path);
+              row['logo_url'] = Api.routerStorageGetPublicUrl('soal', path);
             } catch (_) {/* logo opsional */}
           }
           payload.add(row);
