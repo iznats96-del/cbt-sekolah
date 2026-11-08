@@ -1,5 +1,9 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io' show File, FileMode;
+import 'dart:convert' show utf8;
+import 'dart:typed_data' show Uint8List;
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
@@ -70,7 +74,7 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
       builder: (c) => AlertDialog(
         title: const Text('Reset SEMUA password siswa?'),
         content: const Text(
-            'Setiap siswa akan dapat password baru acak YPxxxx (login tetap pakai NIS).\n'
+            'Setiap siswa akan dapat password baru acak 79xxxx (login tetap pakai NIS).\n'
             'Password lama MATI. Setelah ini: cetak/salin Daftar Akun dan bagikan lewat wali kelas.',
             style: TextStyle(fontSize: 13)),
         actions: [
@@ -122,6 +126,60 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
             backgroundColor: AppTheme.secondary));
   }
 
+  /// Salin daftar khusus rombel terpilih (untuk wali kelas/cetak per kelas).
+  Future<void> _salinPerKelas(String kelas) async {
+    final baris = _shown.where((r) => '${r['kelas']}' == kelas).toList();
+    if (baris.isEmpty) return;
+    final buf = StringBuffer()
+      ..writeln('DAFTAR AKUN LOGIN CBT — ROMBEL $kelas')
+      ..writeln('Login: username = NIS, password sesuai tabel');
+    for (final r in baris) {
+      buf.writeln('${r['nomor'] ?? '-'}  ${r['nis']}  ${r['nama']}  ${r['pw'] ?? '(belum tercatat)'}');
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Daftar rombel $kelas tersalin (${baris.length} siswa)'),
+            backgroundColor: AppTheme.secondary));
+  }
+
+  /// Export CSV daftar akun per kelas (atau semua) — download file.
+  Future<void> _exportPerKelas(String kelas) async {
+    final baris = kelas == 'semua'
+        ? _shown
+        : _shown.where((r) => '${r['kelas']}' == kelas).toList();
+    if (baris.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Data kosong')));
+      return;
+    }
+    final buf = StringBuffer('Nomor;NIS;Nama;Kelas;Password Login\n');
+    for (final r in baris) {
+      final nama = '${r['nama']}'
+          .replaceAll(RegExp(r'[";\n]'), ' ');
+      buf.writeln('${r['nomor'] ?? '-'};${r['nis']};$nama;${r['kelas'] ?? '-'};${r['pw'] ?? '(belum tercatat)'}');
+    }
+    final uri = await FilePicker.saveFile(
+      dialogTitle: 'Export daftar akun',
+      fileName:
+          'daftar_akun_${kelas == 'semua' ? 'semua' : kelas.replaceAll(RegExp(r'\s+'), '_')}.csv',
+      bytes: Uint8List.fromList(utf8.encode(buf.toString())),
+      allowedExtensions: const ['csv'],
+      mimeType: 'text/csv',
+    );
+    if (uri == null || !mounted) return;
+    try {
+      final f = File.fromUri(uri);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Tersimpan: ${uri.path} (${baris.length} siswa)'),
+          backgroundColor: AppTheme.secondary));
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,9 +192,18 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
               icon: const Icon(Icons.copy_all_outlined),
               onPressed: _salinSemua),
           IconButton(
-              tooltip: 'Reset semua password (YP baru)',
+              tooltip: 'Reset semua password (79xxxx baru)',
               icon: const Icon(Icons.admin_panel_settings_outlined),
               onPressed: _resetSemua),
+          PopupMenuButton<String>(
+            tooltip: 'Export per kelas',
+            icon: const Icon(Icons.file_download_outlined),
+            onSelected: (v) => _exportPerKelas(v),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'semua', child: Text('Semua kelas (gabungan)')),
+              ...kelasList.map((k) => PopupMenuItem(value: k, child: Text(k))),
+            ],
+          ),
         ],
       ),
       body: _loading
@@ -223,11 +290,22 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
         lastK = k;
         out.add(Padding(
           padding: const EdgeInsets.only(top: 14, bottom: 4),
-          child: Text('ROMBEL $k',
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primary)),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text('ROMBEL $k',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primary)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_outlined, size: 16),
+                tooltip: 'Salin daftar rombel ini',
+                onPressed: () => _salinPerKelas(k),
+              ),
+            ],
+          ),
         ));
         out.add(Container(
             height: 1, color: Colors.grey.shade200));

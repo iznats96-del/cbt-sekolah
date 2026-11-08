@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
+import 'user_management_screen.dart';
 
 class PengaturanScreen extends StatelessWidget {
   const PengaturanScreen({super.key});
@@ -39,9 +40,10 @@ class PengaturanScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.admin_panel_settings),
                   title: const Text('User Management'),
-                  subtitle: const Text('Administrator, guru, siswa'),
+                  subtitle: const Text('Buat akun guru & panitia, password 79xxxx'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _comingSoon(context, 'User Management'),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const UserManagementScreen())),
                 ),
                 const Divider(height: 1),
                 ListTile(

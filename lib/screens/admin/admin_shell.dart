@@ -8,6 +8,7 @@ import 'bank_soal_screen.dart';
 import 'ujian_list_screen.dart';
 import 'pengumuman_screen.dart';
 import 'daftar_akun_screen.dart';
+import 'user_management_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
 import 'pengaturan_screen.dart';
 
@@ -157,6 +158,12 @@ class _AdminHome extends StatelessWidget {
                       color: const Color(0xFF2F6F4F),
                       onTap: () => Navigator.of(context).push(MaterialPageRoute(
                           builder: (_) => const DaftarAkunScreen()))),
+                  _FeatureCard(
+                      icon: Icons.person_add_outlined,
+                      label: 'Akun Guru & Panitia',
+                      color: const Color(0xFFB25C00),
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => const UserManagementScreen()))),
                 ],
               );
             }),
