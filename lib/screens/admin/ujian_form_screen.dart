@@ -468,16 +468,16 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                     TextFormField(
                       controller: _menitCtrl,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Alokasi (menit)'),
+                      decoration: const InputDecoration(labelText: 'Batas Waktu Pengerjaan (menit)'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _reviewMenitCtrl,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
-                          labelText: 'Jeda Review Setelah Selesai (menit)',
+                          labelText: 'Batas Minimal Pengerjaan (menit)',
                           helperText:
-                              'Siswa bisa melihat jawaban selama jeda ini setelah submit'),
+                              'Sebelum batas ini tercapai, siswa tidak boleh submit ujian. Timer berjalan sejak soal dibuka.'),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(

@@ -29,9 +29,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   int _juangPaused = 0;
   bool _kiosk = false;
   bool _showPalette = false;
-  int _lamaReviewDetik = 45 * 60;
-  int _reviewSisaDetik = 0;
-  bool _inReview = false;
+  int _minDurasiDetik = 45 * 60; // batas minimal: sebelum ini submit terkunci
 
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
@@ -93,30 +91,19 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       final sisa = data['sisa_detik'];
       if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
       final lr = data['lama_review_menit'];
-      if (lr is num && lr.toInt() > 0) _lamaReviewDetik = lr.toInt() * 60;
+      if (lr is num && lr.toInt() > 0) _minDurasiDetik = lr.toInt() * 60;
       final pStatus = data['status_peserta']?.toString();
-      // ===== RESUME: kalau sudah submit sebelumnya, langsung mode review =====
-      // (jendela total dari started_at, bukan mulai ulang 45 menit)
+      // ===== RESUME: kalau sudah submit sebelumnya, langsung ke hasil =====
       if (pStatus == 'selesai' && _soal.isNotEmpty) {
-        final sisaReview = data['sisa_detik'];
-        final reviewSisa = (sisaReview is num && sisaReview > 0) ? sisaReview.toInt() : 0;
         if (!mounted) return;
         setState(() {
           _kiosk = true;
           _loading = false;
-          if (reviewSisa > 0) {
-            _inReview = true;
-            _reviewSisaDetik = reviewSisa;
-          }
         });
-        if (reviewSisa > 0) {
-          Kiosk.setSecure(true);
-          Kiosk.enterKiosk();
-          Kiosk.onEvents(onIntrusionCb: _onIntrusion, onPinningCb: _onPinningWarning);
-          _startReviewTimer();
-        } else {
-          _gotoResults('Waktu review selesai', {});
-        }
+        Kiosk.exitKiosk();
+        Navigator.of(context).pushReplacement(MaterialPageRoute(
+          builder: (_) => _SelesaiScreen(title: 'Ujian sudah selesai', rekap: {}),
+        ));
         return;
       }
       // ===== RESUME dari LOCAL: kalau HP sempat mati, ambil jawaban tersimpan di HP =====
@@ -325,11 +312,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
       return;
     }
-    // ===== Jendela total dari BUKA soal: alokasi (ngerjain) + sisa = lama_review_menit =====
-    // Elapsed = waktu yang sudah terpakai dari alokasi saat submit.
-    // Review sisa = lama_review_menit*60 - elapsed
-    final elapsedDetik = _durasiDetik - _sisaDetik.clamp(0, _durasiDetik);
-    final reviewSisa = _lamaReviewDetik - elapsedDetik;
     Map<String, dynamic> rekap = {};
     try {
       final ans = await Api.client
@@ -343,17 +325,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     } catch (_) {}
     _flushTimer?.cancel();
     if (!mounted) return;
-    if (reviewSisa > 0) {
-      // Enters review mode: student can look at answers for the remaining window
-      setState(() {
-        _inReview = true;
-        _reviewSisaDetik = reviewSisa;
-      });
-      _startReviewTimer();
-    } else {
-      // Jendela total sudah habis -> langsung hasil
-      _gotoResults(auto ? 'Waktu habis' : 'Ujian selesai', rekap);
-    }
+    _gotoResults(auto ? 'Waktu habis' : 'Ujian selesai', rekap);
   }
 
   void _gotoResults(String title, Map<String, dynamic> rekap) {
@@ -365,46 +337,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     ));
   }
 
-  void _startReviewTimer() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      setState(() {
-        if (_reviewSisaDetik > 0) _reviewSisaDetik--;
-        if (_reviewSisaDetik == 0) {
-          t.cancel();
-          _gotoResults('Waktu review selesai', {});
-        }
-      });
-    });
+  /// Sebelum _minDurasiDetik (45 menit) berlalu, submit TIDAK BISA.
+  bool _submitDikunci() {
+    final elapsed = _durasiDetik - _sisaDetik;
+    return elapsed < _minDurasiDetik;
   }
 
   String _fmt(int d) {
     final mm = (d ~/ 60).toString().padLeft(2, '0');
     final ss = (d % 60).toString().padLeft(2, '0');
     return '$mm:$ss';
-  }
-
-  Widget _reviewBanner() {
-    final m = _reviewSisaDetik ~/ 60;
-    final s = _reviewSisaDetik % 60;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      color: AppTheme.primary.withValues(alpha: 0.12),
-      child: Row(
-        children: [
-          const Icon(Icons.lock_outline, size: 18, color: AppTheme.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Mode Review — Anda bisa melihat jawaban, tapi TIDAK bisa mengubah lagi. '
-              'Sisa ${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')} menit',
-              style: const TextStyle(fontSize: 12, color: AppTheme.primary, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -493,7 +435,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
           children: [
             Column(
               children: [
-                if (_inReview) _reviewBanner(),
                 _buildHeader(progress, isLowTime, isCriticalTime, answeredCount, flaggedCount, unansweredCount),
                 LinearProgressIndicator(
                   value: progress,
@@ -509,9 +450,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       children: [
                         _buildQuestionCard(current, curId, jenis, opsiList),
                         const SizedBox(height: 16),
-                        IgnorePointer(ignoring: _inReview, child: _buildOptions(curId, jenis, opsiList)),
+                        _buildOptions(curId, jenis, opsiList),
                         const SizedBox(height: 16),
-                        if (!_inReview) _buildRaguChip(curId),
+                        _buildRaguChip(curId),
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -743,7 +684,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               controller: _ctrlFor(curId),
               maxLines: 6,
               minLines: 4,
-              readOnly: _inReview,
+              readOnly: false,
               textInputAction: TextInputAction.newline,
               onChanged: (v) {
                 // simpan lokal TANPA setState (biar keyboard/cursor tidak lompat)
@@ -839,59 +780,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   Widget _buildBottomNav() {
-    if (_inReview) {
-      final m = _reviewSisaDetik ~/ 60;
-      final s = _reviewSisaDetik % 60;
-      return Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, -4))],
-          border: Border(top: BorderSide(color: const Color(0xFFE2E8F0))),
-        ),
-        child: SafeArea(
-          child: Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: _idx > 0 ? () => setState(() => _idx--) : null,
-                icon: const Icon(Icons.chevron_left, size: 18),
-                label: const Text('Sebelumnya'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _gotoResults('Selesai Review', {}),
-                  icon: const Icon(Icons.check_circle, size: 18),
-                  label: Text('Selesai & Lihat Hasil (${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')})'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.secondary,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              if (_idx < _soal.length - 1)
-                FilledButton(
-                  onPressed: () => setState(() => _idx++),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Row(children: [Text('Lanjut'), SizedBox(width: 4), Icon(Icons.chevron_right, size: 18)]),
-                ),
-            ],
-          ),
-        ),
-      );
-    }
+    final submitDikunci = _submitDikunci();
+    final sisaMinDetik = submitDikunci ? _minDurasiDetik - (_durasiDetik - _sisaDetik) : 0;
+    final sm = sisaMinDetik ~/ 60;
+    final ss = sisaMinDetik % 60;
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
@@ -939,15 +831,21 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               )
             else
               FilledButton(
-                onPressed: _submitting ? null : _confirmSubmit,
+                onPressed: (_submitting || submitDikunci) ? null : _confirmSubmit,
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.secondary,
+                  backgroundColor: submitDikunci ? const Color(0xFFCBD5E1) : AppTheme.secondary,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _submitting
                     ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Kumpulkan'),
+                    : submitDikunci
+                        ? Row(children: [
+                            Icon(Icons.lock_outline, size: 18, color: const Color(0xFF64748B)),
+                            const SizedBox(width: 8),
+                            Text('Kunci ${sm.toString().padLeft(2, '0')}:${ss.toString().padLeft(2, '0')}'),
+                          ])
+                        : const Text('Kumpulkan'),
               ),
           ],
         ),
@@ -1067,6 +965,22 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   Future<void> _confirmSubmit() async {
+    if (_submitDikunci()) {
+      final sisaMenit = _minDurasiDetik - (_durasiDetik - _sisaDetik);
+      final m = sisaMenit ~/ 60;
+      final s = sisaMenit % 60;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Submit dikunci: minimum 45 menit belum tercapai. '
+            'Bisa mengumpulkan setelah ${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}',
+          ),
+          backgroundColor: AppTheme.danger,
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
     final belum = _soal.length - _jawaban.values.where((v) => v != null && v.isNotEmpty).length;
     final ok = await showDialog<bool>(
       context: context,
