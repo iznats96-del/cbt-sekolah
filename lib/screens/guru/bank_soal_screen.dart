@@ -7,7 +7,7 @@ import '../home.dart';
 import '../shared/soal_form_screen.dart';
 import '../admin/import_ujian_screen.dart';
 
-/// Bank Soal GURU — tampil PER MAPEL (tap mapel -> lihat soal-soalnya).
+/// Bank Soal GURU - tampil PER MAPEL, di dalam tiap mapel: 3 grup jenis.
 class BankSoalScreen extends StatefulWidget {
   const BankSoalScreen({super.key});
 
@@ -19,11 +19,19 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
   List<Map<String, dynamic>> _soal = [];
   bool _loading = true;
   String? _error;
+  final _searchCtrl = TextEditingController();
+  String _search = '';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -55,11 +63,22 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
     final out = <String, List<Map<String, dynamic>>>{};
     for (final s in _soal) {
       final mp = s['mata_pelajaran'];
-      final nama = (mp is Map ? '${mp['nama']}' : '') .trim();
+      final nama = (mp is Map ? '${mp['nama']}' : '').trim();
       final key = nama.isEmpty ? '(tanpa mapel)' : nama;
       (out[key] ??= []).add(s);
     }
     return out;
+  }
+
+  /// Filter berdasarkan kata kunci soal.
+  List<Map<String, dynamic>> _filterSoal(List<Map<String, dynamic>> list) {
+    if (_search.isEmpty) return list;
+    final q = _search.toLowerCase();
+    return list
+        .where((s) =>
+            (s['soal']?.toString().toLowerCase().contains(q) ?? false) ||
+            (s['pembahasan']?.toString().toLowerCase().contains(q) ?? false))
+        .toList();
   }
 
   Future<void> _add() async {
@@ -103,86 +122,99 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
     if (_error != null) {
       return ErrorState(message: _error!, onRetry: _load);
     }
-    final groups = _byMapel;
-    if (groups.isEmpty) {
-      return const EmptyState(
-        icon: Icons.quiz_outlined,
-        title: 'Belum ada soal',
-        subtitle: 'Buat soal dengan tombol + atau import naskah DOCX dari ikon upload.',
+
+    final searchBar = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: TextField(
+        controller: _searchCtrl,
+        onChanged: (v) => setState(() => _search = v.trim()),
+        decoration: InputDecoration(
+          hintText: 'Cari soal...',
+          prefixIcon: const Icon(Icons.search, size: 20),
+          isDense: true,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+        ),
+      ),
+    );
+
+    if (_soal.isEmpty) {
+      return Column(
+        children: [
+          searchBar,
+          const EmptyState(
+            icon: Icons.quiz_outlined,
+            title: 'Belum ada soal',
+            subtitle:
+                'Buat soal dengan tombol + atau import naskah DOCX dari ikon upload.',
+          ),
+        ],
       );
     }
+
+    final groups = _byMapel;
     final keys = groups.keys.toList()..sort();
+
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.all(12),
-        itemCount: keys.length,
-        itemBuilder: (context, i) {
-          final nama = keys[i];
-          final list = groups[nama]!;
-          // ringkas jenis: berapa PG / jodoh / esai
-          int pg = 0, jd = 0, es = 0;
-          for (final s in list) {
-            final j = s['jenis']?.toString() ?? 'pg';
-            if (j == 'pg') pg++; else if (j == 'jodoh') jd++; else es++;
-          }
-          return Card(
-            margin: const EdgeInsets.only(bottom: 10),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              leading: CircleAvatar(
-                radius: 22,
-                backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
-                child: const Icon(Icons.menu_book_outlined, color: AppTheme.primary, size: 22),
-              ),
-              title: Text(nama, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              subtitle: Text('${list.length} soal  •  PG $pg · Jodoh $jd · Esai $es',
-                  style: const TextStyle(fontSize: 12)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () async {
-                await Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => SoalPerMapelScreen(namaMapel: nama, soal: list),
-                ));
-                _load();
-              },
+        children: [
+          searchBar,
+          for (final nama in keys)
+            MapelCard(
+              nama: nama,
+              soal: _filterSoal(groups[nama]!),
+              onChanged: _load,
+              onAdd: _add,
             ),
-          );
-        },
+        ],
       ),
     );
   }
 }
 
-/// Daftar soal milik SATU mapel — bisa edit/hapus.
-class SoalPerMapelScreen extends StatefulWidget {
-  final String namaMapel;
+/// Kartu mapel yang menampilkan 3 grup soal di dalamnya.
+class MapelCard extends StatefulWidget {
+  final String nama;
   final List<Map<String, dynamic>> soal;
-  const SoalPerMapelScreen({super.key, required this.namaMapel, required this.soal});
+  final VoidCallback onChanged;
+  final VoidCallback onAdd;
+
+  const MapelCard({
+    super.key,
+    required this.nama,
+    required this.soal,
+    required this.onChanged,
+    required this.onAdd,
+  });
 
   @override
-  State<SoalPerMapelScreen> createState() => _SoalPerMapelScreenState();
+  State<MapelCard> createState() => _MapelCardState();
 }
 
-class _SoalPerMapelScreenState extends State<SoalPerMapelScreen> {
-  late List<Map<String, dynamic>> _soal = List.of(widget.soal);
+class _MapelCardState extends State<MapelCard> {
+  Set<String> _openGrupos = {'pg', 'essay'};
+
+  List<Map<String, dynamic>> _byJenis(String jenis) =>
+      widget.soal.where((s) => (s['jenis'] ?? 'pg').toString() == jenis).toList();
+
+  void _toggleGrupos(String g) {
+    setState(() {
+      if (!_openGrupos.contains(g)) {
+        _openGrupos.add(g);
+      } else {
+        _openGrupos.remove(g);
+      }
+    });
+  }
 
   Future<void> _edit(Map<String, dynamic> soal) async {
     await Navigator.of(context).push(MaterialPageRoute(
         builder: (_) => SoalFormScreen(initial: soal, soalId: soal['id'])));
-    _refresh();
-  }
-
-  Future<void> _refresh() async {
-    final rows = await Api.client
-        .from('bank_soal')
-        .select('*,mata_pelajaran(nama)')
-        .order('created_at', ascending: false);
-    final filtered = List<Map<String, dynamic>>.from(rows).where((s) {
-      final mp = s['mata_pelajaran'];
-      final nama = (mp is Map ? '${mp['nama']}' : '').trim();
-      return (nama.isEmpty ? '(tanpa mapel)' : nama) == widget.namaMapel;
-    }).toList();
-    if (mounted) setState(() => _soal = filtered);
+    widget.onChanged();
   }
 
   Future<void> _delete(Map<String, dynamic> soal) async {
@@ -193,7 +225,9 @@ class _SoalPerMapelScreenState extends State<SoalPerMapelScreen> {
         content: Text('Yakin hapus soal ini?\n\n${soal['soal']}',
             style: const TextStyle(fontSize: 13)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Batal')),
           FilledButton(
               style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
               onPressed: () => Navigator.pop(c, true),
@@ -204,67 +238,197 @@ class _SoalPerMapelScreenState extends State<SoalPerMapelScreen> {
     if (ok != true) return;
     try {
       await Api.client.from('bank_soal').delete().eq('id', soal['id']);
-      _refresh();
+      widget.onChanged();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal hapus: $e'), backgroundColor: AppTheme.danger));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Gagal hapus: $e'),
+          backgroundColor: AppTheme.danger));
     }
   }
 
-  String _jenisLabel(String j) => j == 'pg' ? 'PG' : j == 'jodoh' ? 'JODOH' : 'ESAI';
-  Color _jenisColor(String j) =>
-      j == 'pg' ? AppTheme.primary : j == 'jodoh' ? AppTheme.accent : const Color(0xFFF4A940);
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text(widget.namaMapel)),
-      body: _soal.isEmpty
-          ? const Center(child: Text('Tidak ada soal', style: TextStyle(color: Colors.grey)))
-          : RefreshIndicator(
-              onRefresh: _refresh,
-              child: ListView.separated(
-                padding: const EdgeInsets.all(12),
-                itemCount: _soal.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, i) {
-                  final s = _soal[i];
-                  final jenis = s['jenis']?.toString() ?? 'pg';
-                  final text = s['soal']?.toString() ?? '';
-                  return Card(
-                    margin: EdgeInsets.zero,
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: _jenisColor(jenis).withValues(alpha: 0.12),
-                        child: Text(_jenisLabel(jenis),
-                            style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.bold,
-                                color: _jenisColor(jenis))),
-                      ),
-                      title: Text(
-                        text.length > 70 ? '${text.substring(0, 70)}...' : text,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
-                      ),
-                      subtitle: Text('Bobot: ${s['bobot'] ?? 1}',
-                          style: const TextStyle(fontSize: 11.5)),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _edit(s)),
-                          IconButton(
-                              icon: const Icon(Icons.delete_outline, color: AppTheme.danger),
-                              onPressed: () => _delete(s)),
-                        ],
-                      ),
+    final pgList = _byJenis('pg');
+    final jodohList = _byJenis('jodoh');
+    final essayList = _byJenis('essay');
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 14),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade100),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: AppTheme.primary.withValues(alpha: 0.12),
+                  child: Icon(Icons.menu_book_outlined,
+                      color: AppTheme.primary, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.nama,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(
+                          '${pgList.length + jodohList.length + essayList.length} soal',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade500)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline, size: 22),
+                  tooltip: 'Buat soal di mapel ini',
+                  onPressed: widget.onAdd,
+                ),
+              ],
+            ),
+            Divider(height: 1, color: Colors.grey[200]),
+
+            if (pgList.isNotEmpty)
+              _groupWidget(
+                  'pg',
+                  'Pilihan Ganda',
+                  pgList.length,
+                  AppTheme.primary,
+                  pgList),
+
+            if (jodohList.isNotEmpty)
+              _groupWidget(
+                  'jodoh',
+                  'Menjodohkan',
+                  jodohList.length,
+                  AppTheme.accent,
+                  jodohList),
+
+            if (essayList.isNotEmpty)
+              _groupWidget(
+                  'essay',
+                  'Essay',
+                  essayList.length,
+                  const Color(0xFFF4A940),
+                  essayList),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _groupWidget(String id, String label, int count, Color color,
+      List<Map<String, dynamic>> items) {
+    final open = _openGrupos.contains(id);
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(label,
+                    style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.bold,
+                        color: color)),
+              ),
+              const SizedBox(width: 6),
+              Text('$count soal',
+                  style:
+                      TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              const Spacer(),
+              IconButton(
+                icon:
+                    Icon(open ? Icons.expand_less : Icons.expand_more, size: 18),
+                onPressed: () => _toggleGrupos(id),
+              ),
+            ],
+          ),
+          if (open)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Column(
+                children: [
+                  for (final s in items)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _soalRow(s),
                     ),
-                  );
-                },
+                ],
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _soalRow(Map<String, dynamic> s) {
+    final text = s['soal']?.toString() ?? '';
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text.length > 70 ? '${text.substring(0, 70)}...' : text,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Text('Bobot: ${s['bobot'] ?? 1}',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade500)),
+                    if (s['gambar_url'] != null &&
+                        s['gambar_url'].toString().isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Icon(Icons.image_outlined,
+                          size: 12, color: Colors.grey.shade400),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, size: 18),
+            tooltip: 'Edit',
+            onPressed: () => _edit(s),
+          ),
+          IconButton(
+            icon:
+                const Icon(Icons.delete_outline, size: 18, color: AppTheme.danger),
+            tooltip: 'Hapus',
+            onPressed: () => _delete(s),
+          ),
+        ],
+      ),
     );
   }
 }
