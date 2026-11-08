@@ -94,6 +94,31 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
       final lr = data['lama_review_menit'];
       if (lr is num && lr.toInt() > 0) _lamaReviewDetik = lr.toInt() * 60;
+      final pStatus = data['status_peserta']?.toString();
+      // ===== RESUME: kalau sudah submit sebelumnya, langsung mode review =====
+      // (jendela total dari started_at, bukan mulai ulang 45 menit)
+      if (pStatus == 'selesai' && _soal.isNotEmpty) {
+        final sisaReview = data['sisa_detik'];
+        final reviewSisa = (sisaReview is num && sisaReview > 0) ? sisaReview.toInt() : 0;
+        if (!mounted) return;
+        setState(() {
+          _kiosk = true;
+          _loading = false;
+          if (reviewSisa > 0) {
+            _inReview = true;
+            _reviewSisaDetik = reviewSisa;
+          }
+        });
+        if (reviewSisa > 0) {
+          Kiosk.setSecure(true);
+          Kiosk.enterKiosk();
+          Kiosk.onEvents(onIntrusionCb: _onIntrusion, onPinningCb: _onPinningWarning);
+          _startReviewTimer();
+        } else {
+          _gotoResults('Waktu review selesai', {});
+        }
+        return;
+      }
       // ===== RESUME dari LOCAL: kalau HP sempat mati, ambil jawaban tersimpan di HP =====
       try {
         final lokal = await _store.loadAll();
@@ -300,6 +325,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
       return;
     }
+    // ===== Jendela total dari BUKA soal: alokasi (ngerjain) + sisa = lama_review_menit =====
+    // Elapsed = waktu yang sudah terpakai dari alokasi saat submit.
+    // Review sisa = lama_review_menit*60 - elapsed
+    final elapsedDetik = _durasiDetik - _sisaDetik.clamp(0, _durasiDetik);
+    final reviewSisa = _lamaReviewDetik - elapsedDetik;
     Map<String, dynamic> rekap = {};
     try {
       final ans = await Api.client
@@ -313,15 +343,15 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     } catch (_) {}
     _flushTimer?.cancel();
     if (!mounted) return;
-    if (_lamaReviewDetik > 0) {
-      // Enters review mode: student can look at answers for N minutes
+    if (reviewSisa > 0) {
+      // Enters review mode: student can look at answers for the remaining window
       setState(() {
         _inReview = true;
-        _reviewSisaDetik = _lamaReviewDetik;
+        _reviewSisaDetik = reviewSisa;
       });
       _startReviewTimer();
     } else {
-      // No review window -> go straight to results
+      // Jendela total sudah habis -> langsung hasil
       _gotoResults(auto ? 'Waktu habis' : 'Ujian selesai', rekap);
     }
   }
