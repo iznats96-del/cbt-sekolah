@@ -68,12 +68,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
   }
 
-  /// Password format: 79 + 4 digit acak.
-  static String genPassword() {
-    final now = DateTime.now();
-    final n = ((now.millisecond * 7 + now.microsecond % 97) % 10000);
-    return '79${n.toString().padLeft(4, '0')}';
-  }
 
   static String _cleanEmail(String s) {
     final t = s.replaceAll(RegExp('[^a-z0-9]+'), '.');
@@ -87,42 +81,30 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           .showSnackBar(const SnackBar(content: Text('Nama wajib diisi')));
       return;
     }
-    final email = _emailCtrl.text.trim().isEmpty
-        ? '${_cleanEmail(nama.toLowerCase())}@cbt.local'
-        : _emailCtrl.text.trim();
-
     setState(() => _creating = true);
     try {
-      final res = await Api.client.auth.signUp(
-        email: email,
-        password: genPassword(),
-        data: {'role': _rolePilih, 'nama': nama},
-      );
-      final uid = res.user?.id;
-      if (uid == null) {
-        throw Exception(
-            'Gagal membuat user auth (email sudah dipakai atau settingan supabase belum allow)');
-      }
-      await Api.client.from('profiles').upsert({
-        'id': uid,
-        'email_show': email,
+      // RPC jalan di fallback server (pemegang service key) -> create auth user
+      // Supabase via GoTrue admin API + profiles + tabel guru.
+      final res = await Api.client.rpc('admin_buat_akun', params: {
         'role': _rolePilih,
         'nama': nama,
-        'nip': _rolePilih == 'guru' ? (_nipCtrl.text.trim().isEmpty ? null : _nipCtrl.text.trim()) : null,
+        'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+        'nip': _rolePilih == 'guru'
+            ? (_nipCtrl.text.trim().isEmpty ? null : _nipCtrl.text.trim())
+            : null,
+        'jabatan': _jabatanCtrl.text.trim().isEmpty
+            ? null
+            : _jabatanCtrl.text.trim(),
       });
-      if (_rolePilih == 'guru') {
-        await Api.client.from('guru').upsert({
-          'profile_id': uid,
-          'nama': nama,
-          'nip': _nipCtrl.text.trim().isEmpty ? null : _nipCtrl.text.trim(),
-          'jabatan': _jabatanCtrl.text.trim().isEmpty ? null : _jabatanCtrl.text.trim(),
-        });
-      }
+      final m = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
       if (!mounted) return;
+      final email = '${m['email'] ?? ''}';
+      final pw = '${m['pw'] ?? ''}';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Akun "$nama" ($_rolePilih) berhasil dibuat'),
+          content: Text(
+              'Akun "$nama" ($_rolePilih) dibuat.\nLogin: $email  •  Password: $pw'),
           backgroundColor: AppTheme.secondary,
-          duration: const Duration(seconds: 4)));
+          duration: const Duration(seconds: 8)));
       _resetForm();
       _load();
     } catch (e) {
@@ -131,7 +113,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           SnackBar(
               content: Text('Gagal: $e'),
               backgroundColor: AppTheme.danger,
-              duration: const Duration(seconds: 5)));
+              duration: const Duration(seconds: 6)));
     } finally {
       if (mounted) setState(() => _creating = false);
     }
@@ -149,9 +131,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('Reset password ${p['nama']}?'),
+        title: Text('Reset password ${p['nama'] ?? ''}?'),
         content: const Text(
-            'Password baru format 79xxxx akan dibuat. Password lama tidak berlaku lagi.',
+            'Password baru format 79xxxx akan dibuat (sinkron ke auth user Supabase). Password lama tidak berlaku.',
             style: TextStyle(fontSize: 13)),
         actions: [
           TextButton(
@@ -165,23 +147,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
     if (ok != true) return;
     try {
-      final newPw = genPassword();
-      await Api.client
-          .from('profiles')
-          .update({'pw_default': newPw})
-          .eq('id', p['id']);
-      _load();
+      final res = await Api.client.rpc('admin_reset_pw', params: {'p_id': p['id']});
+      final m = res is Map ? Map<String, dynamic>.from(res) : <String, dynamic>{};
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Password baru ${p['nama']}: $newPw'),
+          content: Text('Password baru ${p['nama'] ?? ''}: ${m['pw'] ?? '?'}'),
           backgroundColor: AppTheme.secondary,
-          duration: const Duration(seconds: 4)));
+          duration: const Duration(seconds: 5)));
+      _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Gagal: $e'),
-              backgroundColor: AppTheme.danger));
+              backgroundColor: AppTheme.danger,
+              duration: const Duration(seconds: 5)));
     }
   }
 
@@ -189,9 +169,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        title: Text('Hapus akun ${p['nama']}?'),
+        title: Text('Hapus akun ${p['nama'] ?? ''}?'),
         content: Text(
-            'Akun login ${p['email_show']} akan dihapus permanen.',
+            'Akun login ${p['email_show'] ?? ''} akan dihapus permanen dari Supabase.',
             style: const TextStyle(fontSize: 13)),
         actions: [
           TextButton(
@@ -206,17 +186,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
     if (ok != true) return;
     try {
-      if (p['role'] == 'guru') {
-        await Api.client.from('guru').delete().eq('profile_id', p['id']);
-      }
-      await Api.client.from('profiles').delete().eq('id', p['id']);
+      // Server-side: hapus dari auth.users + profiles + guru (service key)
+      await Api.client.rpc('admin_hapus_akun', params: {'p_id': p['id']});
       _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Gagal hapus: $e'),
-              backgroundColor: AppTheme.danger));
+              backgroundColor: AppTheme.danger,
+              duration: const Duration(seconds: 5)));
     }
   }
 
@@ -339,7 +318,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                                     controller: _emailCtrl,
                                     decoration: InputDecoration(
                                         labelText:
-                                            'Email login (kosong = otomatis ${_rolePilih}@cbt.local)')),
+                                            'Email login (wajib valid, contoh: guru@smkyp79.my.id)')),
                                 const SizedBox(height: 12),
                                 Row(
                                   children: [
