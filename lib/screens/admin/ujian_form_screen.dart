@@ -27,6 +27,9 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   String? _jadwalId;
   List<dynamic> _jadwalSemua = [];
   List<String> _selectedSoal = [];
+  // Per-kelas soal override: {kelasId: [soalId, ...]}
+  final Map<String, List<String>> _soalPerKelas = {};
+  final _reviewMenitCtrl = TextEditingController(text: '45');
   bool _statusAktif = false;
   bool _loading = false;
 
@@ -53,7 +56,11 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       if (sl is List) _selectedSoal = sl.map((e) => e.toString()).toList();
       _statusAktif = init['status'] == 'aktif';
       _jadwalId = init['jadwal_id']?.toString();
-      if (widget.ujianId != null) _loadKelasTerpilih();
+      _reviewMenitCtrl.text = '${init['lama_review_menit'] ?? 45}';
+      if (widget.ujianId != null) {
+        _loadKelasTerpilih();
+        _loadSoalPerKelas();
+      }
     }
     _loadOptions();
     _loadBankSoal();
@@ -93,6 +100,44 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       final ids = (rows as List).map((e) => '${e['kelas_id']}').toList();
       if (ids.isNotEmpty) setState(() => _kelasIds = ids);
     } catch (_) {}
+  }
+
+  Future<void> _loadSoalPerKelas() async {
+    try {
+      final rows = await Api.client
+          .from('ujian_soal_kelas')
+          .select('kelas_id,soal_list')
+          .eq('ujian_id', widget.ujianId!);
+      if (!mounted) return;
+      for (final r in (rows as List)) {
+        final kid = '${r['kelas_id']}';
+        final sl = r['soal_list'];
+        if (sl is List) {
+          _soalPerKelas[kid] = sl.map((e) => e.toString()).toList();
+        }
+      }
+      if (_soalPerKelas.isNotEmpty) setState(() {});
+    } catch (_) {}
+  }
+
+  Future<void> _pickSoalPerKelas(String kelasId) async {
+    final current = _soalPerKelas[kelasId] ?? _selectedSoal;
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => SoalPickerDialog(
+        allSoal: _bankSoal,
+        selected: current,
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        if (result.isEmpty) {
+          _soalPerKelas[kelasId] = [];
+        } else {
+          _soalPerKelas[kelasId] = result;
+        }
+      });
+    }
   }
 
   Future<void> _loadOptions() async {
@@ -208,6 +253,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'tanggal': _tanggal,
         'sesi_id': _sesiId,
         'alokasi_menit': num.tryParse(_menitCtrl.text.trim()) ?? 90,
+        'lama_review_menit': num.tryParse(_reviewMenitCtrl.text.trim()) ?? 45,
         'token': '',
         'soal_list': _selectedSoal,
         'catatan': _catatanCtrl.text.trim().isEmpty ? null : _catatanCtrl.text.trim(),
@@ -225,6 +271,19 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       if (_kelasIds.isNotEmpty && uid.isNotEmpty) {
         try {
           await Api.client.rpc('ujian_set_kelas', params: {'p_ujian': uid, 'p_kelas': _kelasIds});
+        } catch (_) {}
+      }
+      // Per-class soal override
+      if (uid.isNotEmpty && _soalPerKelas.isNotEmpty) {
+        try {
+          final p_soal_kelas = _soalPerKelas.entries
+              .where((e) => e.value.isNotEmpty)
+              .map((e) => {'kelas_id': e.key, 'soal_list': e.value})
+              .toList();
+          if (p_soal_kelas.isNotEmpty) {
+            await Api.client.rpc('ujian_set_soal_kelas',
+                params: {'p_ujian': uid, 'p_soal_kelas': p_soal_kelas});
+          }
         } catch (_) {}
       }
       if (!mounted) return;
@@ -413,6 +472,15 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
+                      controller: _reviewMenitCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: 'Jeda Review Setelah Selesai (menit)',
+                          helperText:
+                              'Siswa bisa melihat jawaban selama jeda ini setelah submit'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
                       controller: _catatanCtrl,
                       maxLines: 2,
                       decoration: const InputDecoration(labelText: 'Catatan (opsional)'),
@@ -470,6 +538,83 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                 ),
               ),
             ),
+
+            // ===== Per-class soal override =====
+            if (_kelasIds.length > 1)
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                              'Soal Spesifik per Kelas',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Spacer(),
+                          Text(
+                              'opsional — kosongkan = pakai soal umum',
+                              style:
+                                  const TextStyle(fontSize: 11, color: Colors.grey)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      for (final kid in _kelasIds)
+                        Builder(builder: (context) {
+                          final override = _soalPerKelas[kid];
+                          final isOverride =
+                              override != null && override.isNotEmpty;
+                          return Row(
+                            children: [
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                    _kelasLabel(kid),
+                                    style: const TextStyle(fontSize: 12)),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: Text(
+                                    isOverride
+                                        ? '${override!.length} soal khusus'
+                                        : 'pakai umum',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color:
+                                            isOverride ? AppTheme.primary : Colors.grey)),
+                              ),
+                              Expanded(
+                                flex: 1,
+                                child: FilledButton.tonal(
+                                  onPressed: () => _pickSoalPerKelas(kid),
+                                  child: Text(
+                                      isOverride ? 'Ubah' : 'Pilih'),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                      if (_soalPerKelas.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () => setState(
+                                  () => _soalPerKelas.clear()),
+                              child: const Text(
+                                  'Hapus semua override',
+                                  style: TextStyle(fontSize: 11)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 24),
             FilledButton(
