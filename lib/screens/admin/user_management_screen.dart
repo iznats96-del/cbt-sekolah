@@ -86,13 +86,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       // RPC jalan di fallback server (pemegang service key) -> create auth user
       // Supabase via GoTrue admin API + profiles + tabel guru.
       final res = await Api.client.rpc('admin_buat_akun', params: {
-        'role': _rolePilih,
-        'nama': nama,
-        'email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-        'nip': _rolePilih == 'guru'
+        'p_role': _rolePilih,
+        'p_nama': nama,
+        'p_email': _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
+        'p_nip': _rolePilih == 'guru'
             ? (_nipCtrl.text.trim().isEmpty ? null : _nipCtrl.text.trim())
             : null,
-        'jabatan': _jabatanCtrl.text.trim().isEmpty
+        'p_jabatan': _jabatanCtrl.text.trim().isEmpty
             ? null
             : _jabatanCtrl.text.trim(),
       });
