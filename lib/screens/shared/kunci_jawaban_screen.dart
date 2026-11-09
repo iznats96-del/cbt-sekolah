@@ -18,7 +18,8 @@ class KunciJawabanScreen extends StatefulWidget {
 
 class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
   List<Map<String, dynamic>> _soal = [];
-  final Map<String, int> _pilihIdx = {}; // soal id -> index opsi
+  final Map<String, int> _pilihIdx = {}; // soal id -> index opsi (PG)
+  final Map<String, Map<String, int>> _kunciJodoh = {}; // soal id -> {A: idxB}
   final Map<String, String> _essay = {}; // soal id -> teks pedoman
   final Set<String> _dirty = {};
   bool _loading = true;
@@ -58,14 +59,32 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
       final ordered = [for (final id in ids) if (m[id] != null) m[id]!];
       for (final s in ordered) {
         final k = s['kunci'];
+        final jenis = s['jenis']?.toString();
         if (k is Map) {
-          final idx = k['index'];
-          if (idx is int) _pilihIdx[s['id'].toString()] = idx;
-          // Essay: terima 'pedoman' (format baru) maupun 'kunci' (legacy JSON).
-          final pedoman =
-              (k['pedoman'] ?? k['kunci'] ?? k.values.firstOrNull ?? '').toString();
-          if (s['jenis']?.toString() == 'essay' && pedoman.isNotEmpty) {
-            _essay[s['id'].toString()] = pedoman;
+          if (jenis == 'jodoh') {
+            // Kunci jodoh: {0: idxB, 1: idxB, ...} atau legacy {'A': idxB} atau {index: n}
+            final mm = <String, int>{};
+            for (final e in k.entries) {
+              final key = e.key.toString();
+              final v = int.tryParse('${e.value}');
+              if (v == null) continue;
+              mm[key] = v;
+            }
+            // legacy PG-like: {index: n, jawaban: ...}
+            if (mm.isEmpty && k.containsKey('index')) {
+              final n = int.tryParse('${k['index']}');
+              if (n != null) mm['0'] = n;
+            }
+            _kunciJodoh[s['id'].toString()] = mm;
+          } else {
+            final idx = k['index'];
+            if (idx is int) _pilihIdx[s['id'].toString()] = idx;
+            // Essay: terima 'pedoman' (format baru) maupun 'kunci' (legacy JSON).
+            final pedoman =
+                (k['pedoman'] ?? k['kunci'] ?? k.values.firstOrNull ?? '').toString();
+            if (jenis == 'essay' && pedoman.isNotEmpty) {
+              _essay[s['id'].toString()] = pedoman;
+            }
           }
         }
       }
@@ -83,10 +102,15 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
     }
   }
 
-  int get _pgTotal => _soal.where((s) => s['jenis'] != 'essay').length;
+  int get _pgTotal => _soal.where((s) {
+        final j = s['jenis']?.toString();
+        return j == 'pg' || j == null;
+      }).length;
   int get _pgDone =>
-      _soal.where((s) => s['jenis'] != 'essay' && _pilihIdx[s['id'].toString()] != null)
-          .length;
+      _soal.where((s) {
+        final j = s['jenis']?.toString();
+        return (j == 'pg' || j == null) && _pilihIdx[s['id'].toString()] != null;
+      }).length;
 
   Future<void> _save() async {
     if (_dirty.isEmpty) return;
@@ -98,6 +122,16 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
         Map<String, dynamic> kunci;
         if (jenis == 'essay') {
           kunci = {'pedoman': _essay[id] ?? ''};
+        } else if (jenis == 'jodoh') {
+          final map = _kunciJodoh[id] ?? {};
+          final opsiList = s['opsi'] is List ? List<dynamic>.from(s['opsi'] as List) : <dynamic>[];
+          final nB = (opsiList.length ~/ 2).clamp(1, 10);
+          // simpan sebagai {"0": idxB, "1": idxB, ...} (kunci string, konsisten dgn form)
+          kunci = {
+            for (final e in map.entries)
+              e.key: (e.value is int ? e.value : int.tryParse('${e.value}') ?? 0).clamp(0, nB - 1)
+          };
+          if (kunci.isEmpty) kunci = {for (var i = 0; i < nB; i++) '$i': i};
         } else {
           final idx = _pilihIdx[id];
           final opsi = s['opsi'];
@@ -134,6 +168,55 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// Editor kunci jodoh: tiap A[i] -> dropdown B yang benar.
+  Widget _buildJodohEditor(String id, Map<String, dynamic> s) {
+    final opsi = s['opsi'] is List ? List<dynamic>.from(s['opsi'] as List) : <dynamic>[];
+    final nPair = (opsi.length ~/ 2).clamp(1, 10);
+    final map = _kunciJodoh[id] ?? {};
+    if (nPair == 0) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Jodohkan: B yang benar untuk tiap A', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
+          const SizedBox(height: 8),
+          for (var i = 0; i < nPair; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 120,
+                    child: Text('A${i + 1}. ${i * 2 < opsi.length ? opsi[i * 2].toString() : ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                  Expanded(
+                    child: DropdownButton<int>(
+                      value: (map['$i'] ?? i).clamp(0, nPair - 1),
+                      isDense: true,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      items: List.generate(nPair, (b) => DropdownMenuItem<int>(value: b, child: Text('B${b + 1}', style: const TextStyle(fontSize: 12)))),
+                      onChanged: (v) {
+                        if (v == null) return;
+                        final mm = Map<String, int>.from(map);
+                        mm['$i'] = v;
+                        _kunciJodoh[id] = mm;
+                        _dirty.add(id);
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -268,6 +351,8 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
                                               hintText:
                                                   'Jawaban minimal: ... (untuk koreksi manual)'),
                                         ),
+                                      ] else if (jenis == 'jodoh') ...[
+                                        _buildJodohEditor(id, s),
                                       ] else ...[
                                         for (var o = 0; o < opsi.length; o++)
                                           RadioListTile<int>(

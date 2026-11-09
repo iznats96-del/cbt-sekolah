@@ -114,10 +114,44 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
   List<Map<String, dynamic>> _soal = [];
   Map<String, Map<String, dynamic>> _jwbnBySoal = {};
   final Map<String, TextEditingController> _nilai = {};
+  Map<String, String> _pedoman = {}; // soal id -> teks pedoman
   bool _loading = true;
   bool _saving = false;
   String? _err;
   double? _finalNilai;
+
+  /// Ekstrak teks pedoman dari bank_soal.kunci (format baru {pedoman} / legacy {kunci} / teks polos).
+  String _ekstrakPedoman(dynamic kunci) {
+    if (kunci is Map) {
+      for (final k in ['pedoman', 'kunci']) {
+        final v = kunci[k];
+        if (v != null && v.toString().trim().isNotEmpty) return v.toString().trim();
+      }
+      return '';
+    }
+    return kunci?.toString().trim() ?? '';
+  }
+
+  /// Persentase kecocokan jawaban vs pedoman (token overlap kata+angka).
+  /// CUMA SEBAGAI GUIDANCE — nilai tetap manual 0-10.
+  int _persentaseKecocokan(String jawaban, String pedoman) {
+    final a = jawaban.trim();
+    final p = pedoman.trim();
+    if (a.isEmpty || p.isEmpty) return 0;
+    Set<String> _tokens(String s) => s
+        .toLowerCase()
+        .split(RegExp(r'[^a-z0-9]+'))
+        .where((t) => t.isNotEmpty)
+        .toSet();
+    final tj = _tokens(a);
+    final tp = _tokens(p);
+    if (tp.isEmpty) return 0;
+    var hit = 0;
+    for (final t in tp) {
+      if (tj.contains(t)) hit++;
+    }
+    return (hit / tp.length * 100).round();
+  }
 
   @override
   void initState() {
@@ -133,7 +167,7 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
     try {
       final soal = await Api.client
           .from('bank_soal')
-          .select('id,soal,bobot')
+          .select('id,soal,bobot,kunci')
           .inFilter('id', widget.essayIds);
       final jw = await Api.client
           .from('jawaban_siswa')
@@ -150,6 +184,10 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
       }
       setState(() {
         _soal = List<Map<String, dynamic>>.from(soal as List);
+        _pedoman = {
+          for (final s in List<Map<String, dynamic>>.from(soal as List))
+            s['id'].toString(): _ekstrakPedoman(s['kunci'])
+        };
         _loading = false;
       });
       _refreshNilai();
@@ -268,6 +306,8 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
                           borderRadius: BorderRadius.circular(8)),
                       child: Text(_txtJawaban("${s['id']}"), style: const TextStyle(height: 1.45)),
                     ),
+                    if (_pedoman[s['id'].toString()]?.isNotEmpty ?? false)
+                      _badgeKecocokan(s['id'].toString()),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -298,6 +338,47 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
     );
   }
 
+
+  /// Badge persentase kecocokan jawaban vs pedoman (guidance doang).
+  Widget _badgeKecocokan(String sid) {
+    final j = _jwbnBySoal[sid]?['jawaban']?.toString() ?? '';
+    final p = _pedoman[sid] ?? '';
+    if (j.trim().isEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(top: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(color: AppTheme.danger.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8)),
+        child: const Row(children: [
+          Icon(Icons.warning_amber, size: 14, color: AppTheme.danger),
+          SizedBox(width: 6),
+          Text('Belum dijawab siswa', style: TextStyle(fontSize: 12, color: AppTheme.danger)),
+        ]),
+      );
+    }
+    final pct = _persentaseKecocokan(j, p);
+    final warna = pct >= 70 ? AppTheme.secondary : pct >= 35 ? const Color(0xFFD97706) : AppTheme.danger;
+    final label = pct >= 70 ? 'Sangat mendekati pedoman' : pct >= 35 ? 'Mendekati pedoman' : 'Jauh dari pedoman';
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(color: warna.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(pct >= 70 ? Icons.check_circle : pct >= 35 ? Icons.hourglass_bottom : Icons.remove_circle, size: 14, color: warna),
+          const SizedBox(width: 6),
+          Text('${pct}%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: warna)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: warna))),
+        ]),
+        const SizedBox(height: 4),
+        Text('Pedoman: ${p.length > 120 ? '${p.substring(0, 120)}…' : p}',
+            style: const TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic)),
+        const SizedBox(height: 2),
+        const Text('Kecocokan otomatis — nilai tetap 0–10 manual di bawah ini.',
+            style: TextStyle(fontSize: 10, color: Colors.grey)),
+      ]),
+    );
+  }
 
   String _txtJawaban(String sid) {
     final v = _jwbnBySoal[sid];

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
@@ -661,20 +662,41 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   Widget _buildOptions(String curId, String jenis, List opsiList) {
-    if (jenis == 'pg' || (jenis == 'jodoh' && opsiList.isNotEmpty)) {
+    if (jenis == 'pg') {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (jenis == 'jodoh')
-            Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: const Color(0xFFE0E7FF), borderRadius: BorderRadius.circular(8)),
-              child: Row(children: [Icon(Icons.link, size: 14, color: Color(0xFF4338CA)), SizedBox(width: 6), Text('Pilih satu pasangan yang paling tepat', style: TextStyle(fontSize: 12, color: Color(0xFF4338CA), fontWeight: FontWeight.w600))]),
-            ),
           for (var i = 0; i < opsiList.length; i++)
             _buildOptionCard(i, opsiList[i].toString(), curId, _jawaban[curId] == opsiList[i].toString()),
         ],
+      );
+    } else if (jenis == 'jodoh') {
+      // JODOH: satu soal = "pilih B yang cocok utk A".
+      // options A + B diacak, siswa pilih 1 B. Jawaban = teks B terpilih (PG-like,
+      // konsisten dgn skoring hitung_nilai jodoh legacy: cocok dg kunci->>'jawaban').
+      final nB = opsiList.isNotEmpty ? opsiList.length ~/ 2 : 0;
+      if (nB == 0) return const SizedBox.shrink();
+      final aIdx = (_idx * 7) % nB; // variasi deterministik: A yang ditampilkan
+      final aText = aIdx * 2 < opsiList.length ? opsiList[aIdx * 2].toString() : '';
+      return Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [Icon(Icons.link, size: 18, color: const Color(0xFF4338CA)), const SizedBox(width: 8), Text('Jodohkan A', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4338CA)))]),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
+              child: Text('A. $aText', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            ),
+            const SizedBox(height: 12),
+            for (var b = 0; b < nB; b++)
+              _buildOptionCard(b, b * 2 + 1 < opsiList.length ? opsiList[b * 2 + 1].toString() : '', curId, _jawaban[curId] == (b * 2 + 1 < opsiList.length ? opsiList[b * 2 + 1].toString() : '')),
+            const Text('Pilih B yang cocok untuk A di atas.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          ],
+        ),
       );
     } else if (jenis == 'essay') {
       return Container(

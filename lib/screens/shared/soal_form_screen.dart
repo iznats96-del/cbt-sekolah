@@ -30,26 +30,18 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   int? _kunciIdx;
   String _essayKunci = '';
 
-  // Jodoh
-  final List<TextEditingController> _pasanganA = [
-    TextEditingController(),
-    TextEditingController(),
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  final List<TextEditingController> _pasanganB = [
-    TextEditingController(),
-    TextEditingController(),
+  // Jodoh (dinamis: 2–10 pasangan)
+  List<TextEditingController> _pasanganA = [
     TextEditingController(),
     TextEditingController(),
   ];
-  final List<int> _kunciJodoh = [0, 1, 2, 3];
-  static const _kunciJodohOptions = [
-    DropdownMenuItem(value: 0, child: Text('A')),
-    DropdownMenuItem(value: 1, child: Text('B')),
-    DropdownMenuItem(value: 2, child: Text('C')),
-    DropdownMenuItem(value: 3, child: Text('D')),
+  List<TextEditingController> _pasanganB = [
+    TextEditingController(),
+    TextEditingController(),
   ];
+  List<int> _kunciJodoh = [0, 1];
+  static const jodohMin = 2;
+  static const jodohMax = 10;
 
   bool _loading = false;
   List<DropdownItem> _mapelOptions = [];
@@ -92,28 +84,21 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         // Jodoh: A dan B dipisah di DB, tapi form menyimpan pasangan B sebagai kunci.
         // Format: opsi = [A1, B1, A2, B2, ...] sesuai hitung_nilai.
         final opsi = init['opsi'];
-        if (opsi is List) {
-          for (var i = 0; i < opsi.length && i < 8; i++) {
-            if (i % 2 == 0) {
-              // A
-              final idx = i ~/ 2;
-              if (idx < _pasanganA.length) _pasanganA[idx].text = opsi[i].toString();
-            } else {
-              // B
-              final idx = i ~/ 2;
-              if (idx < _pasanganB.length) _pasanganB[idx].text = opsi[i].toString();
-            }
+        if (opsi is List && opsi.length >= 4) {
+          final n = (opsi.length ~/ 2).clamp(jodohMin, jodohMax);
+          _pasanganA = List.generate(n, (_) => TextEditingController());
+          _pasanganB = List.generate(n, (_) => TextEditingController());
+          _kunciJodoh = List.generate(n, (i) => i);
+          for (var i = 0; i < n; i++) {
+            final ia = i * 2;
+            final ib = i * 2 + 1;
+            if (ia < opsi.length) _pasanganA[i].text = opsi[ia].toString();
+            if (ib < opsi.length) _pasanganB[i].text = opsi[ib].toString();
           }
         }
-        // Kunci: map A[i] -> B[j]
+        // Kunci: map A[i] -> B[j]  (bisa legacy {0:B,1:B,...} / {'A':idx} / {index,jawaban})
         if (kunci is Map) {
-          for (var i = 0; i < _pasanganA.length; i++) {
-            // kunci bisa berupa index atau teks B
-            final val = kunci['$i'] ?? kunci[String.fromCharCode(65 + i)];
-            if (val != null) {
-              _kunciJodoh[i] = int.tryParse('${val}') ?? _pasanganB.length - 1;
-            }
-          }
+          _loadKunciJodoh(kunci);
         }
       }
     }
@@ -125,6 +110,43 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       if (e.key.contains('index')) return int.tryParse('${e.value}');
     }
     return null;
+  }
+
+  /// Muat kunci jodoh dari format lama maupun baru.
+  /// - map {0: idx, 1: idx, ...} atau {'A': idx, 'B': idx, ...}
+  /// - legacy PG-like {index: n, jawaban: text} → dianggap B[n] cocok
+  void _loadKunciJodoh(Map kunci) {
+    final n = _pasanganA.length;
+    for (var i = 0; i < n; i++) {
+      dynamic val = kunci['$i'];
+      if (val == null) val = kunci[String.fromCharCode(65 + i)];
+      if (val != null) {
+        _kunciJodoh[i] = (int.tryParse('${val}') ?? i) % n;
+      }
+    }
+    // legacy format PG-like: {index, jawaban}
+    if (kunci.containsKey('index') && !kunci.keys.any((k) => k.toString() == '0' || k.toString() == 'A')) {
+      final idx = int.tryParse('${kunci['index']}');
+      if (idx != null && idx < n) _kunciJodoh[0] = idx;
+    }
+  }
+
+  void _tambahPasangan() {
+    if (_pasanganA.length >= jodohMax) return;
+    setState(() {
+      _pasanganA.add(TextEditingController());
+      _pasanganB.add(TextEditingController());
+      _kunciJodoh.add(_pasanganB.length - 1);
+    });
+  }
+
+  void _hapusPasangan() {
+    if (_pasanganA.length <= jodohMin) return;
+    setState(() {
+      _pasanganA.removeLast().dispose();
+      _pasanganB.removeLast().dispose();
+      _kunciJodoh.removeLast();
+    });
   }
 
   String _charAt(int i) => String.fromCharCode(65 + i);
@@ -212,17 +234,34 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
           return;
         }
 
-        // Kunci: map A[i] -> B[j]
+        // Kunci jodoh: PG-like {index: b_global, jawaban: teksB}.
+        // Setiap soal jodoh = "pilih B yang cocok untuk A".
+        // index = index B global di opsi (b*2+1), konsisten dgn hitung_nilai legacy.
         opsi = <String>[
           for (var i = 0; i < _pasanganA.length; i++) ...[
             _pasanganA[i].text.trim(),
             _pasanganB[i].text.trim(),
           ]
         ];
-        kunci = {
-          for (var i = 0; i < _pasanganA.length; i++)
-            _charAt(i): _kunciJodoh[i]
-        };
+        // default: setiap A[i] -> B[i] (index global = i*2+1)
+        final nB = _pasanganA.length;
+        final pickB = List<int>.generate(nB, (i) => i * 2 + 1);
+        kunci = {'index': pickB.first.clamp(0, opsi.length - 1), 'jawaban': ''};
+        // Jika nB > 1, simpan map {0: idxB, 1: idxB, ...} agar bisa multi-soal,
+        // tapi tetap simpan {index, jawaban} utk kompatibilitas legacy hitung_nilai.
+        if (nB > 1) {
+          // untuk nB>1: kunci disimpan sebagai map {0:idxB, ...} + index/jawaban utk A pertama
+          kunci = {
+            'index': pickB[0].clamp(0, opsi.length - 1),
+            'jawaban': (pickB[0] < opsi.length) ? (opsi as List)[pickB[0]].toString() : '',
+          };
+          for (var i = 0; i < nB; i++) {
+            kunci['$i'] = pickB[i].clamp(0, opsi.length - 1);
+          }
+        } else {
+          kunci['index'] = pickB[0].clamp(0, opsi.length - 1);
+          kunci['jawaban'] = (pickB[0] < opsi.length) ? (opsi as List)[pickB[0]].toString() : '';
+        }
       } else {
         if (_essayKunci.trim().isEmpty) {
           setState(() => _loading = false);
@@ -497,53 +536,65 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                   ),
               ]),
             ] else if (_jenis == 'jodoh') ...[
-              const SizedBox(height: 12),
-              _card('Pasangan Jodoh', [
-                const Row(
-                  children: [
-                    Expanded(child: Text('Kolom A', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                    SizedBox(width: 16),
-                    Expanded(child: Text('Kolom B', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                for (var i = 0; i < _pasanganA.length; i++)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _pasanganA[i],
-                          decoration: InputDecoration(
-                            isDense: true,
-                            labelText: 'A${i + 1}',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      DropdownButton<int>(
-                        value: _kunciJodoh[i],
-                        isDense: true,
-                        onChanged: (v) => setState(() => _kunciJodoh[i] = v ?? i),
-                        items: _kunciJodohOptions,
-                        menuMaxHeight: 200,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _pasanganB[i],
-                          decoration: InputDecoration(
-                            isDense: true,
-                            labelText: 'B${i + 1}',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                const Text(
-                  'Pilih pasangan B yang benar untuk tiap A.',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ]),
+                          const SizedBox(height: 12),
+                          _card('Pasangan Jodoh', [
+                            Row(
+                              children: [
+                                const Expanded(child: Text('Kolom A', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
+                                const SizedBox(width: 16),
+                                const Expanded(child: Text('Pasangan B (jawaban)', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  tooltip: 'Tambah pasangan',
+                                  icon: const Icon(Icons.add_circle_outline),
+                                  onPressed: _pasanganA.length < jodohMax ? _tambahPasangan : null,
+                                ),
+                                IconButton(
+                                  tooltip: 'Hapus pasangan terakhir',
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  onPressed: _pasanganA.length > jodohMin ? _hapusPasangan : null,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            for (var i = 0; i < _pasanganA.length; i++)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _pasanganA[i],
+                                        decoration: InputDecoration(isDense: true, labelText: 'A${i + 1}'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    SizedBox(
+                                      width: 56,
+                                      child: DropdownButton<int>(
+                                        value: _kunciJodoh[i].clamp(0, _pasanganB.length - 1),
+                                        isDense: true,
+                                        isExpanded: true,
+                                        underline: const SizedBox.shrink(),
+                                        items: List.generate(_pasanganB.length, (b) => DropdownMenuItem(value: b, child: Text('B${b + 1}', textAlign: TextAlign.center))),
+                                        onChanged: (v) => setState(() => _kunciJodoh[i] = v ?? i),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _pasanganB[i],
+                                        decoration: InputDecoration(isDense: true, labelText: 'B${i + 1}'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            Text(
+                              'Pasangan: ${_pasanganA.length} (min $jodohMin, max $jodohMax). Pilih B yang cocok untuk setiap A.',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            ),
+                          ]),
             ] else ...[
               const SizedBox(height: 12),
               _card('Kunci Jawaban Essay', [
