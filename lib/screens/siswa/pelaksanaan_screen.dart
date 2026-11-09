@@ -292,7 +292,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     bool okKumpul = false;
     for (int attempt = 0; attempt < 5; attempt++) {
       try {
-        await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
+        await Api.client.rpc('kumpulin_ujian', params: {'p_peserta': widget.pesertaId});
         okKumpul = true;
         break;
       } catch (e) {
@@ -301,6 +301,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         if (s.contains('sudah dikumpulkan') || s.contains('Tidak sedang')) { okKumpul = true; break; }
         if (attempt < 4) await Future.delayed(Duration(seconds: 2 + attempt * 2));
       }
+    }
+    if (okKumpul) {
+      // Server mengkonfirmasi -> hapus cache lokal HP (anti duplikat, privasi)
+      try { _store.clear(); } catch (_) {}
+      _belumKirim.clear();
     }
     if (!okKumpul) {
       if (!mounted) return;

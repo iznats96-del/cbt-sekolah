@@ -82,7 +82,12 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         }
         if (kunci is Map) _kunciIdx = _parseIndex(kunci);
       } else if (_jenis == 'essay') {
-        _essayKunci = kunci != null ? jsonEncode(kunci) : '';
+        // Essay kunci: teks biasa (old rows may still hold a JSON map — unwrap it).
+        dynamic k = kunci;
+        if (k is Map) {
+          k = (k['pedoman'] ?? k['kunci'] ?? k.values.firstOrNull ?? '').toString();
+        }
+        _essayKunci = (k ?? '').toString();
       } else if (_jenis == 'jodoh') {
         // Jodoh: A dan B dipisah di DB, tapi form menyimpan pasangan B sebagai kunci.
         // Format: opsi = [A1, B1, A2, B2, ...] sesuai hitung_nilai.
@@ -225,7 +230,18 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
           return;
         }
         opsi = null;
-        kunci = jsonDecode(_essayKunci);
+        // Essay kunci: teks biasa (bukan wrapper JSON).
+        final t = _essayKunci.trim();
+        if (t.startsWith('{')) {
+          try {
+            final m = jsonDecode(t) as Map;
+            kunci = {'pedoman': (m.values.first ?? '').toString()};
+          } catch (_) {
+            kunci = {'pedoman': t};
+          }
+        } else {
+          kunci = {'pedoman': t};
+        }
       }
 
       final bobot = num.tryParse(_bobotCtrl.text.trim()) ?? 1;
@@ -535,10 +551,10 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                   controller: TextEditingController(text: _essayKunci),
                   maxLines: 3,
                   onChanged: (v) => _essayKunci = v,
-                  decoration: const InputDecoration(
-                    labelText: 'Pedoman jawaban (JSON)',
-                    hintText: '{"kunci": "fotosintesis"}',
-                    helperText: 'JSON. Contoh: {"kunci":"fotosintesis"}',
+                  decoration: InputDecoration(
+                    labelText: 'Pedoman / kunci jawaban essay',
+                    hintText: 'Tulis jawaban/pedoman saja, contoh: fotosintesis',
+                    helperText: 'Teks biasa — tidak perlu format JSON.',
                   ),
                 ),
               ]),

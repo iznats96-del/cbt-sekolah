@@ -120,26 +120,6 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     } catch (_) {}
   }
 
-  Future<void> _pickSoalPerKelas(String kelasId) async {
-    final current = _soalPerKelas[kelasId] ?? _selectedSoal;
-    final result = await showDialog<List<String>>(
-      context: context,
-      builder: (_) => SoalPickerDialog(
-        allSoal: _bankSoal,
-        selected: current,
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        if (result.isEmpty) {
-          _soalPerKelas[kelasId] = [];
-        } else {
-          _soalPerKelas[kelasId] = result;
-        }
-      });
-    }
-  }
-
   Future<void> _loadOptions() async {
     try {
       final r = await Future.wait([
@@ -191,11 +171,18 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     } catch (_) {}
   }
 
+  List<Map<String, dynamic>> get _bankSoalMapel =>
+      _mapelId == null
+          ? _bankSoal
+          : _bankSoal
+              .where((s) => '${s['mata_pelajaran']?['id']}' == _mapelId)
+              .toList();
+
   Future<void> _loadBankSoal() async {
     try {
       final rows = await Api.client
           .from('bank_soal')
-          .select('id,soal,jenis,bobot,mata_pelajaran(nama)')
+          .select('id,soal,jenis,bobot,mata_pelajaran(*)')
           .order('created_at', ascending: false);
       if (!mounted) return;
       setState(() => _bankSoal = List<Map<String, dynamic>>.from(rows));
@@ -203,14 +190,50 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   }
 
   Future<void> _pickSoal() async {
+    if (_mapelId == null) {
+      _err('Pilih mata pelajaran dulu baru pilih soalnya');
+      return;
+    }
     final result = await showDialog<List<String>>(
       context: context,
       builder: (_) => SoalPickerDialog(
-        allSoal: _bankSoal,
+        allSoal: _bankSoalMapel,
         selected: _selectedSoal,
       ),
     );
-    if (result != null) setState(() => _selectedSoal = result);
+    if (result != null) {
+      // only keep soal yang memang milik mapel terpilih
+      final legal = _bankSoalMapel.map((s) => '${s['id']}').toSet();
+      final keep =
+          result.where((id) => legal.contains(id)).toList();
+      setState(() => _selectedSoal = keep);
+    }
+  }
+
+  Future<void> _pickSoalPerKelas(String kelasId) async {
+    if (_mapelId == null) {
+      _err('Pilih mata pelajaran dulu');
+      return;
+    }
+    final current = _soalPerKelas[kelasId] ?? _selectedSoal;
+    final result = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => SoalPickerDialog(
+        allSoal: _bankSoalMapel,
+        selected: current,
+      ),
+    );
+    if (result != null) {
+      final legal = _bankSoalMapel.map((s) => '${s['id']}').toSet();
+      final keep = result.where((id) => legal.contains(id)).toList();
+      setState(() {
+        if (keep.isEmpty) {
+          _soalPerKelas[kelasId] = [];
+        } else {
+          _soalPerKelas[kelasId] = keep;
+        }
+      });
+    }
   }
 
   String? _gabung(String? tgl, TimeOfDay? t) {
