@@ -113,21 +113,35 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   }
 
   /// Muat kunci jodoh dari format lama maupun baru.
-  /// - map {0: idx, 1: idx, ...} atau {'A': idx, 'B': idx, ...}
-  /// - legacy PG-like {index: n, jawaban: text} → dianggap B[n] cocok
+  /// - format editor: {0: idxB_baris, 1: idxB_baris, ...} (0-based terhadap baris B)
+  /// - format form/legacy: {index: idxB_global, jawaban: teks} + {1: idxB_global, ...}
+  ///   (idxB_global = barisB*2+1 -> baris B = (idxB_global - 1) ~/ 2)
+  /// - legacy PG-like: {index: n} -> dianggap B[n] cocok utk A1
   void _loadKunciJodoh(Map kunci) {
     final n = _pasanganA.length;
+    // map baris B: {0: barisB, 1: barisB, ...}
+    final barisB = <int, int>{};
+    final hasIndexKey = kunci.containsKey('index');
     for (var i = 0; i < n; i++) {
       dynamic val = kunci['$i'];
       if (val == null) val = kunci[String.fromCharCode(65 + i)];
       if (val != null) {
-        _kunciJodoh[i] = (int.tryParse('${val}') ?? i) % n;
+        final v = int.tryParse('${val}');
+        if (v != null) {
+          // key numerik: format form lama = index global (genap/apat), editor = baris B.
+          // Deteksi: kalau ada key 'index' berarti angka ini kemungkinan global index
+          // B utk pasangan tsb -> konversi ke baris.
+          barisB[i] = (hasIndexKey && v.isOdd) ? (v - 1) ~/ 2 : v.clamp(0, n - 1);
+        }
       }
     }
-    // legacy format PG-like: {index, jawaban}
-    if (kunci.containsKey('index') && !kunci.keys.any((k) => k.toString() == '0' || k.toString() == 'A')) {
-      final idx = int.tryParse('${kunci['index']}');
-      if (idx != null && idx < n) _kunciJodoh[0] = idx;
+    // legacy / format baru: {index: idxB_global} -> A1
+    if (kunci.containsKey('index')) {
+      final g = int.tryParse('${kunci['index']}');
+      if (g != null) barisB[0] = ((g - 1) ~/ 2).clamp(0, n - 1);
+    }
+    for (var i = 0; i < n; i++) {
+      _kunciJodoh[i] = barisB[i] ?? i;
     }
   }
 
@@ -235,33 +249,23 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         }
 
         // Kunci jodoh: PG-like {index: b_global, jawaban: teksB}.
-        // Setiap soal jodoh = "pilih B yang cocok untuk A".
         // index = index B global di opsi (b*2+1), konsisten dgn hitung_nilai legacy.
+        // Setiap soal jodoh = "pilih B yang cocok untuk A".
         opsi = <String>[
           for (var i = 0; i < _pasanganA.length; i++) ...[
             _pasanganA[i].text.trim(),
             _pasanganB[i].text.trim(),
           ]
         ];
-        // default: setiap A[i] -> B[i] (index global = i*2+1)
+        // _kunciJodoh[i] = index baris B utk A[i] (0-based) -> index global = b*2+1
         final nB = _pasanganA.length;
-        final pickB = List<int>.generate(nB, (i) => i * 2 + 1);
-        kunci = {'index': pickB.first.clamp(0, opsi.length - 1), 'jawaban': ''};
-        // Jika nB > 1, simpan map {0: idxB, 1: idxB, ...} agar bisa multi-soal,
-        // tapi tetap simpan {index, jawaban} utk kompatibilitas legacy hitung_nilai.
-        if (nB > 1) {
-          // untuk nB>1: kunci disimpan sebagai map {0:idxB, ...} + index/jawaban utk A pertama
-          kunci = {
-            'index': pickB[0].clamp(0, opsi.length - 1),
-            'jawaban': (pickB[0] < opsi.length) ? (opsi as List)[pickB[0]].toString() : '',
-          };
-          for (var i = 0; i < nB; i++) {
-            kunci['$i'] = pickB[i].clamp(0, opsi.length - 1);
-          }
-        } else {
-          kunci['index'] = pickB[0].clamp(0, opsi.length - 1);
-          kunci['jawaban'] = (pickB[0] < opsi.length) ? (opsi as List)[pickB[0]].toString() : '';
-        }
+        final pickB = [for (var i = 0; i < nB; i++) _kunciJodoh[i].clamp(0, nB - 1) * 2 + 1];
+        // format legacy: {index: idxB_global_A1, jawaban: teksB} — dipakai hitung_nilai
+        // (skoring jodoh = 1 soal: A pertama harus cocok; map multi-pasangan di form saja)
+        kunci = {
+          'index': pickB.first.clamp(0, opsi.length - 1),
+          'jawaban': (pickB.first < opsi.length) ? (opsi as List)[pickB.first].toString() : '',
+        };
       } else {
         if (_essayKunci.trim().isEmpty) {
           setState(() => _loading = false);

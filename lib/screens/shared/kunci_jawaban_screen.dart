@@ -125,13 +125,23 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
         } else if (jenis == 'jodoh') {
           final map = _kunciJodoh[id] ?? {};
           final opsiList = s['opsi'] is List ? List<dynamic>.from(s['opsi'] as List) : <dynamic>[];
-          final nB = (opsiList.length ~/ 2).clamp(1, 10);
-          // simpan sebagai {"0": idxB, "1": idxB, ...} (kunci string, konsisten dgn form)
+          final nPairSafe = (opsiList.length ~/ 2).clamp(1, 10);
+          // kunci editor: {0: idxB_baris, ...} (idxB 0-based terhadap baris B).
+          // Format simpan: {index: idxB_global_A1, jawaban: teksB} (PG-like, konsisten
+          // dgn hitung_nilai: siswa menjawab teks B yang cocok utk A1).
+          final a1Pick = (map['0'] ?? 0).clamp(0, nPairSafe - 1);
+          final idxBGlobal = a1Pick * 2 + 1;
           kunci = {
-            for (final e in map.entries)
-              e.key: (e.value is int ? e.value : int.tryParse('${e.value}') ?? 0).clamp(0, nB - 1)
+            'index': idxBGlobal.clamp(0, opsiList.length - 1),
+            'jawaban': (idxBGlobal < opsiList.length) ? opsiList[idxBGlobal].toString() : '',
           };
-          if (kunci.isEmpty) kunci = {for (var i = 0; i < nB; i++) '$i': i};
+          // catat pasangan lainnya (A2, A3...) untuk form soal ke depan
+          for (final e in map.entries) {
+            final ii = int.tryParse(e.key);
+            if (ii != null && ii > 0) {
+              kunci['$ii'] = (e.value as int).clamp(0, nPairSafe - 1) * 2 + 1;
+            }
+          }
         } else {
           final idx = _pilihIdx[id];
           final opsi = s['opsi'];
@@ -200,7 +210,7 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
                       isDense: true,
                       isExpanded: true,
                       underline: const SizedBox.shrink(),
-                      items: List.generate(nPair, (b) => DropdownMenuItem<int>(value: b, child: Text('B${b + 1}', style: const TextStyle(fontSize: 12)))),
+                      items: List.generate(nPair, (b) => DropdownMenuItem<int>(value: b, child: Text('B${b + 1}. ${i * 2 + 1 < opsi.length ? opsi[i * 2 + 1].toString() : ''}', style: const TextStyle(fontSize: 12)))),
                       onChanged: (v) {
                         if (v == null) return;
                         final mm = Map<String, int>.from(map);
