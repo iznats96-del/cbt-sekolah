@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -62,18 +64,35 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
         final jenis = s['jenis']?.toString();
         if (k is Map) {
           if (jenis == 'jodoh') {
-            // Kunci jodoh: {0: idxB, 1: idxB, ...} atau legacy {'A': idxB} atau {index: n}
+            // Kunci jodoh multi-pair: {map: '{"0":"3","1":"1",...}'} (baru)
+            // atau legacy {0: idxB_baris, 1: idxB_baris} / {index: n, jawaban: teks}.
             final mm = <String, int>{};
-            for (final e in k.entries) {
-              final key = e.key.toString();
-              final v = int.tryParse('${e.value}');
-              if (v == null) continue;
-              mm[key] = v;
+            // Format baru: kunci['map'] = JSON string {indexA: indexB} (0-based baris B).
+            if (k.containsKey('map')) {
+              try {
+                final m = jsonDecode(k['map'].toString());
+                if (m is Map) {
+                  m.forEach((a, b) {
+                    final ai = int.tryParse(a.toString());
+                    final bi = int.tryParse(b.toString());
+                    if (ai != null && bi != null) mm[ai.toString()] = bi;
+                  });
+                }
+              } catch (_) {}
             }
-            // legacy PG-like: {index: n, jawaban: ...}
-            if (mm.isEmpty && k.containsKey('index')) {
-              final n = int.tryParse('${k['index']}');
-              if (n != null) mm['0'] = n;
+            // Legacy: key numerik / {index: global}.
+            if (mm.isEmpty) {
+              for (final e in k.entries) {
+                final key = e.key.toString();
+                final v = int.tryParse('${e.value}');
+                if (v == null) continue;
+                if (key == 'index' || key == 'jawaban') continue;
+                mm[key] = v;
+              }
+              if (mm.isEmpty && k.containsKey('index')) {
+                final n = int.tryParse('${k['index']}');
+                if (n != null) mm['0'] = ((n - 1) ~/ 2).clamp(0, 9);
+              }
             }
             _kunciJodoh[s['id'].toString()] = mm;
           } else {
@@ -126,22 +145,23 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
           final map = _kunciJodoh[id] ?? {};
           final opsiList = s['opsi'] is List ? List<dynamic>.from(s['opsi'] as List) : <dynamic>[];
           final nPairSafe = (opsiList.length ~/ 2).clamp(1, 10);
-          // kunci editor: {0: idxB_baris, ...} (idxB 0-based terhadap baris B).
-          // Format simpan: {index: idxB_global_A1, jawaban: teksB} (PG-like, konsisten
-          // dgn hitung_nilai: siswa menjawab teks B yang cocok utk A1).
-          final a1Pick = (map['0'] ?? 0).clamp(0, nPairSafe - 1);
-          final idxBGlobal = a1Pick * 2 + 1;
-          kunci = {
-            'index': idxBGlobal.clamp(0, opsiList.length - 1),
-            'jawaban': (idxBGlobal < opsiList.length) ? opsiList[idxBGlobal].toString() : '',
+          // JODOH MULTI-PAIR: kunci baru = {map: '{"0":"bIdx","1":"bIdx",...}'}
+          // (key = index A 0-based, value = index B 0-based baris).
+          // Ini format sama persis sama form input soal (soal_form_screen).
+          final kunciMap = <String, String>{
+            for (final e in map.entries)
+              e.key: (int.tryParse('${e.value}') ?? 0).clamp(0, nPairSafe - 1).toString(),
           };
-          // catat pasangan lainnya (A2, A3...) untuk form soal ke depan
-          for (final e in map.entries) {
-            final ii = int.tryParse(e.key);
-            if (ii != null && ii > 0) {
-              kunci['$ii'] = (e.value as int).clamp(0, nPairSafe - 1) * 2 + 1;
-            }
+          // Pastikan SEMUA A punya entri (default = identitas A[i]->B[i] jika gak diset).
+          for (var i = 0; i < nPairSafe; i++) {
+            final key = i.toString();
+            kunciMap.putIfAbsent(key, () => key);
           }
+          kunci = {
+            'map': jsonEncode(kunciMap),
+            // Kompatibilitas legacy (RPC lama / rekap teks):
+            'jawaban': 'jodoh',
+          };
         } else {
           final idx = _pilihIdx[id];
           final opsi = s['opsi'];

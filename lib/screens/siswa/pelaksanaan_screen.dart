@@ -32,12 +32,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   bool _showPalette = false;
   int _minDurasiDetik = 45 * 60; // batas minimal: sebelum ini submit terkunci
 
-  // ===== JODOH 2 KOLOM =====
-  // A: soal dinomori (kiri). B: jawaban berhuruf, DIACAK 1× per soal (kanan).
-  // Setiap B kepakai max 1×. Ganti pasangan = lepas B lama. Simpan teks B asli.
-  // Kunci di state (bukan widget) biar stabil, gak ngaco tiap rebuild.
-  final Map<String, List<int>> _jodohOnggok = {}; // soalId -> urutan index B (acak 1×)
-  int _jodohSelA = -1; // index A yang sedang dipilih (di soal jodoh aktif)
+  // ===== JODOH 2 KOLOM (MULTI-PAIR) =====
+// Konsep lu bener: 1 soal jodoh = 1 blok matching dengan N pasangan.
+// - Kolom A (kiri): pernyataan dinomori 1..N
+// - Kolom B (kanan): jawaban berhuruf a..N, DIACAK 1× per load (stable)
+// - Tap A → tap B yang cocok. Tiap B hanya boleh 1× per soal.
+// - Ganti pasangan = lepas B lama.
+// - Simpan: _jodohJawaban[soalId][indexA] = indexB (JSON ke DB).
+// - Teks panjang: auto-wrap, gak ketutup (maxLines: null di form, Expanded di UI).
+final Map<String, Map<int, int>> _jodohJawaban = {}; // soalId -> {indexA: indexB}
+final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B (acak 1×)
 
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
@@ -242,8 +246,14 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   /// Dipanggil tiap murid tap jawaban: SIMPAN LOKAL SAJA (gak kirim server).
+  /// JODOH: serialize map indexA->indexB ke JSON string di _jawaban[soalId].
   Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
     _belumKirim.add(soalId);
+    // JODOH: simpan map ke _jawaban sebagai JSON biar satu field, backend bisa parse
+    final jm = _jodohJawaban[soalId];
+    if (jm != null) {
+      _jawaban[soalId] = jsonEncode(jm.map((k, v) => MapEntry(k.toString(), v.toString())));
+    }
     await _simpanLokal();
     // flush=true hanya dipakai saat submit (paksa kirim)
     if (flush) await _flushKeServer();
@@ -669,12 +679,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ],
       );
     } else if (jenis == 'jodoh') {
-      // JODOH 2 KOLOM SEJAJAR (spec):
-      // - Kolom kiri  = A (pernyataan/soal), dinomori 1..N
-      // - Kolom kanan = B (jawaban), berlabel a..z, DIACAK 1× per load (stable)
-      // - Tap A lalu tap B = pasangan tersimpan. Ganti = lepas B lama.
-      // - Tiap B hanya boleh dipakai 1×. Simpan berdasarkan TEKS B asli (bukan posisi).
-      // - Autosave / reload / backend scoring tetap jalan (_jawaban[curId] = teks B).
+      // JODOH MULTI-PAIR: 1 soal = N pasangan (A1..An vs B diacak).
+      // - Kolom A (kiri): pernyataan dinomori 1..N
+      // - Kolom B (kanan): jawaban berhuruf a..N, DIACAK 1× per load (stable)
+      // - Tap A → tap B yang cocok. Tiap B hanya boleh 1× per soal.
+      // - Simpan: _jodohJawaban[soalId][indexA] = indexB (JSON ke DB).
+      // - Teks panjang: auto-wrap, gak ketutup (maxLines: null di form, Expanded di UI).
       final nRow = opsiList.isNotEmpty ? opsiList.length ~/ 2 : 0;
       if (nRow == 0) return const SizedBox.shrink();
 
@@ -685,15 +695,21 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         return idx;
       });
 
-      // Parse jawaban tersimpan: cari index B asli yang match teks jawaban.
-      int? selectedBOrig;
-      final savedText = (_jawaban[curId] ?? '').toString();
-      if (savedText.isNotEmpty) {
-        for (var i = 0; i < nRow; i++) {
-          final bText = (i * 2 + 1 < opsiList.length) ? opsiList[i * 2 + 1].toString() : '';
-          if (bText == savedText) { selectedBOrig = i; break; }
+      // Load jawaban jodoh tersimpan (JSON map indexA->indexB).
+      final jodohMap = _jodohJawaban.putIfAbsent(curId, () {
+        final saved = (_jawaban[curId] ?? '').toString();
+        if (saved.isNotEmpty) {
+          try {
+            final m = jsonDecode(saved);
+            if (m is Map) {
+              final r = <int, int>{};
+              m.forEach((k, v) => r[int.parse(k.toString())] = int.parse(v.toString()));
+              return r;
+            }
+          } catch (_) {}
         }
-      }
+        return <int, int>{};
+      });
 
       return Container(
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
@@ -726,13 +742,16 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               ],
             ),
             const SizedBox(height: 8),
-            // Baris sejajar: A (kiri) | B (kanan, urutan acak)
+            // Baris sejajar: A (kiri, dinomori) | B (kanan, urutan acak)
             for (var r = 0; r < nRow; r++) ...[
-              _buildJodohRow(r, curId, opsiList, shuffledB, selectedBOrig),
+              _buildJodohPairRow(r, curId, opsiList, shuffledB, jodohMap),
               if (r < nRow - 1) const Divider(height: 1, color: Color(0xFFE2E8F0)),
             ],
             const SizedBox(height: 8),
-            const Text('Tap nomor di Kolom A, lalu tap huruf di Kolom B yang cocok. Setiap huruf hanya bisa dipakai sekali.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            Text(
+              'Tap nomor di Kolom A, lalu tap huruf di Kolom B yang cocok. Setiap huruf hanya bisa dipakai sekali. Sudah ${jodohMap.length} dari $nRow pasangan.',
+              style: const TextStyle(fontSize: 11, color: Colors.grey),
+            ),
           ],
         ),
       );
@@ -773,116 +792,140 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     return const SizedBox.shrink();
   }
 
-  /// Satu baris jodoh: A (kiri, dinomori) | B (kanan, urutan acak).
-  /// Tap A → set _jodohSelA. Tap B → simpan pasangan (lepas B lama jika ada).
-  /// Tiap B hanya boleh dipakai 1× per soal. Simpan teks B asli di _jawaban.
-  Widget _buildJodohRow(
+  /// Satu baris jodoh multi-pair: A (kiri, dinomori) | B (kanan, urutan acak).
+  /// Tap A → set selectedA. Tap B → simpan pasangan (lepas B lama jika ada).
+  /// Tiap B hanya boleh dipakai 1× per soal. Garis A→B digambar di canvas.
+  /// Simpan: _jodohJawaban[soalId][indexA] = indexB (JSON ke DB).
+  Widget _buildJodohPairRow(
     int rowIndex,
     String curId,
     List opsiList,
     List<int> shuffledB,
-    int? selectedBOrig,
+    Map<int, int> jodohMap,
   ) {
     // A: index asli = rowIndex (urutan form guru)
     final aText = (rowIndex * 2 < opsiList.length) ? opsiList[rowIndex * 2].toString() : '';
-    final isASel = (_jodohSelA == rowIndex);
+    final pairedB = jodohMap[rowIndex]; // index B yang sudah dipasangkan (original index)
+    final isAPaired = pairedB != null;
 
-    // B: ambil dari urutan acak; label huruf berdasarkan posisi tampil (bukan index asli)
+    // B: ambil dari urutan acak; label huruf berdasarkan posisi tampil
     final bOrigIdx = (rowIndex < shuffledB.length) ? shuffledB[rowIndex] : rowIndex;
     final bText = (bOrigIdx * 2 + 1 < opsiList.length) ? opsiList[bOrigIdx * 2 + 1].toString() : '';
     final bLabel = String.fromCharCode(97 + rowIndex); // a, b, c, ...
 
-    // Apakah B ini sedang dipasangkan dengan A manapun?
-    // Cek: jawaban tersimpan == teks B ini → B terpakai
-    final isBUsed = (_jawaban[curId] ?? '').toString() == bText;
-    // Apakah B ini yang sedang dipilih (pasangan aktif dari A yang diseleksi)?
-    final isBPaired = (selectedBOrig == bOrigIdx);
+    // Apakah B ini sudah dipakai oleh A lain?
+    final bUsedByOther = jodohMap.values.contains(bOrigIdx);
+    final isThisBUsed = bUsedByOther && !isAPaired; // B kepake tapi bukan A ini
 
+    // Teks panjang: auto-wrap (Expanded + Text tanpa overflow), gak ketutup.
+    // Layout: card A (kiri) + card B (kanan) dalam 1 baris, teks wrap.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // KOLOM A (kiri): nomor + teks
-          Expanded(
-            flex: 3,
-            child: Material(
-              color: isASel ? const Color(0xFF4338CA) : Colors.white,
+          // KOLOM A (kiri): nomor + teks — auto-expand, gak dipotong
+          Material(
+            color: isAPaired ? AppTheme.primary.withValues(alpha: 0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () {
+                // Tap A: unpair dulu, baru tap B buat pasang
+                setState(() {
+                  jodohMap.remove(rowIndex);
+                  _jodohJawaban[curId] = jodohMap;
+                });
+                _saveJawaban(curId);
+              },
               borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: () => setState(() => _jodohSelA = rowIndex),
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: isASel ? const Color(0xFF4338CA) : const Color(0xFFE2E8F0), width: isASel ? 2 : 1),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isAPaired ? AppTheme.primary : const Color(0xFFE2E8F0),
+                    width: isAPaired ? 2 : 1,
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isASel ? Colors.white : const Color(0xFFF1F5F9),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text('${rowIndex + 1}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isASel ? const Color(0xFF4338CA) : const Color(0xFF475569))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isAPaired ? AppTheme.primary : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(aText, style: TextStyle(fontSize: 13, height: 1.3, color: isASel ? Colors.white : const Color(0xFF0F172A), fontWeight: isASel ? FontWeight.w600 : FontWeight.normal))),
-                    ],
-                  ),
+                      alignment: Alignment.center,
+                      child: Text('${rowIndex + 1}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isAPaired ? Colors.white : const Color(0xFF475569))),
+                    ),
+                    const SizedBox(width: 8),
+                    // Teks A: auto-wrap, gak ketutup
+                    Expanded(
+                      child: Text(
+                        aText,
+                        style: TextStyle(fontSize: 13, height: 1.4, color: const Color(0xFF0F172A), fontWeight: isAPaired ? FontWeight.w600 : FontWeight.normal),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          // KOLOM B (kanan): huruf + teks (urutan acak)
-          Expanded(
-            flex: 4,
-            child: Material(
-              color: isBPaired ? AppTheme.primary.withValues(alpha: 0.08) : isBUsed ? const Color(0xFFF1F5F9) : Colors.white,
+          const SizedBox(height: 8),
+          // KOLOM B (kanan): huruf + teks (urutan acak) — auto-expand
+          Material(
+            color: isAPaired ? AppTheme.primary.withValues(alpha: 0.08) : isThisBUsed ? const Color(0xFFF1F5F9) : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            child: InkWell(
+              onTap: () {
+                // Tap B: kalau B kepake A lain, lepas dulu
+                setState(() {
+                  if (isThisBUsed) {
+                    jodohMap.removeWhere((_, b) => b == bOrigIdx);
+                  }
+                  jodohMap[rowIndex] = bOrigIdx;
+                  _jodohJawaban[curId] = jodohMap;
+                });
+                _saveJawaban(curId);
+              },
               borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: () {
-                  if (_jodohSelA < 0) return; // harus pilih A dulu
-                  setState(() {
-                    // Ganti pasangan: _jawaban[curId] otomatis lepas B lama
-                    // karena kita overwrite dengan teks B baru.
-                    _jawaban[curId] = bText;
-                    _jodohSelA = -1; // reset seleksi A
-                  });
-                  _saveJawaban(curId);
-                },
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: isBPaired ? AppTheme.primary : isBUsed ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
-                      width: isBPaired ? 2 : 1,
-                    ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isAPaired ? AppTheme.primary : isThisBUsed ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+                    width: isAPaired ? 2 : 1,
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: isBPaired ? AppTheme.primary : isBUsed ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(bLabel, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isBPaired ? Colors.white : const Color(0xFF64748B))),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isAPaired ? AppTheme.primary : isThisBUsed ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(bText, style: TextStyle(fontSize: 13, height: 1.3, color: isBPaired ? const Color(0xFF0F172A) : const Color(0xFF334155), fontWeight: isBPaired ? FontWeight.w600 : FontWeight.normal))),
-                      if (isBPaired) Icon(Icons.check_circle, size: 18, color: AppTheme.primary),
-                    ],
-                  ),
+                      alignment: Alignment.center,
+                      child: Text(bLabel, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isAPaired ? Colors.white : const Color(0xFF64748B))),
+                    ),
+                    const SizedBox(width: 8),
+                    // Teks B: auto-wrap, gak ketutup
+                    Expanded(
+                      child: Text(
+                        bText,
+                        style: TextStyle(fontSize: 13, height: 1.4, color: isAPaired ? const Color(0xFF0F172A) : const Color(0xFF334155), fontWeight: isAPaired ? FontWeight.w600 : FontWeight.normal),
+                      ),
+                    ),
+                    if (isAPaired) const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(Icons.check_circle, size: 18, color: AppTheme.primary),
+                    ),
+                  ],
                 ),
               ),
             ),

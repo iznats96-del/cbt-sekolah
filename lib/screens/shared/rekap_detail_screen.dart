@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -123,6 +125,50 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     );
   }
 
+  /// Format jodoh multi-pair jadi readable "A1→B3, A2→B1".
+  /// [isKunci] = true -> parse dari kunci ({map: "..."} atau legacy {index, jawaban, ...}).
+  /// [isKunci] = false -> parse dari jawaban siswa (JSON map indexA->indexB atau teks legacy).
+  String _fmtJodoh(String raw, bool isKunci) {
+    if (raw.isEmpty) return '';
+    try {
+      Map<String, String> map;
+      if (isKunci) {
+        // Kunci: {map: '{"0":"3","1":"1"}'} -> parse map.
+        final m = jsonDecode(raw);
+        if (m is Map && m['map'] != null) {
+          final km = jsonDecode(m['map'].toString());
+          map = <String, String>{
+            for (final e in km.entries) e.key.toString(): e.value.toString(),
+          };
+        } else {
+          // Legacy: {index: n, jawaban: teks, 1: n2, ...}
+          map = {};
+          for (final e in m.entries) {
+            final k = e.key.toString();
+            if (k == 'jawaban') continue;
+            map[k] = e.value.toString();
+          }
+        }
+      } else {
+        // Jawaban siswa: {"0":"3","1":"1"}
+        final m = jsonDecode(raw);
+        if (m is Map) {
+          map = {for (final e in m.entries) e.key.toString(): e.value.toString()};
+        } else {
+          // Teks legacy (B tunggal) -> tampilin apa adanya
+          return raw;
+        }
+      }
+      // Sort by A index
+      final sorted = map.entries.toList()..sort((a, b) =>
+          (int.tryParse(a.key) ?? 0).compareTo(int.tryParse(b.key) ?? 0));
+      if (sorted.isEmpty) return raw;
+      return sorted.map((e) => 'A${(int.tryParse(e.key) ?? 0) + 1}→B${(int.tryParse(e.value) ?? 0) + 1}').join(', ');
+    } catch (_) {
+      return raw; // fallback: tampilin mentah
+    }
+  }
+
   Widget _stat(String label, String val, Color c) {
     return Expanded(
       child: Container(
@@ -140,10 +186,14 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
 
   Widget _soalCard(int no, Map<String, dynamic> s) {
     final jenis = '${s['jenis'] ?? 'pg'}';
-    final jwbn = s['jawaban'] == null ? '' : '${s['jawaban']}';
-    final kunci = s['kunci'] == null ? null : '${s['kunci']}';
+    final jwbnRaw = s['jawaban'] == null ? '' : '${s['jawaban']}';
+    final kunciRaw = s['kunci'] == null ? null : '${s['kunci']}';
     final jawabBetul = s['benar'];
     final nilaiEsai = s['nilai_esai'];
+
+    // JODOH MULTI-PAIR: format jawaban/kunci jadi "A1→B3, A2→B1" biar readable.
+    final jwbn = jenis == 'jodoh' ? _fmtJodoh(jwbnRaw, false) : jwbnRaw;
+    final kunci = kunciRaw == null ? null : (jenis == 'jodoh' ? _fmtJodoh(kunciRaw, true) : kunciRaw);
 
     Color warn;
     String badge;

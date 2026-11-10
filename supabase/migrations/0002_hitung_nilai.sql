@@ -21,6 +21,11 @@ declare
   kunci_val text;
   jawaban_val text;
   benar boolean;
+  jodoh_benar boolean;
+  kunci_map jsonb;
+  jawaban_map jsonb;
+  k text;
+  v text;
 begin
   -- reset hasil lama
   delete from public.hasil_ujian where peserta_ujian_id = p_peserta;
@@ -38,16 +43,11 @@ begin
     jawaban_val := r.jawaban;
     kunci_val := null;
 
-    if r.jenis = 'pg' or r.jenis = 'jodoh' then
-      -- PG & JODOH: kunci = {"index":..., "jawaban":...}
-      -- JODOH UI 2 kolom menyimpan teks B asli di jawaban_siswa.jawaban
-      -- Cocokkan berdasarkan teks (case-insensitive), sama seperti server.js fallback
+    if r.jenis = 'pg' then
+      -- PG: kunci = {"index":..., "jawaban":...} -> cocokkan teks (case-insensitive)
       kunci_val := r.kunci->>'jawaban';
       if jawaban_val is null or jawaban_val = '' then
         v_jumlah_kosong := v_jumlah_kosong + 1;
-      elsif r.jenis = 'jodoh' and kunci_val is null then
-        -- jodoh tanpa kunci teks: exclude dari total (sama seperti server.js)
-        v_total_soal := v_total_soal - 1;
       else
         benar := lower(trim(jawaban_val)) = lower(trim(coalesce(kunci_val, '')));
         if benar then
@@ -57,6 +57,83 @@ begin
           v_jumlah_salah := v_jumlah_salah + 1;
         end if;
       end if;
+
+    elsif r.jenis = 'jodoh' then
+      -- ============================================================
+      -- JODOH MULTI-PAIR: 1 soal = N pasangan (A1..An vs B diacak).
+      -- - kunci->'map' = JSON string '{"0":"bIdx","1":"bIdx",...}'
+      --   (key = index A 0-based, value = index B 0-based baris)
+      -- - jawaban siswa = JSON string indexA->indexB (dari UI siswa)
+      -- - SKORING: SOAL BENAR hanya jika SETIAP pasangan A->B yang
+      --   siswa pilih COCOK sama kunci->>'map'.
+      -- - Legacy (jodoh lama simpan teks B tunggal): fallback cocokkan
+      --   teks case-insensitive, sama seperti format {jawaban: teks}.
+      -- ============================================================
+      jodoh_benar := false;
+      if jawaban_val is null or jawaban_val = '' then
+        v_jumlah_kosong := v_jumlah_kosong + 1;
+      else
+        -- Apakah kunci pakai format baru ({map: ...})?
+        -- Simpan: kunci::jsonb = {"map": "{\"0\":\"3\",...}"}
+        -- ->'map' menghasilkan jsonb STRING -> parse lagi ::jsonb jadi objek.
+        kunci_map := null;
+        begin
+          kunci_map := (r.kunci->'map')::jsonb;
+        exception
+          when others then
+            kunci_map := null;
+        end;
+
+        if kunci_map is not null then
+          -- FORMAT BARU: cocokkan peta A->B secara lengkap.
+          begin
+            jawaban_map := jsonb(jawaban_val);
+          exception
+            when others then
+              -- jawaban bukan JSON map (legacy teks) -> coba fallback di bawah
+              jawaban_map := null;
+            end;
+
+          if jawaban_map is not null then
+            -- Cek SEMUA A yang ada di kunci: siswa harus pilih B yang sama.
+            jodoh_benar := true;
+            for k in select key from jsonb_object_keys(kunci_map)
+            loop
+              v := jawaban_map->>k;  -- value di jawaban (teks index B), null jika A tsb belum dijawab
+              if v is distinct from kunci_map->>k then
+                jodoh_benar := false;
+                exit;
+              end if;
+            end loop;
+            -- Soal jodoh benar hanya jika semua pasangan cocok.
+            if jodoh_benar then
+              v_jumlah_benar := v_jumlah_benar + 1;
+              v_skor := v_skor + coalesce(r.bobot, 1);
+            else
+              v_jumlah_salah := v_jumlah_salah + 1;
+            end if;
+          else
+            -- Jawaban bukan JSON map -> anggap belum terjawab (legacy)
+            v_jumlah_kosong := v_jumlah_kosong + 1;
+          end if;
+        else
+          -- LEGACY: kunci lama {jawaban: teks} -> cocokkan teks case-insensitive
+          kunci_val := coalesce(r.kunci->>'jawaban', '');
+          if kunci_val = '' then
+            -- jodoh tanpa kunci: exclude dari total
+            v_total_soal := v_total_soal - 1;
+          else
+            benar := lower(trim(jawaban_val)) = lower(trim(kunci_val));
+            if benar then
+              v_jumlah_benar := v_jumlah_benar + 1;
+              v_skor := v_skor + coalesce(r.bobot, 1);
+            else
+              v_jumlah_salah := v_jumlah_salah + 1;
+            end if;
+          end if;
+        end if;
+      end if;
+
     elsif r.jenis = 'essay' then
       -- essay: tandai belum dinilai; guru menilai manual
       v_jumlah_kosong := v_jumlah_kosong + 1; -- placeholder

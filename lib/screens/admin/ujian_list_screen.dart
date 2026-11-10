@@ -84,12 +84,23 @@ class _UjianListScreenState extends State<UjianListScreen> {
               .select('id,jenis,kunci')
               .inFilter('id', ids);
           final tanpaKunci = (soal as List)
-              .where((s) => s['jenis'] == 'pg' && (s['kunci'] == null ||
-                  (s['kunci'] is Map && !(s['kunci'] as Map).containsKey('jawaban'))))
+              .where((s) {
+                final j = s['jenis'];
+                final k = s['kunci'];
+                if (j == 'pg') {
+                  return (k == null ||
+                      (k is Map && !k.containsKey('jawaban')));
+                }
+                if (j == 'jodoh') {
+                  return (k == null ||
+                      (k is Map && !(k.containsKey('map') || k.containsKey('jawaban'))));
+                }
+                return false;
+              })
               .length;
           if (tanpaKunci > 0) {
             extraWarn =
-                '\n\n$tanpaKunci soal PG belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
+                '\n\n$tanpaKunci soal (PG/Jodoh) belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
           }
         }
       } catch (_) {}
