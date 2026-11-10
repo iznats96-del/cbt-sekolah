@@ -32,11 +32,17 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   bool _showPalette = false;
   int _minDurasiDetik = 45 * 60; // batas minimal: sebelum ini submit terkunci
 
+  // ===== JODOH 2 KOLOM =====
+  // A: soal dinomori (kiri). B: jawaban berhuruf, DIACAK 1× per soal (kanan).
+  // Setiap B kepakai max 1×. Ganti pasangan = lepas B lama. Simpan teks B asli.
+  // Kunci di state (bukan widget) biar stabil, gak ngaco tiap rebuild.
+  final Map<String, List<int>> _jodohOnggok = {}; // soalId -> urutan index B (acak 1×)
+  int _jodohSelA = -1; // index A yang sedang dipilih (di soal jodoh aktif)
+
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
   final Set<String> _belumKirim = {}; // soalId yang berubah & belum disinkron ke server
   Timer? _flushTimer;
-  bool _sinkron = true; // semua jawaban tersimpan di server?
   // controller essay per-soal (JANGAN bikin baru tiap build -> bikin cursor ngaco)
   final Map<String, TextEditingController> _essayCtrl = {};
 
@@ -238,7 +244,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   /// Dipanggil tiap murid tap jawaban: SIMPAN LOKAL SAJA (gak kirim server).
   Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
     _belumKirim.add(soalId);
-    if (mounted) setState(() => _sinkron = false);
     await _simpanLokal();
     // flush=true hanya dipakai saat submit (paksa kirim)
     if (flush) await _flushKeServer();
@@ -267,7 +272,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       synced.addAll(ids.where((i) => !_belumKirim.contains(i)));
       await _store.markSynced(synced);
     } catch (_) {}
-    if (mounted) setState(() => _sinkron = _belumKirim.isEmpty);
   }
 
   /// Flush otomatis tiap 2 menit (ringan, gak rate-limit).
@@ -650,12 +654,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               ),
             ),
           ],
-           Container(
-               margin: const EdgeInsets.only(top: 12),
-               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-               decoration: BoxDecoration(color: (_sinkron ? AppTheme.secondary : AppTheme.accent).withValues(alpha: 0.10), borderRadius: BorderRadius.circular(8), border: Border.all(color: (_sinkron ? AppTheme.secondary : AppTheme.accent).withValues(alpha: 0.25))),
-               child: Row(children: [Icon(_sinkron ? Icons.cloud_done_outlined : Icons.save_outlined, size: 14, color: _sinkron ? AppTheme.secondary : AppTheme.accent), const SizedBox(width: 8), Expanded(child: Text(_sinkron ? 'Jawaban tersimpan di server' : 'Tersimpan di HP — mengirim ke server otomatis', style: TextStyle(fontSize: 12, color: _sinkron ? AppTheme.secondary : AppTheme.accent)))]),
-             ),
         ],
       ),
     );
@@ -671,30 +669,70 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ],
       );
     } else if (jenis == 'jodoh') {
-      // JODOH: satu soal = "pilih B yang cocok utk A".
-      // options A + B diacak, siswa pilih 1 B. Jawaban = teks B terpilih (PG-like,
-      // konsisten dgn skoring hitung_nilai jodoh legacy: cocok dg kunci->>'jawaban').
-      final nB = opsiList.isNotEmpty ? opsiList.length ~/ 2 : 0;
-      if (nB == 0) return const SizedBox.shrink();
-      final aIdx = (_idx * 7) % nB; // variasi deterministik: A yang ditampilkan
-      final aText = aIdx * 2 < opsiList.length ? opsiList[aIdx * 2].toString() : '';
+      // JODOH 2 KOLOM SEJAJAR (spec):
+      // - Kolom kiri  = A (pernyataan/soal), dinomori 1..N
+      // - Kolom kanan = B (jawaban), berlabel a..z, DIACAK 1× per load (stable)
+      // - Tap A lalu tap B = pasangan tersimpan. Ganti = lepas B lama.
+      // - Tiap B hanya boleh dipakai 1×. Simpan berdasarkan TEKS B asli (bukan posisi).
+      // - Autosave / reload / backend scoring tetap jalan (_jawaban[curId] = teks B).
+      final nRow = opsiList.isNotEmpty ? opsiList.length ~/ 2 : 0;
+      if (nRow == 0) return const SizedBox.shrink();
+
+      // Stable shuffle: generate sekali per soal, simpan di state.
+      final shuffledB = _jodohOnggok.putIfAbsent(curId, () {
+        final idx = List<int>.generate(nRow, (i) => i);
+        idx.shuffle();
+        return idx;
+      });
+
+      // Parse jawaban tersimpan: cari index B asli yang match teks jawaban.
+      int? selectedBOrig;
+      final savedText = (_jawaban[curId] ?? '').toString();
+      if (savedText.isNotEmpty) {
+        for (var i = 0; i < nRow; i++) {
+          final bText = (i * 2 + 1 < opsiList.length) ? opsiList[i * 2 + 1].toString() : '';
+          if (bText == savedText) { selectedBOrig = i; break; }
+        }
+      }
+
       return Container(
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
         padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [Icon(Icons.link, size: 18, color: const Color(0xFF4338CA)), const SizedBox(width: 8), Text('Jodohkan A', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF4338CA)))]),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
-              child: Text('A. $aText', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            // Header 2 kolom
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFF4338CA), borderRadius: BorderRadius.circular(8)),
+                    alignment: Alignment.center,
+                    child: const Text('Kolom A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    decoration: BoxDecoration(color: const Color(0xFFE0E7FF), borderRadius: BorderRadius.circular(8)),
+                    alignment: Alignment.center,
+                    child: const Text('Kolom B', style: TextStyle(color: Color(0xFF4338CA), fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            for (var b = 0; b < nB; b++)
-              _buildOptionCard(b, b * 2 + 1 < opsiList.length ? opsiList[b * 2 + 1].toString() : '', curId, _jawaban[curId] == (b * 2 + 1 < opsiList.length ? opsiList[b * 2 + 1].toString() : '')),
-            const Text('Pilih B yang cocok untuk A di atas.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+            const SizedBox(height: 8),
+            // Baris sejajar: A (kiri) | B (kanan, urutan acak)
+            for (var r = 0; r < nRow; r++) ...[
+              _buildJodohRow(r, curId, opsiList, shuffledB, selectedBOrig),
+              if (r < nRow - 1) const Divider(height: 1, color: Color(0xFFE2E8F0)),
+            ],
+            const SizedBox(height: 8),
+            const Text('Tap nomor di Kolom A, lalu tap huruf di Kolom B yang cocok. Setiap huruf hanya bisa dipakai sekali.', style: TextStyle(fontSize: 11, color: Colors.grey)),
           ],
         ),
       );
@@ -733,6 +771,125 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
     }
     return const SizedBox.shrink();
+  }
+
+  /// Satu baris jodoh: A (kiri, dinomori) | B (kanan, urutan acak).
+  /// Tap A → set _jodohSelA. Tap B → simpan pasangan (lepas B lama jika ada).
+  /// Tiap B hanya boleh dipakai 1× per soal. Simpan teks B asli di _jawaban.
+  Widget _buildJodohRow(
+    int rowIndex,
+    String curId,
+    List opsiList,
+    List<int> shuffledB,
+    int? selectedBOrig,
+  ) {
+    // A: index asli = rowIndex (urutan form guru)
+    final aText = (rowIndex * 2 < opsiList.length) ? opsiList[rowIndex * 2].toString() : '';
+    final isASel = (_jodohSelA == rowIndex);
+
+    // B: ambil dari urutan acak; label huruf berdasarkan posisi tampil (bukan index asli)
+    final bOrigIdx = (rowIndex < shuffledB.length) ? shuffledB[rowIndex] : rowIndex;
+    final bText = (bOrigIdx * 2 + 1 < opsiList.length) ? opsiList[bOrigIdx * 2 + 1].toString() : '';
+    final bLabel = String.fromCharCode(97 + rowIndex); // a, b, c, ...
+
+    // Apakah B ini sedang dipasangkan dengan A manapun?
+    // Cek: jawaban tersimpan == teks B ini → B terpakai
+    final isBUsed = (_jawaban[curId] ?? '').toString() == bText;
+    // Apakah B ini yang sedang dipilih (pasangan aktif dari A yang diseleksi)?
+    final isBPaired = (selectedBOrig == bOrigIdx);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // KOLOM A (kiri): nomor + teks
+          Expanded(
+            flex: 3,
+            child: Material(
+              color: isASel ? const Color(0xFF4338CA) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () => setState(() => _jodohSelA = rowIndex),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: isASel ? const Color(0xFF4338CA) : const Color(0xFFE2E8F0), width: isASel ? 2 : 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: isASel ? Colors.white : const Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text('${rowIndex + 1}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isASel ? const Color(0xFF4338CA) : const Color(0xFF475569))),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(aText, style: TextStyle(fontSize: 13, height: 1.3, color: isASel ? Colors.white : const Color(0xFF0F172A), fontWeight: isASel ? FontWeight.w600 : FontWeight.normal))),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // KOLOM B (kanan): huruf + teks (urutan acak)
+          Expanded(
+            flex: 4,
+            child: Material(
+              color: isBPaired ? AppTheme.primary.withValues(alpha: 0.08) : isBUsed ? const Color(0xFFF1F5F9) : Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                onTap: () {
+                  if (_jodohSelA < 0) return; // harus pilih A dulu
+                  setState(() {
+                    // Ganti pasangan: _jawaban[curId] otomatis lepas B lama
+                    // karena kita overwrite dengan teks B baru.
+                    _jawaban[curId] = bText;
+                    _jodohSelA = -1; // reset seleksi A
+                  });
+                  _saveJawaban(curId);
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isBPaired ? AppTheme.primary : isBUsed ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
+                      width: isBPaired ? 2 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: isBPaired ? AppTheme.primary : isBUsed ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(bLabel, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isBPaired ? Colors.white : const Color(0xFF64748B))),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(bText, style: TextStyle(fontSize: 13, height: 1.3, color: isBPaired ? const Color(0xFF0F172A) : const Color(0xFF334155), fontWeight: isBPaired ? FontWeight.w600 : FontWeight.normal))),
+                      if (isBPaired) Icon(Icons.check_circle, size: 18, color: AppTheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildOptionCard(int index, String text, String curId, bool selected) {
