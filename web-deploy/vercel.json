@@ -8,9 +8,9 @@
   ],
   "routes": [
     {
-      "src": "/(.*).(css|js|png|jpg|jpeg|webp|svg|woff|woff2|ttf|eot|map)",
+      "src": "/(.*.[a-zA-Z0-9]+)",
       "headers": {
-        "Cache-Control": "public,max-age=31536000,immutable"
+        "Cache-Control": "public,max-age=0,must-revalidate"
       },
       "continue": true
     },
