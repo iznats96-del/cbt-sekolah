@@ -293,7 +293,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     bool okKumpul = false;
     for (int attempt = 0; attempt < 5; attempt++) {
       try {
-        await Api.client.rpc('kumpulin_ujian', params: {'p_peserta': widget.pesertaId});
+        await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
         okKumpul = true;
         break;
       } catch (e) {
