@@ -38,11 +38,16 @@ begin
     jawaban_val := r.jawaban;
     kunci_val := null;
 
-    if r.jenis = 'pg' then
-      -- kunci disimpan sebagai json {"index":..., "jawaban":...}
+    if r.jenis = 'pg' or r.jenis = 'jodoh' then
+      -- PG & JODOH: kunci = {"index":..., "jawaban":...}
+      -- JODOH UI 2 kolom menyimpan teks B asli di jawaban_siswa.jawaban
+      -- Cocokkan berdasarkan teks (case-insensitive), sama seperti server.js fallback
       kunci_val := r.kunci->>'jawaban';
       if jawaban_val is null or jawaban_val = '' then
         v_jumlah_kosong := v_jumlah_kosong + 1;
+      elsif r.jenis = 'jodoh' and kunci_val is null then
+        -- jodoh tanpa kunci teks: exclude dari total (sama seperti server.js)
+        v_total_soal := v_total_soal - 1;
       else
         benar := lower(trim(jawaban_val)) = lower(trim(coalesce(kunci_val, '')));
         if benar then
