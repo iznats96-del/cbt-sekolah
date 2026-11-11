@@ -21,7 +21,13 @@ begin
 
   select token, status, kelas_id into v_token, v_status, v_kelas from public.ujian where id = p_ujian;
   if v_status is distinct from 'aktif' then raise exception 'Ujian tidak aktif'; end if;
-  if v_kelas is not null and srow.kelas_id is distinct from v_kelas then
+  -- KONSISTEN dgn my_ujian_aktif: cek SEMUA kelas yang diizinkan (ujian.kelas_id
+  -- + tabel ujian_kelas), bukan cuma kelas_id utama. Kalau ujian dibuka utk
+  -- beberapa kelas (ujian_kelas), siswa kelas lain pun boleh masuk.
+  if not (
+    public.ujian_izinkan_kelas(p_ujian, srow.kelas_id)
+    or (v_kelas is not null and srow.kelas_id = v_kelas)
+  ) then
     raise exception 'Bukan kelas untuk ujian ini';
   end if;
   if not public.uin_window_ok(p_ujian) then

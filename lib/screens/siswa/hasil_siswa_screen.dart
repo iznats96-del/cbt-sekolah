@@ -63,8 +63,11 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
     }
     final dinilai = _rows.where((r) => r['dinilai'] == true).toList();
     final tuntas = dinilai.where((r) => ((r['nilai'] as num?)?.round() ?? 0) >= 75).length;
-    final totalNilai = dinilai.fold<int>(0, (sum, r) => sum + ((r['nilai'] as num?)?.round() ?? 0));
-    final rata = dinilai.isEmpty ? 0 : (totalNilai / dinilai.length).round();
+    // Rata-rata: pakai SEMUA hasil (dinilai & belum dinilai), karena nilai sistem
+    // udah terhitung (untuk pg/jodoh). essay = koreksi manual guru (dinilai=false).
+    final semuaDgnNilai = _rows.where((r) => r['nilai'] != null).toList();
+    final totalNilai = semuaDgnNilai.fold<int>(0, (sum, r) => sum + ((r['nilai'] as num?)?.round() ?? 0));
+    final rata = semuaDgnNilai.isEmpty ? 0 : (totalNilai / semuaDgnNilai.length).round();
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -131,12 +134,22 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                           .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Text(
-                      dinilai ? '$nilai' : '—',
-                      style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: _penilaianColor(dinilai, nilai)),
+                    child: Column(
+                      children: [
+                        Text(
+                          ((r['nilai'] as num?)?.round()).toString() == 'null' ? '—' : '${(r['nilai'] as num).round()}',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: _penilaianColor(dinilai, nilai)),
+                        ),
+                        if (!dinilai)
+                          Text('menunggu koreksi',
+                              style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.grey,
+                                  fontStyle: FontStyle.italic)),
+                      ],
                     ),
                   ),
                 ],

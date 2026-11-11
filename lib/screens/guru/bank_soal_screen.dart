@@ -5,6 +5,7 @@ import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
 import '../shared/soal_form_screen.dart';
+import '../shared/soal_detail_screen.dart';
 import '../admin/import_ujian_screen.dart';
 
 /// Bank Soal GURU - tampil PER MAPEL, di dalam tiap mapel: 3 grup jenis.
@@ -405,6 +406,22 @@ class _MapelCardState extends State<MapelCard> {
                     Text('Bobot: ${s['bobot'] ?? 1}',
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade500)),
+                    if ((s['jenis'] ?? '').toString() == 'jodoh') ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('JODOH',
+                            style: TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.accent)),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
                     if (s['gambar_url'] != null &&
                         s['gambar_url'].toString().isNotEmpty) ...[
                       const SizedBox(width: 6),
@@ -422,10 +439,21 @@ class _MapelCardState extends State<MapelCard> {
             onPressed: () => _edit(s),
           ),
           IconButton(
-            icon:
-                const Icon(Icons.delete_outline, size: 18, color: AppTheme.danger),
+            icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.danger),
             tooltip: 'Hapus',
             onPressed: () => _delete(s),
+          ),
+          // Drill-down: klik soal → detail lengkap (opsi, kunci, pembahasan, gambar)
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            tooltip: 'Lihat detail soal',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SoalDetailScreen(soalId: s['id']),
+                ),
+              ).then((_) => widget.onChanged());
+            },
           ),
         ],
       ),

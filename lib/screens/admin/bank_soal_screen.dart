@@ -5,6 +5,7 @@ import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
 import '../shared/soal_form_screen.dart';
+import '../shared/soal_detail_screen.dart';
 import '../admin/import_ujian_screen.dart';
 
 /// Bank Soal ADMIN - layout per mapel, grup PG / Menjodohkan / Essay di dalam tiap mapel.
@@ -380,7 +381,16 @@ class _MapelCardState extends State<MapelCard> {
   Widget _soalRow(Map<String, dynamic> s) {
     final text = s['soal']?.toString() ?? '';
     final jenis = (s['jenis'] ?? 'pg').toString();
-    return Container(
+    return GestureDetector(
+      onTap: () {
+        // Drill-down: buka detail soal (opsi, kunci, pembahasan, gambar)
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SoalDetailScreen(soalId: s['id'].toString()),
+          ),
+        ).then((_) => widget.onChanged());
+      },
+      child: Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -438,12 +448,12 @@ class _MapelCardState extends State<MapelCard> {
             onPressed: () => _edit(s),
           ),
           IconButton(
-            icon:
-                const Icon(Icons.delete_outline, size: 18, color: AppTheme.danger),
+            icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.danger),
             tooltip: 'Hapus',
             onPressed: () => _delete(s),
           ),
         ],
+      ),
       ),
     );
   }

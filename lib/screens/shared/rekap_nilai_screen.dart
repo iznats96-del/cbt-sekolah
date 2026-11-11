@@ -109,7 +109,9 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
 
   double? _nilai(Map<String, dynamic> p) {
     final h = p['hasil_ujian'];
-    if (h is Map && h['nilai'] != null && h['dinilai'] != false) {
+    // Nilai sistem (pg/jodoh) terhitung otomatis; essay=0 sampai guru nilai manual.
+    // Tampilkan angka ini di rekap GURU walau dinilai=false, biar rata-rata gak kosong.
+    if (h is Map && h['nilai'] != null) {
       return double.tryParse('${h['nilai']}');
     }
     return null;
