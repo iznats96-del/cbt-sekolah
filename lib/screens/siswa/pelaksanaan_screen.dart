@@ -712,9 +712,16 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
         return <int, int>{};
       });
 
-      // ===== KOORDINAT: pakai LayoutBuilder + GlobalKey per baris
-      // Biar garis SVG tahu posisi A & B secara absolut, tiap row pakai GlobalKey.
+      // ===== KOORDINAT: pakai GlobalKey per kartu A & B di tiap baris =====
+      // Tiap kartu A & B punya GlobalKey sendiri; saat paint dipanggil,
+      // RenderBox-nya diukur relatif terhadap jodohKey (container Stack).
+      // Ini ngilangin estimasi 48px-per-row yang meleset kalau teks wrap
+      // multi-line — garis selalu nutup di posisi A & B yang beneran.
       final jodohKey = GlobalKey();
+      final keysA = List<GlobalKey>.generate(nRow, (_) => GlobalKey());
+      final keysB = List<GlobalKey>.generate(nRow, (_) => GlobalKey());
+      // LayoutBuilder gak dipakai lagi (posisi diukur dari GlobalKey,
+      // bukan dari constraints). Dipertahain karena gak nganggu.
       return LayoutBuilder(
         builder: (context, constraints) {
           return Stack(
@@ -752,8 +759,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                     ),
                     const SizedBox(height: 8),
                     // Baris sejajar: A (kiri, dinomori) | B (kanan, urutan acak)
-                    // Tiap baris pakai GlobalKey buat ukur posisi A & B, terus
-                    // garis SVG digambar di CustomPaint di bawah semua baris.
+                    // Tiap kartu A & B pakai GlobalKey sendiri (keysA / keysB).
                     // Layout: 2 kolom side-by-side (A kiri, B kanan) bukan A/B vertikal.
                     ...List.generate(nRow, (r) =>
                       Padding(
@@ -764,14 +770,14 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                             // ===== KOLOM A (kiri) =====
                             Expanded(
                               flex: 3,
-                              key: GlobalKey(), // GlobalKey buat ukur posisi A
+                              key: keysA[r], // GlobalKey buat ukur posisi A
                               child: _buildJodohCardA(r, curId, opsiList, jodohMap),
                             ),
                             const SizedBox(width: 12),
                             // ===== KOLOM B (kanan, urutan acak) =====
                             Expanded(
                               flex: 4,
-                              key: GlobalKey(), // GlobalKey buat ukur posisi B
+                              key: keysB[r], // GlobalKey buat ukur posisi B
                               child: _buildJodohCardB(r, curId, opsiList, shuffledB, jodohMap),
                             ),
                           ],
@@ -786,16 +792,19 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                   ],
                 ),
               ),
-              // Garis SVG: curve A↔B yang sudah dipasangkan (lapis atas, gak nerima tap)
+              // Garis SVG: curve A↔B yang sudah dipasangkan (lapis atas, gak nerima tap).
+              // Posisi A & B diukur dari GlobalKey (bukan estimasi), jadi garis selalu
+              // nutup di kartu yang beneran, meskipun teks multi-line.
               if (jodohMap.isNotEmpty)
                 Positioned.fill(
                   child: IgnorePointer(
                     child: CustomPaint(
                       painter: _JodohLinesPainter(
                         jodohMap: jodohMap,
-                        nRow: nRow,
+                        keysA: keysA,
+                        keysB: keysB,
+                        anchor: jodohKey,
                         shuffledB: shuffledB,
-                        containerWidth: constraints.maxWidth,
                       ),
                     ),
                   ),
@@ -1267,47 +1276,47 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
 
 class _JodohLinesPainter extends CustomPainter {
   final Map<int, int> jodohMap;
-  final int nRow;
+  final List<GlobalKey> keysA;
+  final List<GlobalKey> keysB;
+  final GlobalKey anchor;
   final List<int> shuffledB;
-  final double containerWidth;
 
   _JodohLinesPainter({
     required this.jodohMap,
-    required this.nRow,
+    required this.keysA,
+    required this.keysB,
+    required this.anchor,
     required this.shuffledB,
-    required this.containerWidth,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Hitung posisi A & B secara estimasi (layout 2 kolom side-by-side).
-    // Kolom A: flex 3 dari 7 total, Kolom B: flex 4 dari 7 total.
-    // Total width = containerWidth - padding(28) - gap(12)
-    final usableWidth = containerWidth - 28; // 14*2 padding
-    final aWidth = usableWidth * (3 / 7) - 12; // dikurangi gap
-    final bLeft = 14 + aWidth + 12; // 14 = padding kiri container
-    final aRight = 14 + aWidth; // sisi kanan kartu A
+    // Ukur posisi A & B dari GlobalKey (RenderBox), relatif terhadap
+    // container jodohKey (anchor). Ini ngilangin estimasi tinggi-row
+    // yang meleset buat teks multi-line — garis selalu nutup di posisi
+    // kartu yang beneran.
+    final anchorContext = anchor.currentContext;
+    if (anchorContext == null) return;
+    final anchorBox = anchorContext.findRenderObject() as RenderBox?;
+    if (anchorBox == null) return;
 
-    // Header tinggi: 36 (padding 8+8 + teks) + 8 (spacing) = 44
-    // Tiap baris kartu: tinggi dinamis (auto-wrap). Estimasi tinggi per baris:
-    // 40px (1 baris teks) + 8px spacing vertikal = 48px per baris
-    // Tapi teks bisa multi-line, jadi tinggi kartu = max(40, nLine * 18 + 20)
-    // Gw pakai estimasi: tiap baris = 48px, header = 44px
-    final topOffset = 44.0; // header + spacing
-    final rowHeight = 48.0; // 40 kartu + 8 spacing
     final dotRadius = 5.0;
     final strokeWidth = 3.0;
-
-    // Warna garis: biru untuk jodoh
     final lineColor = const Color(0xFF4338CA);
 
     for (final MapEntry(key: aIdx, value: bIdx) in jodohMap.entries) {
-      // Posisi A: baris aIdx, sisi kanan kartu A
-      final aY = topOffset + aIdx * rowHeight + 24; // tengah kartu (tinggi 48)
-      final aX = aRight;
+      if (aIdx >= keysA.length) continue;
+      final aCtx = keysA[aIdx].currentContext;
+      if (aCtx == null) continue;
+      final aBox = aCtx.findRenderObject() as RenderBox?;
+      if (aBox == null || !aBox.hasSize) continue;
 
-      // Posisi B: B di baris yang posisi tampil-nya = bOrigIdx (index original B).
-      // shuffledB[posisiTampil] = bOrigIdx. Jadi cari posisiTampil dari bOrigIdx.
+      // Posisi A: tengah-kanan kartu A
+      final aPos = aBox.localToGlobal(Offset.zero, ancestor: anchorBox);
+      final aCenter = Offset(aPos.dx + aBox.size.width, aPos.dy + aBox.size.height / 2);
+
+      // Posisi B: bIdx = index B asli (0..nRow-1). Baris display mana yang
+      // nampilin B itu? shuffledB[displayPos] = bOrigIdx, jadi reverse-kan.
       int bDisplayPos = -1;
       for (int i = 0; i < shuffledB.length; i++) {
         if (shuffledB[i] == bIdx) {
@@ -1315,16 +1324,20 @@ class _JodohLinesPainter extends CustomPainter {
           break;
         }
       }
-      if (bDisplayPos < 0) continue; // gak valid
+      if (bDisplayPos < 0 || bDisplayPos >= keysB.length) continue;
+      final bCtx = keysB[bDisplayPos].currentContext;
+      if (bCtx == null) continue;
+      final bBox = bCtx.findRenderObject() as RenderBox?;
+      if (bBox == null || !bBox.hasSize) continue;
 
-      final bY = topOffset + bDisplayPos * rowHeight + 24;
-      final bX = bLeft;
+      final bPos = bBox.localToGlobal(Offset.zero, ancestor: anchorBox);
+      final bCenter = Offset(bPos.dx, bPos.dy + bBox.size.height / 2);
 
-      // Garis bezier: dari (aX, aY) ke (bX, bY), curve di tengah
-      final midX = (aX + bX) / 2;
+      // Garis bezier: dari (aCenter) ke (bCenter), control point tengah X
+      final midX = (aCenter.dx + bCenter.dx) / 2;
       final path = Path()
-        ..moveTo(aX, aY)
-        ..cubicTo(midX, aY, midX, bY, bX, bY);
+        ..moveTo(aCenter.dx, aCenter.dy)
+        ..cubicTo(midX, aCenter.dy, midX, bCenter.dy, bCenter.dx, bCenter.dy);
 
       final paint = Paint()
         ..color = lineColor
@@ -1334,24 +1347,19 @@ class _JodohLinesPainter extends CustomPainter {
       canvas.drawPath(path, paint);
 
       // Dot di ujung A
-      canvas.drawCircle(
-          Offset(aX, aY),
-          dotRadius,
-          Paint()..color = lineColor);
+      canvas.drawCircle(aCenter, dotRadius, Paint()..color = lineColor);
       // Dot di ujung B
-      canvas.drawCircle(
-          Offset(bX, bY),
-          dotRadius,
-          Paint()..color = lineColor);
+      canvas.drawCircle(bCenter, dotRadius, Paint()..color = lineColor);
     }
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     if (oldDelegate is! _JodohLinesPainter) return true;
-    return oldDelegate.jodohMap.length != jodohMap.length ||
-        oldDelegate.nRow != nRow ||
-        oldDelegate.shuffledB != shuffledB;
+    // Repaint setiap kali jumlah pasangan berubah (map mutasi in-place di
+    // onTap, jadi compare by length). Posisi GlobalKey selalu up-to-date
+    // karena CustomPaint di-rebuild tiap frame layout.
+    return oldDelegate.jodohMap.length != jodohMap.length;
   }
 }
 
