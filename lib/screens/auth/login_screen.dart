@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/config.dart';
 import '../../services/api.dart';
 import '../../services/auth_service.dart';
+import '../../services/hybrid_api.dart';
 import '../admin/admin_shell.dart';
 import '../siswa/siswa_shell.dart';
 import '../guru/guru_shell.dart';
@@ -34,6 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Email/username dan password wajib diisi.');
       return;
     }
+    // dukung login pakai NIS -> map ke email internal
+    String loginEmail = email;
+    if (!email.contains('@')) {
+      loginEmail = '${email.toLowerCase()}@cbt.local';
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -41,28 +47,56 @@ class _LoginScreenState extends State<LoginScreen> {
       _attempt = 0;
     });
     try {
-      // dukung login pakai NIS -> map ke email internal
-      String loginEmail = email;
-      if (!email.contains('@')) {
-        loginEmail = '${email.toLowerCase()}@cbt.local';
-      }
       final res = await _loginResilient(loginEmail, pass);
       if (res.user != null) {
-        Api.setRole(res.user!.userMetadata?['role'] as String?);
-        // pastikan profil default
+        // Ambil role dari BOTH sources: GoTrue metadata + profiles table
+        // Prefer profiles (lebih fresh, bisa di-update admin via UI)
+        final metadataRole = res.user!.userMetadata?['role'] as String?;
         try {
           final p = await Api.currentProfile();
+          final profileRole = p?['role'] as String?;
+          // Gunakan profileRole jika ada, kalau gak metadataRole
+          final effectiveRole = profileRole ?? metadataRole;
+          Api.setRole(effectiveRole);
+          // Jika profiles kosong, buat profile default
           if (p == null) {
             await _auth.registerEmail(loginEmail, pass,
                 nama: res.user!.userMetadata?['nama'] as String? ?? '',
-                role: res.user!.userMetadata?['role'] as String? ?? 'siswa');
+                role: effectiveRole ?? 'siswa');
           }
-        } catch (_) {}
+        } catch (_) {
+          // Fallback ke metadata saja
+          Api.setRole(metadataRole);
+        }
         await Api.init();
       }
       if (!mounted) return;
       _goToRole();
     } catch (e) {
+      // Supabase auth gagal — try local fallback
+      debugPrint('LoginScreen: Supabase login failed, trying fallback...');
+      try {
+        final fallbackRes = await HybridApi.login(loginEmail, pass);
+        final source = fallbackRes['source'] as String?;
+        final user = fallbackRes['user'];
+        if (source == 'fallback' && user is Map<String, dynamic>) {
+          // Fallback juga ambil role dari profiles
+          try {
+            final p = await Api.currentProfile();
+            final profileRole = p?['role'] as String?;
+            final metaRole = user['role'] as String?;
+            Api.setRole(profileRole ?? metaRole);
+          } catch (_) {
+            Api.setRole(user['role'] as String?);
+          }
+          await Api.init();
+          if (!mounted) return;
+          _goToRole();
+          return;
+        }
+      } catch (fallbackErr) {
+        debugPrint('LoginScreen: Fallback login also failed: $fallbackErr');
+      }
       if (!mounted) return;
       setState(() {
         _error = _parseAuthError(e);

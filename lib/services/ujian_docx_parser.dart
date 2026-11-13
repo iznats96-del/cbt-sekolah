@@ -15,7 +15,8 @@ class PgSoal {
 class JodohSoal {
   final String soal;
   final List<String> opsi;
-  JodohSoal(this.soal, this.opsi);
+  Map<int, int>? kunci; // index A -> index B (0-based)
+  JodohSoal(this.soal, this.opsi, {this.kunci});
 }
 
 class EssaySoal {
@@ -163,9 +164,20 @@ class UjianDocxParser {
 
     for (final b in blocks) {
       if (b.isTable) {
+        final jodohKunciCollector = <int, int>{};
         _handleTable(b, u,
             essaySink: (t) => u.essay.add(EssaySoal(t)),
-            onJodoh: (it, opsi) => u.jodoh.add(JodohSoal(it, opsi)));
+            onJodoh: (it, opsi) => {
+              final j = JodohSoal(it, opsi);
+              u.jodoh.add(j);
+              j,
+            },
+            onJodohKunci: (a, b) => jodohKunciCollector[a] = b);
+        // Terapkan kunci jodoh ke soal terakhir
+        if (jodohKunciCollector.isNotEmpty && u.jodoh.isNotEmpty) {
+          final j = u.jodoh.last;
+          j.kunci = jodohKunciCollector;
+        }
         if (sec == 'pg') flushPg();
         continue;
       }
@@ -177,7 +189,13 @@ class UjianDocxParser {
         final mk = RegExp(r'^(\d{1,3})\s*[.):=]\s*([A-J])\b', caseSensitive: false).firstMatch(line);
         if (mk != null) {
           final n = int.tryParse(mk.group(1)!) ?? 0;
-          if (n >= 1 && n <= u.pg.length) {
+          // Kunci jodoh: jika ada soal jodoh terakhir, terapkan kunci ke sana
+          if (u.jodoh.isNotEmpty && u.jodoh.last.opsi.isNotEmpty && n <= u.jodoh.last.opsi.length ~/ 2) {
+            final j = u.jodoh.last;
+            j.kunci ??= {};
+            j.kunci![n - 1] = (mk.group(2)!.toUpperCase().codeUnitAt(0) - 65);
+          } else if (n >= 1 && n <= u.pg.length) {
+            // Kunci PG
             u.pg[n - 1].kunci = mk.group(2)!.toUpperCase();
           }
         }
@@ -397,7 +415,8 @@ class UjianDocxParser {
 
   static void _handleTable(_Block b, UjianDocx u,
       {required void Function(String) essaySink,
-      required void Function(String item, List<String> opsi) onJodoh}) {
+      required void Function(String item, List<String> opsi) onJodoh,
+      void Function(int, int)? onJodohKunci}) {
     if (b.table == null) return;
     final cells = <List<String>>[];
     for (final r in b.table!) {
@@ -449,21 +468,54 @@ class UjianDocxParser {
         if (t.isEmpty || RegExp(r'^(SOAL|KUNCI)', caseSensitive: false).hasMatch(t)) continue;
         onJodoh(t, opsi);
       }
-    } else {
-      final joinedHeader =
-          (b.table!.expand((r) => r).expand((c) => c).join(' ').toUpperCase());
-      final isEssayTable = joinedHeader.contains('PERTANYAAN') ||
-          joinedHeader.contains('ESSAY') ||
-          joinedHeader.contains('URAIAN');
-      if (isEssayTable) {
-        for (final it in kiriLines) {
-          final t = it.trim();
-          if (t.length > 8 && RegExp('[A-Za-zÀ-ÿ]').hasMatch(t) && !t.startsWith('https')) {
-            essaySink(t);
+      } else {
+        final joinedHeader =
+            (b.table!.expand((r) => r).expand((c) => c).join(' ').toUpperCase());
+        final isEssayTable = joinedHeader.contains('PERTANYAAN') ||
+            joinedHeader.contains('ESSAY') ||
+            joinedHeader.contains('URAIAN');
+        if (isEssayTable) {
+          for (final it in kiriLines) {
+            final t = it.trim();
+            if (t.length > 8 && RegExp('[A-Za-zÀ-ÿ]').hasMatch(t) && !t.startsWith('https')) {
+              essaySink(t);
+            }
           }
         }
       }
-    }
+
+      // ===== PARSER KUNCI JODOH =====
+      // Cari pola kunci jodoh di dalam tabel:
+      // - Format: "1 — B" atau "1. C" atau "1=B" (nomor soal — huruf jawaban)
+      // - Atau: baris terakhir tabel berisi kunci (jika ada header "KUNCI JAWABAN")
+      if (hasPasang && opsi.isNotEmpty && onJodohKunci != null) {
+        // Cari baris kunci di dalam tabel yang sama
+        final kunciLines = <String>[];
+        for (final c in cells) {
+          for (final line in c) {
+            final t = line.trim();
+            // Pola: angka + separator + huruf A-J
+            final mk = RegExp(r'^(\d{1,2})\s*(?:[.):=—\-]\s*)([A-J])\b', caseSensitive: false).firstMatch(t);
+            if (mk != null) {
+              kunciLines.add(t);
+            }
+          }
+        }
+        if (kunciLines.isNotEmpty) {
+          // Parse setiap kunci jodoh
+          for (final line in kunciLines) {
+            final mk = RegExp(r'^(\d{1,2})\s*(?:[.):=—\-]\s*)([A-J])\b', caseSensitive: false).firstMatch(line);
+            if (mk != null) {
+              final nomorSoal = int.parse(mk.group(1)!);
+              final hurufJawab = mk.group(2)!.toUpperCase();
+              final idxJawab = hurufJawab.codeUnitAt(0) - 65; // A=0, B=1, C=2, dll
+              if (nomorSoal >= 1 && nomorSoal <= kiriLines.length) {
+                onJodohKunci(nomorSoal - 1, idxJawab);
+              }
+            }
+          }
+        }
+      }
   }
 
   static bool _isDots(String s) => RegExp(r'^[\s.…_—-]+$').hasMatch(s.trim());

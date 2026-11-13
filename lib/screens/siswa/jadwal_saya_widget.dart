@@ -29,7 +29,7 @@ class _JadwalSayaWidgetState extends State<JadwalSayaWidget> {
       _error = null;
     });
     try {
-      final raw = await Api.client.rpc('jadwal_siswa_aktif');
+      final raw = await Api.routerRpc('jadwal_siswa_aktif');
       if (!mounted) return;
       dynamic data = raw;
       if (data is String) data = jsonDecode(data);

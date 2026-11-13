@@ -58,9 +58,13 @@ key.properties
 .env
 .vercel
 .env*
-
-.vercel
-.env*
+.vtoken.txt
 # allow web-deploy folder for Vercel static web hosting
 !web-deploy/
 !web-deploy/**
+# tapi build artifact web-deploy tetap ignore (yang di-commit cuma sumber, bukan hasil build)
+web-deploy/main.dart.js
+web-deploy/flutter_bootstrap.js
+web-deploy/.last_build_id
+web-deploy/main.dart.js.map
+web-deploy/*.map

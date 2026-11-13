@@ -51,6 +51,38 @@ class Api {
   static DateTime? _circuitOpenedAt;
   static Timer? _healthCheckTimer;
 
+  // ─── FALLBACK STATUS (reactive UI indicator) ──────────────
+  static final List<void Function(FallbackStatus)> _fallbackSubs = [];
+
+  static void _notifyFallback() {
+    final s = getFallbackStatus();
+    for (final cb in _fallbackSubs.toList()) cb(s);
+  }
+
+  /// Snapshot of current failover state — consumed by UI widgets.
+  static FallbackStatus getFallbackStatus() {
+    final recovering =
+        _circuitOpen &&
+        _circuitOpenedAt != null &&
+        DateTime.now().difference(_circuitOpenedAt!)
+                .inSeconds >=
+            AppConfig.circuitBreakerOpenSec;
+    return FallbackStatus(
+      useFallback: _circuitOpen,
+      state: _circuitOpen ? (recovering ? 'recovering' : 'fallback') : 'primary',
+      consecutiveFailures: _consecutiveFailures,
+    );
+  }
+
+  /// Subscribe to failover state changes. Cancel via [removeFallbackListener].
+  static void addFallbackListener(void Function(FallbackStatus) cb) {
+    _fallbackSubs.add(cb);
+  }
+
+  static void removeFallbackListener(void Function(FallbackStatus) cb) {
+    _fallbackSubs.remove(cb);
+  }
+
   /// true when requests are currently routed to fallback
   static bool get isUsingFallback => _circuitOpen;
 
@@ -87,9 +119,11 @@ class Api {
       _circuitOpen = false;
       _consecutiveFailures = 0;
       _circuitOpenedAt = null;
+      _notifyFallback();
     } catch (_) {
       debugPrint(
           '[BackendRouter] ⏳ Supabase still down — staying on FALLBACK');
+      _notifyFallback();
     }
   }
 
@@ -103,6 +137,7 @@ class Api {
         '[BackendRouter] 🔴 Circuit OPEN after $_consecutiveFailures failures ($context) '
         '— switching to FALLBACK (${AppConfig.fallbackApiUrl})',
       );
+      _notifyFallback();
     }
   }
 
@@ -110,6 +145,7 @@ class Api {
   static void _recordSuccess() {
     if (_consecutiveFailures > 0) {
       debugPrint('[BackendRouter] 🟢 Primary success — reset failure counter');
+      _notifyFallback();
     }
     _consecutiveFailures = 0;
   }
@@ -144,11 +180,17 @@ class Api {
       }
       return false;
     }
+    if (error is _FallbackHttpError) {
+      // Fallback business/validation errors (400/401/403) are NOT transient:
+      // they must surface to the UI, never trigger retries or re-failover.
+      // Only 5xx/502/503/504 from the fallback itself are transient.
+      return error.statusCode >= 500;
+    }
     return false;
   }
-
   // ─── FALLBACK HTTP HELPERS ────────────────────────────────
-  static String? _fallbackToken;
+  static String? get _fallbackToken =>
+      client.auth.currentSession?.accessToken;
 
   static Map<String, String> _fallbackHeaders({String? contentType}) {
     final h = <String, String>{};
@@ -249,7 +291,19 @@ class Api {
         )
         .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
     if (res.statusCode != 200) {
-      throw Exception('Fallback RPC $function: ${res.statusCode}');
+      // Surface the server message so screens can show business errors
+      // (400/403 from the fallback RPC mirror are validation, not failures).
+      dynamic body;
+      try {
+        body = jsonDecode(res.body);
+      } catch (_) {
+        body = res.body;
+      }
+      final err = body is Map && body['error'] != null
+          ? body['error']
+          : 'Fallback RPC $function: ${res.statusCode}';
+      final e = Exception(err);
+      throw _FallbackHttpError(res.statusCode, e);
     }
     return jsonDecode(res.body);
   }
@@ -502,6 +556,31 @@ class Api {
     }
     return client.storage.from(bucket).getPublicUrl(path);
   }
+}
+
+/// Wraps a non-200 HTTP response from the fallback RPC mirror so that
+/// [_isTransientError] can distinguish 4xx business errors (no retry)
+/// from 5xx transient errors (retry + failover).
+class _FallbackHttpError implements Exception {
+  final int statusCode;
+  final Exception cause;
+  _FallbackHttpError(this.statusCode, this.cause);
+  @override
+  String toString() => cause.toString();
+}
+
+/// Immutable snapshot of the failover router state, delivered to
+/// [Api.addFallbackListener] subscribers so UI widgets can reactively
+/// show a "FALLBACK ACTIVE" banner without polling.
+class FallbackStatus {
+  final bool useFallback;
+  final String state; // 'primary' | 'fallback' | 'recovering'
+  final int consecutiveFailures;
+  const FallbackStatus({
+    required this.useFallback,
+    required this.state,
+    this.consecutiveFailures = 0,
+  });
 }
 
 /// Helper generik CRUD — now uses BackendRouter for automatic failover.

@@ -56,7 +56,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         // RPC AMAN: tanpa token & tanpa kunci
-        final rows = await Api.client.rpc('my_ujian_aktif');
+        final rows = await Api.routerRpc('my_ujian_aktif');
         if (!mounted) return;
         dynamic data = rows;
         if (data is String) data = jsonDecode(data);
@@ -83,6 +83,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
   }
 
   /// Probe mentah REST (jalur sama dgn supabase lib) utk diagnosa layar kosong.
+  /// Dipakai saat _load() gagal, jadi tidak perlu failover.
   Future<String> _diag() async {
     final s = Api.client.auth.currentSession;
     if (s == null) return 'NO SESSION (login ulang)';
@@ -130,7 +131,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
     // registrasi peserta di SERVER (token kosong -> sistem tanpa token)
     try {
       final pesertaId =
-          await Api.client.rpc('cek_token_ujian', params: {
+          await Api.routerRpc('cek_token_ujian', params: {
         'p_ujian': u['id'],
         'p_token': '',
       });

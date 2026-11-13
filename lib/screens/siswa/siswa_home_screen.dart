@@ -7,6 +7,54 @@ import 'ujian_beranda_list.dart';
 import 'kartu_saya_screen.dart';
 import 'jadwal_saya_widget.dart';
 
+/// Thin reactive wrapper: rebuilds when the failover router flips
+/// primary/fallback so the banner below stays accurate.
+class _FailoverStatus extends StatefulWidget {
+  final Widget Function(BuildContext, bool useFallback, String statusText) builder;
+  const _FailoverStatus({required this.builder});
+
+  @override
+  State<_FailoverStatus> createState() => _FailoverStatusState();
+}
+
+class _FailoverStatusState extends State<_FailoverStatus> {
+  FallbackStatus _st = Api.getFallbackStatus();
+  @override
+  void initState() {
+    super.initState();
+    Api.addFallbackListener(_onStatus);
+  }
+
+  void _onStatus(FallbackStatus s) {
+    if (!mounted) return;
+    setState(() => _st = s);
+  }
+
+  @override
+  void dispose() {
+    Api.removeFallbackListener(_onStatus);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final useFallback = _st.useFallback;
+    String text;
+    Color color;
+    if (useFallback && _st.state == 'fallback') {
+      text = 'MODE CADANGAN AKTIF — Supabase terputus, koneksi ke server cadangan.';
+      color = Colors.amber.shade900;
+    } else if (useFallback && _st.state == 'recovering') {
+      text = 'Memulihkan koneksi Supabase (data cadangan sedang disinkronkan)...';
+      color = Colors.blueGrey.shade800;
+    } else {
+      text = 'Koneksi normal (Supabase).';
+      color = Colors.green.shade800;
+    }
+    return widget.builder(context, useFallback, text);
+  }
+}
+
 class SiswaHomeScreen extends StatefulWidget {
   const SiswaHomeScreen({super.key});
 
@@ -29,11 +77,10 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
     final p = await Api.currentProfile();
     Map<String, dynamic>? row;
     try {
-      final rows = await Api.client
-          .from('siswa')
-          .select('nama,nis,nomor_peserta,foto_url,aktive_ok,kelas(nama,jurusan(singkatan))')
-          .eq('profile_id', Api.user?.id ?? '')
-          .limit(1);
+      final rows = await Api.routerSelect(
+          'siswa',
+          select: 'nama,nis,nomor_peserta,foto_url,aktive_ok,kelas(nama,jurusan(singkatan))',
+          eq: {'profile_id': Api.user?.id ?? ''});
       if (rows.isNotEmpty) row = Map<String, dynamic>.from(rows.first as Map);
     } catch (_) {}
     if (!mounted) return;

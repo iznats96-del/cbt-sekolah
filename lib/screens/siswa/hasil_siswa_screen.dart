@@ -33,7 +33,7 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.client.rpc('my_hasil');
+      final rows = await Api.routerRpc('my_hasil');
       if (!mounted) return;
       setState(() {
         _rows = List<Map<String, dynamic>>.from(rows as List);

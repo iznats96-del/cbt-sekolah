@@ -41,6 +41,18 @@ class _SplashScreenState extends State<SplashScreen> {
       _go(const LoginScreen());
       return;
     }
+
+    // Jika role masih null, coba ambil dari profiles table
+    if (Api.role == null) {
+      try {
+        final p = await Api.currentProfile();
+        final profileRole = p?['role'] as String?;
+        if (profileRole != null) {
+          Api.setRole(profileRole);
+        }
+      } catch (_) {}
+    }
+
     _go(const HomeScreen());
   }
 

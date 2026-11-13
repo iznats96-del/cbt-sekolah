@@ -30,7 +30,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   int _juangPaused = 0;
   bool _kiosk = false;
   bool _showPalette = false;
-  int _minDurasiDetik = 45 * 60; // batas minimal: sebelum ini submit terkunci
 
   // ===== JODOH 2 KOLOM (MULTI-PAIR) =====
 // Konsep lu bener: 1 soal jodoh = 1 blok matching dengan N pasangan.
@@ -86,7 +85,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
 
   Future<void> _load() async {
     try {
-      final res = await Api.client.rpc('soal_milik_ujian', params: {'p_peserta': widget.pesertaId});
+      final res = await Api.routerRpc('soal_milik_ujian', params: {'p_peserta': widget.pesertaId});
       final data = Map<String, dynamic>.from(res as Map);
       _soal = List<Map<String, dynamic>>.from(data['soal'] as List? ?? []);
       final jw = data['jawaban'];
@@ -101,9 +100,13 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
       }
       final sisa = data['sisa_detik'];
       if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
-      final lr = data['lama_review_menit'];
-      if (lr is num && lr.toInt() > 0) _minDurasiDetik = lr.toInt() * 60;
       final pStatus = data['status_peserta']?.toString();
+      // ===== JAM AKSES: cek apakah ujian sudah di waktu-nya =====
+      // server RPC soal_milik_ujian sudah filter ujian yang JAM AKSES-nya belum buka
+      // (via my_ujian_aktif → hanya kembalikan ujian yang waktu_mulai <= now <= waktu_selesai)
+      // Jadi kalau siswa sudah masuk sini, artinya JAM AKSES-nya sudah terbuka.
+      // TAPI, timer countdown yang ditampilkan harus pakai sisa_detik dari server
+      // (bukan alokasi_menit dari client), karena server tahu kapan ujian harus selesai.
       // ===== RESUME: kalau sudah submit sebelumnya, langsung ke hasil =====
       if (pStatus == 'selesai' && _soal.isNotEmpty) {
         if (!mounted) return;
@@ -236,7 +239,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
 
   Future<void> _catatPelanggaran() async {
     try {
-      await Api.client.rpc('catat_pelanggaran', params: {'p_peserta': widget.pesertaId});
+      await Api.routerRpc('catat_pelanggaran', params: {'p_peserta': widget.pesertaId});
     } catch (_) {}
   }
 
@@ -265,7 +268,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
     final ids = _belumKirim.toList();
     for (final id in ids) {
       try {
-        await Api.client.rpc('simpan_jawaban', params: {
+        await Api.routerRpc('simpan_jawaban', params: {
           'p_peserta': widget.pesertaId,
           'p_soal': id,
           'p_jawaban': _jawaban[id] ?? '',
@@ -307,7 +310,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
     bool okKumpul = false;
     for (int attempt = 0; attempt < 5; attempt++) {
       try {
-        await Api.client.rpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
+        await Api.routerRpc('kumpulkan_ujian', params: {'p_peserta': widget.pesertaId});
         okKumpul = true;
         break;
       } catch (e) {
@@ -334,10 +337,9 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
     }
     Map<String, dynamic> rekap = {};
     try {
-      final ans = await Api.client
-          .from('jawaban_siswa')
-          .select('soal_id,ragu_ragu')
-          .eq('peserta_ujian_id', widget.pesertaId);
+      final ans = await Api.routerSelect('jawaban_siswa',
+          select: 'soal_id,ragu_ragu',
+          eq: {'peserta_ujian_id': widget.pesertaId});
       rekap = {
         'jawab': ans.length,
         'ragu': ans.where((a) => a['ragu_ragu'] == true).length,
@@ -355,12 +357,6 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => _SelesaiScreen(title: title, rekap: rekap),
     ));
-  }
-
-  /// Sebelum _minDurasiDetik (45 menit) berlalu, submit TIDAK BISA.
-  bool _submitDikunci() {
-    final elapsed = _durasiDetik - _sisaDetik;
-    return elapsed < _minDurasiDetik;
   }
 
   String _fmt(int d) {
@@ -658,12 +654,23 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                 width: double.infinity,
                 decoration: BoxDecoration(border: Border.all(color: const Color(0xFFE2E8F0)), borderRadius: BorderRadius.circular(12)),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 280),
-                  child: Image.network(current['gambar_url'].toString(), fit: BoxFit.contain, errorBuilder: (_, e, s) => const SizedBox.shrink()),
+                  constraints: const BoxConstraints(maxWidth: 280, maxHeight: 200),
+                  child: Image.network(
+                    current['gambar_url'].toString(),
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 200,
+                      height: 100,
+                      color: const Color(0xFFF1F5F9),
+                      child: const Center(child: Icon(Icons.broken_image, color: Color(0xFFCBD5E1))),
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          _buildOptions(curId, jenis, opsiList),
         ],
       ),
     );
@@ -733,7 +740,35 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header 2 kolom
+                    // ===== INSTRUKSI =====
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'PETUNJUK PENGERJAAN',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '• Hubungkan setiap nomor di kolom A dengan huruf jawaban di kolom B yang paling tepat.\n'
+                            '• Setiap huruf hanya boleh digunakan sekali.\n'
+                            '• Tap nomor di kolom A, lalu tap huruf di kolom B.\n'
+                            '• Garis akan muncul otomatis untuk menunjukkan pasangan.',
+                            style: const TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF475569)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // ===== HEADER 2 KOLOM =====
                     Row(
                       children: [
                         Expanded(
@@ -758,35 +793,48 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                       ],
                     ),
                     const SizedBox(height: 8),
-                    // Baris sejajar: A (kiri, dinomori) | B (kanan, urutan acak)
-                    // Tiap kartu A & B pakai GlobalKey sendiri (keysA / keysB).
-                    // Layout: 2 kolom side-by-side (A kiri, B kanan) bukan A/B vertikal.
-                    ...List.generate(nRow, (r) =>
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // ===== KOLOM A (kiri) =====
-                            Expanded(
-                              flex: 3,
-                              key: keysA[r], // GlobalKey buat ukur posisi A
-                              child: _buildJodohCardA(r, curId, opsiList, jodohMap),
-                            ),
-                            const SizedBox(width: 12),
-                            // ===== KOLOM B (kanan, urutan acak) =====
-                            Expanded(
-                              flex: 4,
-                              key: keysB[r], // GlobalKey buat ukur posisi B
-                              child: _buildJodohCardB(r, curId, opsiList, shuffledB, jodohMap),
-                            ),
-                          ],
+                    // ===== 2 KOLOM BERDAMPINGAN =====
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Kolom A (kiri)
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            children: [
+                              for (var r = 0; r < nRow; r++)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Builder(
+                                    key: keysA[r],
+                                    builder: (_) => _buildJodohCardA(r, curId, opsiList, jodohMap),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        // Kolom B (kanan)
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            children: [
+                              for (var r = 0; r < nRow; r++)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Builder(
+                                    key: keysB[r],
+                                    builder: (_) => _buildJodohCardB(r, curId, opsiList, shuffledB, jodohMap),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Tap nomor di Kolom A, lalu tap huruf di Kolom B yang cocok. Setiap huruf hanya bisa dipakai sekali. Sudah ${jodohMap.length} dari $nRow pasangan.',
+                      'Tap nomor di Kolom A, lalu tap huruf di Kolom B yang cocok. Sudah ${jodohMap.length} dari $nRow pasangan.',
                       style: const TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                   ],
@@ -1037,10 +1085,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
   }
 
   Widget _buildBottomNav() {
-    final submitDikunci = _submitDikunci();
-    final sisaMinDetik = submitDikunci ? _minDurasiDetik - (_durasiDetik - _sisaDetik) : 0;
-    final sm = sisaMinDetik ~/ 60;
-    final ss = sisaMinDetik % 60;
+    // Satu timer saja: sisa waktu ujian
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       decoration: BoxDecoration(
@@ -1069,7 +1114,7 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
                 icon: Icon(_showPalette ? Icons.close : Icons.grid_view, size: 18),
                 label: Text(_showPalette ? 'Tutup' : 'Daftar Soal'),
                 style: FilledButton.styleFrom(
-                 backgroundColor: AppTheme.primary,
+                  backgroundColor: AppTheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -1088,21 +1133,15 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
               )
             else
               FilledButton(
-                onPressed: (_submitting || submitDikunci) ? null : _confirmSubmit,
+                onPressed: _submitting ? null : _confirmSubmit,
                 style: FilledButton.styleFrom(
-                  backgroundColor: submitDikunci ? const Color(0xFFCBD5E1) : AppTheme.secondary,
+                  backgroundColor: AppTheme.secondary,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _submitting
                     ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : submitDikunci
-                        ? Row(children: [
-                            Icon(Icons.lock_outline, size: 18, color: const Color(0xFF64748B)),
-                            const SizedBox(width: 8),
-                            Text('Kunci ${sm.toString().padLeft(2, '0')}:${ss.toString().padLeft(2, '0')}'),
-                          ])
-                        : const Text('Kumpulkan'),
+                    : const Text('Kumpulkan'),
               ),
           ],
         ),
@@ -1222,22 +1261,8 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
   }
 
   Future<void> _confirmSubmit() async {
-    if (_submitDikunci()) {
-      final sisaMenit = _minDurasiDetik - (_durasiDetik - _sisaDetik);
-      final m = sisaMenit ~/ 60;
-      final s = sisaMenit % 60;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Submit dikunci: minimum 45 menit belum tercapai. '
-            'Bisa mengumpulkan setelah ${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}',
-          ),
-          backgroundColor: AppTheme.danger,
-          duration: const Duration(seconds: 6),
-        ),
-      );
-      return;
-    }
+    // TIDAK ada lock submit — siswa bisa kumpulkan kapan aja
+    // (auto-submit masih jalan saat timer habis)
     final belum = _soal.length - _jawaban.values.where((v) => v != null && v.isNotEmpty).length;
     final ok = await showDialog<bool>(
       context: context,

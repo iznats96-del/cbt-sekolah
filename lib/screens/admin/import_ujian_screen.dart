@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -168,7 +169,11 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
           'jenis': 'jodoh',
           'soal': j.soal,
           'opsi': j.opsi.map((o) => o.replaceFirst(RegExp(r'^[A-J][.)]\s*'), '').trim()).toList(),
-          'kunci': null,
+          'kunci': j.kunci != null
+              ? {'map': jsonEncode({
+                  for (final e in j.kunci!.entries) e.key.toString(): e.value.toString()
+                })}
+              : null,
           'bobot': '1',
         });
       }
