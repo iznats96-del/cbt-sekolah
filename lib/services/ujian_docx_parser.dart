@@ -167,10 +167,9 @@ class UjianDocxParser {
         final jodohKunciCollector = <int, int>{};
         _handleTable(b, u,
             essaySink: (t) => u.essay.add(EssaySoal(t)),
-            onJodoh: (it, opsi) => {
+            onJodoh: (it, opsi) {
               final j = JodohSoal(it, opsi);
               u.jodoh.add(j);
-              j,
             },
             onJodohKunci: (a, b) => jodohKunciCollector[a] = b);
         // Terapkan kunci jodoh ke soal terakhir
