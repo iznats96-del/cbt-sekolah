@@ -449,8 +449,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       children: [
                         _buildQuestionCard(current, curId, jenis, opsiList),
                         const SizedBox(height: 16),
-                        _buildOptions(curId, jenis, opsiList),
-                        const SizedBox(height: 16),
                         _buildRaguChip(curId),
                         const SizedBox(height: 24),
                       ],
