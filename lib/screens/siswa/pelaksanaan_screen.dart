@@ -34,8 +34,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   // ===== JODOH 2 KOLOM =====
   // - Baris kiri: soal (1..N). Baris kanan: jawaban acak (a..N, DIACAK 1× per load).
   // - Di bawahnya: input jawaban per soal (siswa ketik huruf a,b,c... atau nomor 1,2,3...).
-  // - Jawaban disimpan di _jawaban['${soalId}_jodoh_${n}'] (bukan JSON map).
-  final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B (acak 1×)
+  // - Jawaban disimpan di _jawaban[soalId].
+
 
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
@@ -244,11 +244,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   /// Dipanggil tiap murid tap jawaban: SIMPAN LOKAL SAJA (gak kirim server).
-  /// JODOH: serialize map indexA->indexB ke JSON string di _jawaban[soalId].
   Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
     _belumKirim.add(soalId);
-    // JODOH: jawaban disimpan per input (_jawaban['${soalId}_jodoh_${n}']),
-    // bukan JSON map. Backend harus parse input per soal.
     await _simpanLokal();
     // flush=true hanya dipakai saat submit (paksa kirim)
     if (flush) await _flushKeServer();
@@ -607,10 +604,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: jenis == 'essay' ? const Color(0xFFFEF3C7) : jenis == 'jodoh' ? const Color(0xFFE0E7FF) : const Color(0xFFDBEAFE),
+                  color: jenis == 'essay' ? const Color(0xFFFEF3C7) : const Color(0xFFDBEAFE),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(jenis.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: jenis == 'essay' ? const Color(0xFF92400E) : jenis == 'jodoh' ? const Color(0xFF4338CA) : AppTheme.primary)),
+                child: Text(jenis.toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: jenis == 'essay' ? const Color(0xFF92400E) : AppTheme.primary)),
               ),
               const Spacer(),
               if (_ragu[curId] == true)
@@ -677,112 +674,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
             _buildOptionCard(i, opsiList[i].toString(), curId, _jawaban[curId] == opsiList[i].toString()),
         ],
       );
-    } else if (jenis == 'jodoh') {
-      // JODOH: baris kiri = soal (1..N), baris kanan = jawaban acak (a..N).
-      // Di bawahnya: input jawaban per soal (siswa ketik huruf a,b,c... atau nomor 1,2,3...).
-      final nRow = opsiList.isNotEmpty ? opsiList.length ~/ 2 : 0;
-      if (nRow == 0) return const SizedBox.shrink();
-
-      // Stable shuffle: generate sekali per soal, simpan di state.
-      final shuffledB = _jodohOnggok.putIfAbsent(curId, () {
-        final idx = List<int>.generate(nRow, (i) => i);
-        idx.shuffle();
-        return idx;
-      });
-
-      // ===== DISPLAY: SOAL (KIRI) + JAWABAN ACAK (KANAN), TANPA TAP =====
-      // Jawaban disimpan sebagai JSON array di _jawaban[soalId]: ["a","b","c"]
-      // (index = nomor soal, value = huruf jawaban yang diketik siswa).
-      // Load jawaban tersimpan ke controller.
-      final savedJodoh = (_jawaban[curId] ?? '').toString();
-      if (savedJodoh.isNotEmpty) {
-        try {
-          final arr = jsonDecode(savedJodoh);
-          if (arr is List) {
-            for (var i = 0; i < nRow; i++) {
-              final key = '${curId}_jodoh_${i + 1}';
-              if (i < arr.length && !(_essayCtrl[key]?.text.isNotEmpty ?? false)) {
-                _ctrlFor(key).text = '${arr[i]}';
-              }
-            }
-          }
-        } catch (_) {}
-      }
-
-      return Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Kolom soal (kiri): nomor + teks pernyataan
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    children: [
-                      for (var r = 0; r < nRow; r++)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: _buildJodohSoalCard(r, opsiList),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Kolom jawaban acak (kanan): huruf + teks jawaban
-                Expanded(
-                  flex: 4,
-                  child: Column(
-                    children: [
-                      for (var r = 0; r < nRow; r++)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: _buildJodohJawabanCard(r, opsiList, shuffledB),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // ===== INPUT JAWABAN PER SOAL (DI BAWAH) =====
-            for (var r = 0; r < nRow; r++) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: TextField(
-                  key: ValueKey('jodoh_input_${curId}_$r'),
-                  controller: _ctrlFor('${curId}_jodoh_${r + 1}'),
-                  maxLines: 1,
-                  onChanged: (v) {
-                    // Kumpulkan semua input jodoh jadi JSON array, simpan di _jawaban[soalId]
-                    final arr = <String>[
-                      for (var i = 0; i < nRow; i++)
-                        _ctrlFor('${curId}_jodoh_${i + 1}').text,
-                    ];
-                    _jawaban[curId] = jsonEncode(arr);
-                    _belumKirim.add(curId);
-                    _simpanLokal();
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Jawaban soal ${r + 1}',
-                    hintStyle: TextStyle(color: Colors.grey[400]),
-                    filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[200]!)),
-                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 2)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    isDense: true,
-                  ),
-                ),
-              ),
-              if (r < nRow - 1) const SizedBox(height: 4),
-            ],
-          ],
-        ),
-      );
     } else if (jenis == 'essay') {
       return Container(
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
@@ -818,72 +709,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
     }
     return const SizedBox.shrink();
-  }
-
-  /// Card soal (kiri): nomor + teks pernyataan. Display doang, tanpa tap.
-  Widget _buildJodohSoalCard(int rowIndex, List opsiList) {
-    final aText = (rowIndex * 2 < opsiList.length) ? opsiList[rowIndex * 2].toString() : '';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Text('${rowIndex + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              aText,
-              style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF0F172A)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Card jawaban acak (kanan): huruf + teks jawaban. Display doang, tanpa tap.
-  Widget _buildJodohJawabanCard(int rowIndex, List opsiList, List<int> shuffledB) {
-    final bOrigIdx = (rowIndex < shuffledB.length) ? shuffledB[rowIndex] : rowIndex;
-    final bText = (bOrigIdx * 2 + 1 < opsiList.length) ? opsiList[bOrigIdx * 2 + 1].toString() : '';
-    final bLabel = String.fromCharCode(97 + rowIndex);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(color: const Color(0xFFE0E7FF), shape: BoxShape.circle),
-            alignment: Alignment.center,
-            child: Text(bLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4338CA))),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              bText,
-              style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF334155)),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildOptionCard(int index, String text, String curId, bool selected) {

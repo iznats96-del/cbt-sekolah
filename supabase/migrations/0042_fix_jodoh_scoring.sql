@@ -21,12 +21,6 @@ declare
   v_override uuid[];
   v_ujian_id uuid;
   v_siswa_kelas uuid;
-  kunci_map jsonb;
-  jawaban_map jsonb;
-  jodoh_benar boolean;
-  k text;
-  v_val text;
-  v_val_num int;
 begin
   select u.soal_list, u.id, s.kelas_id
     into v_soal_list, v_ujian_id, v_siswa_kelas
@@ -72,80 +66,13 @@ begin
       end if;
 
     elsif r.jenis = 'jodoh' then
-      -- ===== JODOH =====
-      -- Format kunci: kunci->'map' = JSON string peta A→B: '{"0":"3","1":"1"}'
-      --   (key = index A 0-based, value = index B 0-based)
-      -- Jawaban siswa: JSON array ["1","2","3"] atau ["a","b","c"]
-      --   (index = nomor soal 1-based, value = jawaban yang diketik)
-      -- Soal BENAR hanya jika SETIAP jawaban cocok sama kunci.
-
-      kunci_map := null;
-      if r.kunci ? 'map' then
-        begin
-          kunci_map := (r.kunci->'map')::jsonb;
-        exception when others then
-          kunci_map := null;
-        end;
-      end if;
-
-      if kunci_map is not null then
-        -- ---- format baru: cocokkan JSON array jawaban ----
-        if jv is null then
-          v_kosong := v_kosong + 1;
-        else
-          begin
-            -- Jawaban: JSON array ["1","2","3"] (index 0 = soal 1, index 1 = soal 2, ...)
-            -- Kunci: {"0":"3","1":"1"} (key = index A 0-based, value = index B 0-based)
-            jodoh_benar := true;
-            for k in select key from jsonb_object_keys(kunci_map)
-            loop
-              -- k = index A 0-based (0,1,2,...)
-              -- Ambil jawaban untuk soal ke-(k+1) dari array (index = k)
-              select coalesce(jv::jsonb->k, '') into v_val;
-              -- Convert v_val (huruf/nomor) ke index B 0-based
-              case
-                when v_val ~ '^[a-z]$' then
-                  -- a=0, b=1, c=2, ...
-                  select chr(lower(v_val) - 96) - 1 into v_val_num;
-                when v_val ~ '^[0-9]+$' then
-                  -- 1=0, 2=1, 3=2, ...
-                  select cast(v_val as int) - 1 into v_val_num;
-                else
-                  -- Format tidak valid -> salah
-                  jodoh_benar := false;
-                  exit;
-              end case;
-              -- Cocokkan sama kunci (index B 0-based)
-              if v_val_num is distinct from cast(kunci_map->>k as int) then
-                jodoh_benar := false;
-                exit;
-              end if;
-            end loop;
-            if jodoh_benar then
-              v_benar := v_benar + 1;
-              v_skor := v_skor + coalesce(r.bobot, 1);
-            else
-              v_salah := v_salah + 1;
-            end if;
-          exception when others then
-            -- Jawaban bukan JSON array valid -> salah
-            v_salah := v_salah + 1;
-          end;
-        end if;
+      -- ===== JODOH: DILEMAHKAN =====
+      -- Soal jodoh tidak lagi di-score (treat as kosong).
+      -- Jika siswa tidak menjawab, hitung sebagai kosong.
+      if jv is null then
+        v_kosong := v_kosong + 1;
       else
-        -- ---- legacy fallback: kunci->>'jawaban' teks tunggal ----
-        kj := nullif(btrim(coalesce(r.kunci->>'jawaban', '')), '');
-        if kj is null then
-          v_total := v_total - coalesce(r.bobot, 1); -- jodoh tanpa kunci tak dihitung
-          continue;
-        elsif jv is null then
-          v_kosong := v_kosong + 1;
-        elsif lower(btrim(jv)) = lower(btrim(kj)) then
-          v_benar := v_benar + 1;
-          v_skor := v_skor + coalesce(r.bobot, 1);
-        else
-          v_salah := v_salah + 1;
-        end if;
+        v_salah := v_salah + 1;
       end if;
     else
       -- esai: skor dari nilai koreksi (0..10) proporsional bobot

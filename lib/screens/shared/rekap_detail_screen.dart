@@ -1,12 +1,10 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 
 /// Detail jawaban 1 murid pada 1 ujian (untuk guru/admin) — pakai RPC rekap_detail.
-/// Tampilkan: PG & jodoh (jawaban murid vs kunci, benar/salah) + esai (jawaban + nilai).
+/// Tampilkan: PG (jawaban murid vs kunci, benar/salah) + esai (jawaban + nilai).
 class RekapDetailScreen extends StatefulWidget {
   final Map<String, dynamic> ujian;
   final String pesertaId;
@@ -99,7 +97,7 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
                   children: [
                     const Icon(Icons.insights, size: 16, color: AppTheme.primary),
                     const SizedBox(width: 6),
-                    Text('PG/Jodoh benar: ', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
+                    Text('PG benar: ', style: TextStyle(fontSize: 13, color: Colors.grey[700])),
                     Text('$benar/$totalPg',
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primary)),
                     const Spacer(),
@@ -125,35 +123,6 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     );
   }
 
-  /// Format jodoh: jawaban siswa (JSON array ["1","2","3"] atau ["a","b","c"])
-  /// + kunci ({map: "..."}).
-  String _fmtJodohJawaban(String raw) {
-    if (raw.isEmpty) return '';
-    try {
-      final arr = jsonDecode(raw);
-      if (arr is List) {
-        return arr.map((e) => e.toString()).join(', ');
-      }
-    } catch (_) {}
-    return raw;
-  }
-
-  String _fmtJodohKunci(String raw) {
-    if (raw.isEmpty) return '';
-    try {
-      final m = jsonDecode(raw);
-      if (m is Map && m['map'] != null) {
-        final km = jsonDecode(m['map'].toString());
-        if (km is Map) {
-          final sorted = km.entries.toList()..sort((a, b) =>
-              (int.tryParse(a.key.toString()) ?? 0).compareTo(int.tryParse(b.key.toString()) ?? 0));
-          return sorted.map((e) => 'A${(int.tryParse(e.key.toString()) ?? 0) + 1}→B${(int.tryParse(e.value.toString()) ?? 0) + 1}').join(', ');
-        }
-      }
-    } catch (_) {}
-    return raw;
-  }
-
   Widget _stat(String label, String val, Color c) {
     return Expanded(
       child: Container(
@@ -171,15 +140,10 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
 
   Widget _soalCard(int no, Map<String, dynamic> s) {
     final jenis = '${s['jenis'] ?? 'pg'}';
-    final jwbnRaw = s['jawaban'] == null ? '' : '${s['jawaban']}';
-    final kunciRaw = s['kunci'] == null ? null : '${s['kunci']}';
+    final jwbn = s['jawaban'] == null ? '' : '${s['jawaban']}';
+    final kunci = s['kunci'] == null ? null : '${s['kunci']}';
     final jawabBetul = s['benar'];
     final nilaiEsai = s['nilai_esai'];
-
-    // JODOH: format jawaban/kunci.
-    final jwbn = jenis == 'jodoh' ? _fmtJodohJawaban(jwbnRaw) : jwbnRaw;
-    final kunci = kunciRaw == null ? null : (jenis == 'jodoh' ? _fmtJodohKunci(kunciRaw) : kunciRaw);
-
     Color warn;
     String badge;
     if (jenis == 'essay') {

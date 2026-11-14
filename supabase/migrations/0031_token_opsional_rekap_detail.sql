@@ -89,38 +89,34 @@ begin
              'jenis', s.jenis,
              'soal', s.soal,
              'opsi', s.opsi,
-             'kunci', case
-               when s.jenis = 'jodoh' then s.kunci->>'map'   -- baru: JSON peta A->B
-               when s.jenis in ('pg','jodoh') then s.kunci->>'jawaban'
-               else s.kunci->>'pedoman'
-             end,
+          'kunci', case
+            when s.jenis = 'jodoh' then
+              coalesce(
+                case
+                  when s.kunci is not null and s.kunci::text like '%map%'
+                  then
+                    (s.kunci->'map')::text
+                  else
+                    null
+                end,
+                s.kunci->>'jawaban'
+              )
+            when s.jenis in ('pg','jodoh') then s.kunci->>'jawaban'
+            else s.kunci->>'pedoman'
+          end,
              'jawaban', j.jawaban,
              'nilai_esai', j.nilai,
              'benar', case
                  when s.jenis = 'pg'
                    then (nullif(lower(btrim(j.jawaban)),'') is not null
                          and lower(btrim(j.jawaban)) = lower(btrim(s.kunci->>'jawaban')))
-                 when s.jenis = 'jodoh'
-                   then (
-                     -- jodoh multi-pair: cocokkan JSON map A->B siswa dgn kunci->'map'.
-                     -- kunci->>'map' = JSON string peta A->B; jawaban siswa = JSON map indexA->indexB.
-                     -- Cek SETIAP kunci: siswa harus pilih B yang sama (kurang pasang = salah).
-                     case
-                       when (s.kunci ? 'map')
-                            and j.jawaban is not null
-                            and coalesce(j.jawaban ~ '^\s*{', false) = true then
-                         not exists (
-                           select 1
-                           from jsonb_each(s.kunci->'map'::jsonb) as k(key, val)
-                           where coalesce(
-                               (select to_char((j.jawaban::jsonb->>k.key)::numeric, '999999999'), 'MISSING')
-                               , 'MISSING') <> k.val::text
-                         )
-                       else
-                         (nullif(lower(btrim(j.jawaban)),'') is not null
-                          and lower(btrim(j.jawaban)) = lower(btrim(s.kunci->>'jawaban')))
-                       end
-                   )
+                     when s.jenis = 'jodoh'
+                      then (
+                        -- jodoh: dilema (dianggap kosong).
+                        -- Siswa tidak bisa menjawab jodoh dari app,
+                        -- sehingga selalu dianggap tidak dijawab.
+                        null
+                    )
                  else null end
            ) order by o.ordn)
            from unnest(u.soal_list) with ordinality as o(sid, ordn)
