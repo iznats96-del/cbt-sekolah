@@ -91,16 +91,12 @@ class _UjianListScreenState extends State<UjianListScreen> {
                   return (k == null ||
                       (k is Map && !k.containsKey('jawaban')));
                 }
-                if (j == 'jodoh') {
-                  return (k == null ||
-                      (k is Map && !(k.containsKey('map') || k.containsKey('jawaban'))));
-                }
                 return false;
               })
               .length;
           if (tanpaKunci > 0) {
             extraWarn =
-                '\n\n$tanpaKunci soal (PG/Jodoh) belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
+                '\n\n$tanpaKunci soal PG belum punya KUNCI JAWABAN — nilai otomatis tidak akan benar. Isi kunci dulu lewat menu Soal, atau ujian tetap jalan dengan koreksi manual.';
           }
         }
       } catch (_) {}

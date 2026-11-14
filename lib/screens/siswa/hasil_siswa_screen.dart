@@ -64,7 +64,7 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
     final dinilai = _rows.where((r) => r['dinilai'] == true).toList();
     final tuntas = dinilai.where((r) => ((r['nilai'] as num?)?.round() ?? 0) >= 75).length;
     // Rata-rata: pakai SEMUA hasil (dinilai & belum dinilai), karena nilai sistem
-    // udah terhitung (untuk pg/jodoh). essay = koreksi manual guru (dinilai=false).
+    // udah terhitung (untuk pg). essay = koreksi manual guru (dinilai=false).
     final semuaDgnNilai = _rows.where((r) => r['nilai'] != null).toList();
     final totalNilai = semuaDgnNilai.fold<int>(0, (sum, r) => sum + ((r['nilai'] as num?)?.round() ?? 0));
     final rata = semuaDgnNilai.isEmpty ? 0 : (totalNilai / semuaDgnNilai.length).round();

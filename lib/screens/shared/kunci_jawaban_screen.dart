@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
@@ -8,8 +6,8 @@ import '../../widgets/state_views.dart';
 
 /// Editor kunci jawaban per ujian — dipakai GURU (dan admin).
 /// - PG   : tap pilihan yang benar -> bank_soal.kunci = {index, jawaban}
-/// - Jodoh: tap pasangan benar      -> kunci {index, jawaban} (auto-korel)
 /// - Essay: pedoman/kunci teks       -> kunci {pedoman: '...'}
+/// - Jenis jodoh sudah dihapus dari app.
 class KunciJawabanScreen extends StatefulWidget {
   final Map<String, dynamic> ujian;
   const KunciJawabanScreen({super.key, required this.ujian});
@@ -21,7 +19,6 @@ class KunciJawabanScreen extends StatefulWidget {
 class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
   List<Map<String, dynamic>> _soal = [];
   final Map<String, int> _pilihIdx = {}; // soal id -> index opsi (PG)
-  final Map<String, Map<String, int>> _kunciJodoh = {}; // soal id -> {A: idxB}
   final Map<String, String> _essay = {}; // soal id -> teks pedoman
   final Set<String> _dirty = {};
   bool _loading = true;
@@ -63,45 +60,14 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
         final k = s['kunci'];
         final jenis = s['jenis']?.toString();
         if (k is Map) {
-          if (jenis == 'jodoh') {
-            // Kunci jodoh multi-pair: {map: '{"0":"3","1":"1",...}'} (baru)
-            // atau legacy {0: idxB_baris, 1: idxB_baris} / {index: n, jawaban: teks}.
-            final mm = <String, int>{};
-            // Format baru: kunci['map'] = JSON string {indexA: indexB} (0-based baris B).
-            if (k.containsKey('map')) {
-              try {
-                final m = jsonDecode(k['map'].toString());
-                if (m is Map) {
-                  m.forEach((a, b) {
-                    final ai = int.tryParse(a.toString());
-                    final bi = int.tryParse(b.toString());
-                    if (ai != null && bi != null) mm[ai.toString()] = bi;
-                  });
-                }
-              } catch (_) {}
-            }
-            // Legacy: key numerik / {index: global}.
-            if (mm.isEmpty) {
-              for (final e in k.entries) {
-                final key = e.key.toString();
-                final v = int.tryParse('${e.value}');
-                if (v == null) continue;
-                if (key == 'index' || key == 'jawaban') continue;
-                mm[key] = v;
-              }
-              if (mm.isEmpty && k.containsKey('index')) {
-                final n = int.tryParse('${k['index']}');
-                if (n != null) mm['0'] = ((n - 1) ~/ 2).clamp(0, 9);
-              }
-            }
-            _kunciJodoh[s['id'].toString()] = mm;
-          } else {
+          if (jenis != 'essay') {
             final idx = k['index'];
             if (idx is int) _pilihIdx[s['id'].toString()] = idx;
+          } else {
             // Essay: terima 'pedoman' (format baru) maupun 'kunci' (legacy JSON).
             final pedoman =
                 (k['pedoman'] ?? k['kunci'] ?? k.values.firstOrNull ?? '').toString();
-            if (jenis == 'essay' && pedoman.isNotEmpty) {
+            if (pedoman.isNotEmpty) {
               _essay[s['id'].toString()] = pedoman;
             }
           }
@@ -141,27 +107,6 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
         Map<String, dynamic> kunci;
         if (jenis == 'essay') {
           kunci = {'pedoman': _essay[id] ?? ''};
-        } else if (jenis == 'jodoh') {
-          final map = _kunciJodoh[id] ?? {};
-          final opsiList = s['opsi'] is List ? List<dynamic>.from(s['opsi'] as List) : <dynamic>[];
-          final nPairSafe = (opsiList.length ~/ 2).clamp(1, 10);
-          // JODOH MULTI-PAIR: kunci baru = {map: '{"0":"bIdx","1":"bIdx",...}'}
-          // (key = index A 0-based, value = index B 0-based baris).
-          // Ini format sama persis sama form input soal (soal_form_screen).
-          final kunciMap = <String, String>{
-            for (final e in map.entries)
-              e.key: (int.tryParse('${e.value}') ?? 0).clamp(0, nPairSafe - 1).toString(),
-          };
-          // Pastikan SEMUA A punya entri (default = identitas A[i]->B[i] jika gak diset).
-          for (var i = 0; i < nPairSafe; i++) {
-            final key = i.toString();
-            kunciMap.putIfAbsent(key, () => key);
-          }
-          kunci = {
-            'map': jsonEncode(kunciMap),
-            // Kompatibilitas legacy (RPC lama / rekap teks):
-            'jawaban': 'jodoh',
-          };
         } else {
           final idx = _pilihIdx[id];
           final opsi = s['opsi'];
@@ -198,55 +143,6 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  /// Editor kunci jodoh: tiap A[i] -> dropdown B yang benar.
-  Widget _buildJodohEditor(String id, Map<String, dynamic> s) {
-    final opsi = s['opsi'] is List ? List<dynamic>.from(s['opsi'] as List) : <dynamic>[];
-    final nPair = (opsi.length ~/ 2).clamp(1, 10);
-    final map = _kunciJodoh[id] ?? {};
-    if (nPair == 0) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: const Color(0xFFEEF2FF), borderRadius: BorderRadius.circular(10)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Jodohkan: B yang benar untuk tiap A', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF4338CA))),
-          const SizedBox(height: 8),
-          for (var i = 0; i < nPair; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 120,
-                    child: Text('A${i + 1}. ${i * 2 < opsi.length ? opsi[i * 2].toString() : ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
-                  Expanded(
-                    child: DropdownButton<int>(
-                      value: (map['$i'] ?? i).clamp(0, nPair - 1),
-                      isDense: true,
-                      isExpanded: true,
-                      underline: const SizedBox.shrink(),
-                      items: List.generate(nPair, (b) => DropdownMenuItem<int>(value: b, child: Text('B${b + 1}. ${i * 2 + 1 < opsi.length ? opsi[i * 2 + 1].toString() : ''}', style: const TextStyle(fontSize: 12)))),
-                      onChanged: (v) {
-                        if (v == null) return;
-                        final mm = Map<String, int>.from(map);
-                        mm['$i'] = v;
-                        _kunciJodoh[id] = mm;
-                        _dirty.add(id);
-                        setState(() {});
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -358,13 +254,11 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
                                             ),
                                           ),
                                           if (jenis != 'essay')
-                                            Text(jenis == 'jodoh' ? 'JODOH' : 'PG',
+                                            const Text('PG',
                                                 style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.bold,
-                                                    color: jenis == 'jodoh'
-                                                        ? AppTheme.accent
-                                                        : AppTheme.primary)),
+                                                    color: AppTheme.primary)),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
@@ -382,7 +276,7 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
                                                   'Jawaban minimal: ... (untuk koreksi manual)'),
                                         ),
                                       ] else if (jenis == 'jodoh') ...[
-                                        _buildJodohEditor(id, s),
+                                        const Text('Jenis soal jodoh sudah dihapus — ubah soal ini ke PG/Essay di menu Soal.', style: TextStyle(fontSize: 12, color: Colors.grey)),
                                       ] else ...[
                                         for (var o = 0; o < opsi.length; o++)
                                           RadioListTile<int>(

@@ -48,57 +48,6 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
     }
   }
 
-  /// Dekode opsi jodoh (JSON array [A1, B1, A2, B2, ...]).
-  List<String> _opsiJodoh(Map<String, dynamic> s) {
-    final opsi = s['opsi'];
-    if (opsi == null) return [];
-    List raw;
-    if (opsi is List) {
-      raw = opsi;
-    } else if (opsi is String) {
-      try {
-        raw = jsonDecode(opsi) as List;
-      } catch (_) {
-        return [opsi];
-      }
-    } else {
-      return [];
-    }
-    return raw.map((e) => e.toString()).toList();
-  }
-
-  /// Parse kunci jodoh: ambil "map" dari kunci JSON.
-  Map<String, String> _kunciJodoh(Map<String, dynamic> s) {
-    final kunci = s['kunci'];
-    if (kunci == null) return {};
-    Map<String, dynamic> kObj;
-    if (kunci is Map<String, dynamic>) {
-      kObj = kunci;
-    } else if (kunci is String) {
-      try {
-        kObj = Map<String, dynamic>.from(jsonDecode(kunci) as Map);
-      } catch (_) {
-        return {};
-      }
-    } else {
-      return {};
-    }
-    final mapVal = kObj['map'];
-    if (mapVal == null) return {};
-    Map<String, String> m;
-    if (mapVal is String) {
-      try {
-        m = Map<String, String>.from(jsonDecode(mapVal) as Map);
-      } catch (_) {
-        return {};
-      }
-    } else if (mapVal is Map) {
-      m = mapVal.map((k, v) => MapEntry(k.toString(), v.toString()));
-    } else {
-      return {};
-    }
-    return m;
-  }
 
   Widget _sectionHeader(String label, {Color? color}) {
     return Container(
@@ -159,13 +108,9 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
     final bobot = s['bobot'];
     final gambarUrl = s['gambar_url']?.toString();
 
-    // Opsi PG / JODOH
+    // Opsi PG
     List<String> opsiList = [];
-    Map<String, String> kunciJodoh = {};
-    if (jenis == 'jodoh') {
-      opsiList = _opsiJodoh(s);
-      kunciJodoh = _kunciJodoh(s);
-    } else {
+    {
       final opsi = s['opsi'];
       if (opsi is List) {
         opsiList = opsi.map((e) => e.toString()).toList();
@@ -218,9 +163,7 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                   decoration: BoxDecoration(
                     color: jenis == 'essay'
                         ? const Color(0xFFFEF3C7)
-                        : jenis == 'jodoh'
-                            ? const Color(0xFFE0E7FF)
-                            : const Color(0xFFDBEAFE),
+                        : const Color(0xFFDBEAFE),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -230,9 +173,7 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                         fontWeight: FontWeight.bold,
                         color: jenis == 'essay'
                             ? const Color(0xFF92400E)
-                            : jenis == 'jodoh'
-                                ? const Color(0xFF4338CA)
-                                : AppTheme.primary),
+                            : AppTheme.primary),
                   ),
                 ),
                 const Spacer(),
@@ -275,13 +216,10 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                 ),
               ),
 
-            // OPSI / JODOH
+            // OPSI
             if (opsiList.isNotEmpty) ...[
-              jenis == 'jodoh'
-                  ? _card('Jawaban Jodoh (${opsiList.length ~/ 2} pasang)',
-                      _buildJodohDetail(opsiList, kunciJodoh))
-                  : _card('Pilihan Jawaban',
-                      _buildPilihanJawaban(opsiList, kunciLabel)),
+              _card('Pilihan Jawaban',
+                  _buildPilihanJawaban(opsiList, kunciLabel)),
             ],
 
             // KUNCI / PEDOMAN ESSAY
@@ -355,124 +293,4 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
     );
   }
 
-  Widget _buildJodohDetail(List<String> opsi, Map<String, String> kunciMap) {
-    final nRow = opsi.length ~/ 2;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Soal jodoh: ${nRow} pasangan. Setiap A harus cocok dengan B yang benar.',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        const SizedBox(height: 8),
-        for (var i = 0; i < nRow; i++) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // A
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4338CA).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFF4338CA)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: const BoxDecoration(
-                              color: Color(0xFF4338CA), shape: BoxShape.circle),
-                          alignment: Alignment.center,
-                          child: Text('${i + 1}',
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            i * 2 < opsi.length ? opsi[i * 2] : '',
-                            style: const TextStyle(fontSize: 12, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Panah
-                Padding(
-                  padding: const EdgeInsets.only(top: 10),
-                  child: Icon(Icons.arrow_forward,
-                      size: 16,
-                      color: kunciMap['$i'] == null
-                          ? Colors.grey
-                          : AppTheme.primary),
-                ),
-                const SizedBox(width: 8),
-                // B
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0E7FF).withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color:
-                              kunciMap['$i'] == null
-                                  ? const Color(0xFFE2E8F0)
-                                  : AppTheme.primary),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: kunciMap['$i'] == null
-                                ? const Color(0xFFF1F5F9)
-                                : AppTheme.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            String.fromCharCode(97 + i),
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: kunciMap['$i'] == null
-                                    ? const Color(0xFF64748B)
-                                    : Colors.white),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            i * 2 + 1 < opsi.length ? opsi[i * 2 + 1] : '',
-                            style: const TextStyle(fontSize: 12, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
 }

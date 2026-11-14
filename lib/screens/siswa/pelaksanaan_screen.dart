@@ -31,12 +31,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   bool _kiosk = false;
   bool _showPalette = false;
 
-  // ===== JODOH 2 KOLOM =====
-  // - Baris kiri: soal (1..N). Baris kanan: jawaban acak (a..N, DIACAK 1× per load).
-  // - Di bawahnya: input jawaban per soal (siswa ketik huruf a,b,c... atau nomor 1,2,3...).
-  // - Jawaban disimpan di _jawaban[soalId].
-
-
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
   final Set<String> _belumKirim = {}; // soalId yang berubah & belum disinkron ke server

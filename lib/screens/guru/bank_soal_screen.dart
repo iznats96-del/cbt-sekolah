@@ -251,7 +251,6 @@ class _MapelCardState extends State<MapelCard> {
   @override
   Widget build(BuildContext context) {
     final pgList = _byJenis('pg');
-    final jodohList = _byJenis('jodoh');
     final essayList = _byJenis('essay');
 
     return Card(
@@ -283,7 +282,7 @@ class _MapelCardState extends State<MapelCard> {
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                       Text(
-                          '${pgList.length + jodohList.length + essayList.length} soal',
+                          '${pgList.length + essayList.length} soal',
                           style: TextStyle(
                               fontSize: 12, color: Colors.grey.shade500)),
                     ],
@@ -305,14 +304,6 @@ class _MapelCardState extends State<MapelCard> {
                   pgList.length,
                   AppTheme.primary,
                   pgList),
-
-            if (jodohList.isNotEmpty)
-              _groupWidget(
-                  'jodoh',
-                  'Menjodohkan',
-                  jodohList.length,
-                  AppTheme.accent,
-                  jodohList),
 
             if (essayList.isNotEmpty)
               _groupWidget(
@@ -406,22 +397,6 @@ class _MapelCardState extends State<MapelCard> {
                     Text('Bobot: ${s['bobot'] ?? 1}',
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade500)),
-                    if ((s['jenis'] ?? '').toString() == 'jodoh') ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text('JODOH',
-                            style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.accent)),
-                      ),
-                      const SizedBox(width: 4),
-                    ],
                     if (s['gambar_url'] != null &&
                         s['gambar_url'].toString().isNotEmpty) ...[
                       const SizedBox(width: 6),

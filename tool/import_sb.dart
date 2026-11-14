@@ -29,5 +29,5 @@ Future<void> main(List<String> args) async {
         'jenis_ujian': 'ASESMEN SUMATIF AKHIR TAHUN', 'items': items
       }}));
   print('IMPORT SB: ${r.statusCode} ${(r.body.length>160?r.body.substring(0,160):r.body)}');
-  print('parser: mapel=${doc.mapel} pg=${doc.pg.length} jodoh=${doc.jodoh.length} essay=${doc.essay.length}');
+  print('parser: mapel=${doc.mapel} pg=${doc.pg.length} essay=${doc.essay.length}');
 }

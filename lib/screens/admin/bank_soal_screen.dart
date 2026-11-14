@@ -8,7 +8,7 @@ import '../shared/soal_form_screen.dart';
 import '../shared/soal_detail_screen.dart';
 import '../admin/import_ujian_screen.dart';
 
-/// Bank Soal ADMIN - layout per mapel, grup PG / Menjodohkan / Essay di dalam tiap mapel.
+/// Bank Soal ADMIN - layout per mapel, grup PG / Essay di dalam tiap mapel.
 class BankSoalScreen extends StatefulWidget {
   const BankSoalScreen({super.key});
 
@@ -175,7 +175,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
   }
 }
 
-/// Kartu mapel berisi grup PG / Menjodohkan / Essay (yang kosong di-skip).
+/// Kartu mapel berisi grup PG / Essay (yang kosong di-skip).
 class MapelCard extends StatefulWidget {
   final String nama;
   final List<Map<String, dynamic>> soal;
@@ -249,7 +249,6 @@ class _MapelCardState extends State<MapelCard> {
   @override
   Widget build(BuildContext context) {
     final pgList = _byJenis('pg');
-    final jodohList = _byJenis('jodoh');
     final essayList = _byJenis('essay');
 
     return Card(
@@ -281,7 +280,7 @@ class _MapelCardState extends State<MapelCard> {
                           style: const TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 15)),
                       Text(
-                          '${pgList.length + jodohList.length + essayList.length} soal',
+                          '${pgList.length + essayList.length} soal',
                           style: TextStyle(
                               fontSize: 12, color: Colors.grey.shade500)),
                     ],
@@ -303,14 +302,6 @@ class _MapelCardState extends State<MapelCard> {
                   pgList.length,
                   AppTheme.primary,
                   pgList),
-
-            if (jodohList.isNotEmpty)
-              _groupWidget(
-                  'jodoh',
-                  'Menjodohkan',
-                  jodohList.length,
-                  AppTheme.accent,
-                  jodohList),
 
             if (essayList.isNotEmpty)
               _groupWidget(
@@ -411,9 +402,7 @@ class _MapelCardState extends State<MapelCard> {
                       decoration: BoxDecoration(
                         color: (jenis == 'pg'
                             ? AppTheme.primary
-                            : jenis == 'jodoh'
-                                ? AppTheme.accent
-                                : const Color(0xFFF4A940))
+                            : const Color(0xFFF4A940))
                             .withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
@@ -423,9 +412,7 @@ class _MapelCardState extends State<MapelCard> {
                               fontWeight: FontWeight.bold,
                               color: jenis == 'pg'
                                   ? AppTheme.primary
-                                  : jenis == 'jodoh'
-                                      ? AppTheme.accent
-                                      : const Color(0xFFF4A940))),
+                                  : const Color(0xFFF4A940))),
                     ),
                     const SizedBox(width: 8),
                     Text('Bobot: ${s['bobot'] ?? 1}',

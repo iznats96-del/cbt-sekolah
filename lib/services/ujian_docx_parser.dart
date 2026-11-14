@@ -12,13 +12,6 @@ class PgSoal {
   PgSoal(this.soal, this.opsi, this.hurufOpsi, this.kunci, this.imgPath);
 }
 
-class JodohSoal {
-  final String soal;
-  final List<String> opsi;
-  Map<int, int>? kunci; // index A -> index B (0-based)
-  JodohSoal(this.soal, this.opsi, {this.kunci});
-}
-
 class EssaySoal {
   final String soal;
   EssaySoal(this.soal);
@@ -32,7 +25,6 @@ class UjianDocx {
   String guru;
   String? jurusan;
   final List<PgSoal> pg = [];
-  final List<JodohSoal> jodoh = [];
   final List<EssaySoal> essay = [];
   final Map<String, Uint8List> images = {};
   final List<String> warnings = [];
@@ -164,19 +156,7 @@ class UjianDocxParser {
 
     for (final b in blocks) {
       if (b.isTable) {
-        final jodohKunciCollector = <int, int>{};
-        _handleTable(b, u,
-            essaySink: (t) => u.essay.add(EssaySoal(t)),
-            onJodoh: (it, opsi) {
-              final j = JodohSoal(it, opsi);
-              u.jodoh.add(j);
-            },
-            onJodohKunci: (a, b) => jodohKunciCollector[a] = b);
-        // Terapkan kunci jodoh ke soal terakhir
-        if (jodohKunciCollector.isNotEmpty && u.jodoh.isNotEmpty) {
-          final j = u.jodoh.last;
-          j.kunci = jodohKunciCollector;
-        }
+        _handleTable(b, u, essaySink: (t) => u.essay.add(EssaySoal(t)));
         if (sec == 'pg') flushPg();
         continue;
       }
@@ -188,12 +168,7 @@ class UjianDocxParser {
         final mk = RegExp(r'^(\d{1,3})\s*[.):=]\s*([A-J])\b', caseSensitive: false).firstMatch(line);
         if (mk != null) {
           final n = int.tryParse(mk.group(1)!) ?? 0;
-          // Kunci jodoh: jika ada soal jodoh terakhir, terapkan kunci ke sana
-          if (u.jodoh.isNotEmpty && u.jodoh.last.opsi.isNotEmpty && n <= u.jodoh.last.opsi.length ~/ 2) {
-            final j = u.jodoh.last;
-            j.kunci ??= {};
-            j.kunci![n - 1] = (mk.group(2)!.toUpperCase().codeUnitAt(0) - 65);
-          } else if (n >= 1 && n <= u.pg.length) {
+          if (n >= 1 && n <= u.pg.length) {
             // Kunci PG
             u.pg[n - 1].kunci = mk.group(2)!.toUpperCase();
           }
@@ -234,7 +209,10 @@ class UjianDocxParser {
       }
       if (RegExp(r'MENJODOHKAN|JODOHKAN|MENJODOH|MENCOCOKKAN', caseSensitive: false).hasMatch(line)) {
         flushPg();
-        sec = 'jodoh';
+        sec = 'jodoh'; // seksi jodoh di-skip — soal jenis ini tidak didukung
+        if (!u.warnings.any((w) => w.contains('Menjodohkan'))) {
+          u.warnings.add('Seksi Menjodohkan/Mencocokkan terdeteksi — jenis soal ini tidak didukung dan di-skip otomatis');
+        }
         continue;
       }
       if (RegExp(r'ESSAY|URAIAN', caseSensitive: false).hasMatch(up)) {
@@ -287,11 +265,8 @@ class UjianDocxParser {
       } else if (sec == 'essay') {
         var t = line.replaceFirst(RegExp(r'^\d+[.)]\s*'), '').trim();
         if (_looksLikeEssay(t)) u.essay.add(EssaySoal(t));
-      } else if (sec == 'jodoh') {
-        if (_qEnd.hasMatch(line) && line.length > 18) {
-          u.jodoh.add(JodohSoal(line, const []));
-        }
       }
+      // sec == 'jodoh': baris di-skip — soal jenis ini tidak didukung
     }
     flushPg();
 
@@ -332,7 +307,7 @@ class UjianDocxParser {
     if (tanpaOpsi > 0) u.warnings.add('$tanpaOpsi soal PG terdeteksi tanpa opsi — periksa sebelum disimpan');
     if (u.mapel.isEmpty) u.warnings.add('Nama Mata Pelajaran tidak terdeteksi di dokumen');
     if (u.kelas.isEmpty) u.warnings.add('Kelas tidak terdeteksi di dokumen');
-    if (u.pg.isEmpty && u.jodoh.isEmpty && u.essay.isEmpty) {
+    if (u.pg.isEmpty && u.essay.isEmpty) {
       u.warnings.add('Tidak ada soal yang terdeteksi');
     }
     final adaKunci = u.pg.any((p) => p.kunci != null);
@@ -413,9 +388,7 @@ class UjianDocxParser {
   }
 
   static void _handleTable(_Block b, UjianDocx u,
-      {required void Function(String) essaySink,
-      required void Function(String item, List<String> opsi) onJodoh,
-      void Function(int, int)? onJodohKunci}) {
+      {required void Function(String) essaySink}) {
     if (b.table == null) return;
     final cells = <List<String>>[];
     for (final r in b.table!) {
@@ -426,8 +399,7 @@ class UjianDocxParser {
     final joined = cells.map((c) => c.join(' ')).join(' ~ ').toUpperCase();
     final hasOpsiKolom = joined.contains('PILIHAN JAWABAN');
     final hasKiri = joined.contains('SOAL') || joined.contains('PERTANYAAN') || joined.contains('Cocokkan');
-    final hasPasang = joined.contains('PASANGKANLAH') || joined.contains('JODOHKANLAH');
-    if (!hasOpsiKolom || !hasKiri && !hasPasang) {
+    if (!hasOpsiKolom || !hasKiri) {
       // mungkin jawabian kosong / header jawaban — lewati
       return;
     }
@@ -461,60 +433,22 @@ class UjianDocxParser {
     }
     if (kiriLines.isEmpty) return;
     final opsi = _splitOpts(opsiLines);
-    if (opsi.length >= 2) {
-      for (final it in kiriLines) {
-        final t = it.trim();
-        if (t.isEmpty || RegExp(r'^(SOAL|KUNCI)', caseSensitive: false).hasMatch(t)) continue;
-        onJodoh(t, opsi);
-      }
-      } else {
-        final joinedHeader =
-            (b.table!.expand((r) => r).expand((c) => c).join(' ').toUpperCase());
-        final isEssayTable = joinedHeader.contains('PERTANYAAN') ||
-            joinedHeader.contains('ESSAY') ||
-            joinedHeader.contains('URAIAN');
-        if (isEssayTable) {
-          for (final it in kiriLines) {
-            final t = it.trim();
-            if (t.length > 8 && RegExp('[A-Za-zÀ-ÿ]').hasMatch(t) && !t.startsWith('https')) {
-              essaySink(t);
-            }
+    if (opsi.length < 2) {
+      final joinedHeader =
+          (b.table!.expand((r) => r).expand((c) => c).join(' ').toUpperCase());
+      final isEssayTable = joinedHeader.contains('PERTANYAAN') ||
+          joinedHeader.contains('ESSAY') ||
+          joinedHeader.contains('URAIAN');
+      if (isEssayTable) {
+        for (final it in kiriLines) {
+          final t = it.trim();
+          if (t.length > 8 && RegExp('[A-Za-zÀ-ÿ]').hasMatch(t) && !t.startsWith('https')) {
+            essaySink(t);
           }
         }
       }
-
-      // ===== PARSER KUNCI JODOH =====
-      // Cari pola kunci jodoh di dalam tabel:
-      // - Format: "1 — B" atau "1. C" atau "1=B" (nomor soal — huruf jawaban)
-      // - Atau: baris terakhir tabel berisi kunci (jika ada header "KUNCI JAWABAN")
-      if (hasPasang && opsi.isNotEmpty && onJodohKunci != null) {
-        // Cari baris kunci di dalam tabel yang sama
-        final kunciLines = <String>[];
-        for (final c in cells) {
-          for (final line in c) {
-            final t = line.trim();
-            // Pola: angka + separator + huruf A-J
-            final mk = RegExp(r'^(\d{1,2})\s*(?:[.):=—\-]\s*)([A-J])\b', caseSensitive: false).firstMatch(t);
-            if (mk != null) {
-              kunciLines.add(t);
-            }
-          }
-        }
-        if (kunciLines.isNotEmpty) {
-          // Parse setiap kunci jodoh
-          for (final line in kunciLines) {
-            final mk = RegExp(r'^(\d{1,2})\s*(?:[.):=—\-]\s*)([A-J])\b', caseSensitive: false).firstMatch(line);
-            if (mk != null) {
-              final nomorSoal = int.parse(mk.group(1)!);
-              final hurufJawab = mk.group(2)!.toUpperCase();
-              final idxJawab = hurufJawab.codeUnitAt(0) - 65; // A=0, B=1, C=2, dll
-              if (nomorSoal >= 1 && nomorSoal <= kiriLines.length) {
-                onJodohKunci(nomorSoal - 1, idxJawab);
-              }
-            }
-          }
-        }
-      }
+    }
+    // Tabel dgn opsi >= 2 = tabel jodoh (PERTANYAAN|PILIHAN JAWABAN) — di-skip.
   }
 
   static bool _isDots(String s) => RegExp(r'^[\s.…_—-]+$').hasMatch(s.trim());

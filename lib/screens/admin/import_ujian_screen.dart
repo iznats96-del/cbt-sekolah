@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -164,19 +163,6 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
           'bobot': '1',
         });
       }
-      for (final j in doc.jodoh) {
-        items.add({
-          'jenis': 'jodoh',
-          'soal': j.soal,
-          'opsi': j.opsi.map((o) => o.replaceFirst(RegExp(r'^[A-J][.)]\s*'), '').trim()).toList(),
-          'kunci': j.kunci != null
-              ? {'map': jsonEncode({
-                  for (final e in j.kunci!.entries) e.key.toString(): e.value.toString()
-                })}
-              : null,
-          'bobot': '1',
-        });
-      }
       for (final e in doc.essay) {
         items.add({
           'jenis': 'essay',
@@ -257,8 +243,8 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                   const Text(
                     'Format: naskah ujian sekolah (.docx) yang berisi kop, "Mata Pelajaran:", '
                     '"Kelas/Kompetensi keahlian:", "Waktu: 60 menit", sesi "PILIHAN GANDA" '
-                    '(opsi a. A. ... s.d. e. E.), "MENJODOHKAN", "C. Essay", dan '
-                    '"KUNCI JAWABAN" (1. B, dst).',
+                    '(opsi a. A. ... s.d. e. E.), "C. Essay", dan '
+                    '"KUNCI JAWABAN" (1. B, dst). Seksi Menjodohkan di-skip otomatis.',
                     style: TextStyle(fontSize: 12, height: 1.5),
                   ),
                   const SizedBox(height: 12),
@@ -323,7 +309,6 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, children: [
                       Chip(label: Text('${doc.pg.length} PG'), avatar: const Icon(Icons.radio_button_checked, size: 16)),
-                      Chip(label: Text('${doc.jodoh.length} Jodoh'), avatar: const Icon(Icons.link, size: 16)),
                       Chip(label: Text('${doc.essay.length} Essay'), avatar: const Icon(Icons.edit_note, size: 16)),
                       if (doc.images.isNotEmpty)
                         Chip(label: Text('${doc.images.length} gambar'), avatar: const Icon(Icons.image, size: 16)),
@@ -396,14 +381,14 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: AppTheme.secondary),
-                onPressed: _importing || doc.pg.isEmpty && doc.jodoh.isEmpty && doc.essay.isEmpty
+                onPressed: _importing || doc.pg.isEmpty && doc.essay.isEmpty
                     ? null
                     : _import,
                 icon: _importing
                     ? const SizedBox(height: 18, width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.cloud_upload_outlined),
-                label: Text('IMPORT ${doc.pg.length + doc.jodoh.length + doc.essay.length} SOAL '
+                label: Text('IMPORT ${doc.pg.length + doc.essay.length} SOAL '
                     '(+ mapel & ujian draft)'),
               ),
             ),

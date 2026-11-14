@@ -30,19 +30,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   int? _kunciIdx;
   String _essayKunci = '';
 
-  // Jodoh (dinamis: 2–10 pasangan)
-  List<TextEditingController> _pasanganA = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  List<TextEditingController> _pasanganB = [
-    TextEditingController(),
-    TextEditingController(),
-  ];
-  List<int> _kunciJodoh = [0, 1];
-  static const jodohMin = 2;
-  static const jodohMax = 10;
-
   bool _loading = false;
   List<DropdownItem> _mapelOptions = [];
 
@@ -56,6 +43,8 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
     final init = widget.initial;
     if (init != null) {
       _jenis = init['jenis']?.toString() ?? 'pg';
+      // Jenis jodoh sudah dihapus — fallback ke PG supaya form tetap jalan.
+      if (_jenis != 'pg' && _jenis != 'essay') _jenis = 'pg';
       _mapelId = init['mapel_id']?.toString();
       _soalCtrl.text = init['soal']?.toString() ?? '';
       _pembahasanCtrl.text = init['pembahasan']?.toString() ?? '';
@@ -80,26 +69,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
           k = (k['pedoman'] ?? k['kunci'] ?? k.values.firstOrNull ?? '').toString();
         }
         _essayKunci = (k ?? '').toString();
-      } else if (_jenis == 'jodoh') {
-        // Jodoh: A dan B dipisah di DB, tapi form menyimpan pasangan B sebagai kunci.
-        // Format: opsi = [A1, B1, A2, B2, ...] sesuai hitung_nilai.
-        final opsi = init['opsi'];
-        if (opsi is List && opsi.length >= 4) {
-          final n = (opsi.length ~/ 2).clamp(jodohMin, jodohMax);
-          _pasanganA = List.generate(n, (_) => TextEditingController());
-          _pasanganB = List.generate(n, (_) => TextEditingController());
-          _kunciJodoh = List.generate(n, (i) => i);
-          for (var i = 0; i < n; i++) {
-            final ia = i * 2;
-            final ib = i * 2 + 1;
-            if (ia < opsi.length) _pasanganA[i].text = opsi[ia].toString();
-            if (ib < opsi.length) _pasanganB[i].text = opsi[ib].toString();
-          }
-        }
-        // Kunci: map A[i] -> B[j]  (bisa legacy {0:B,1:B,...} / {'A':idx} / {index,jawaban})
-        if (kunci is Map) {
-          _loadKunciJodoh(kunci);
-        }
       }
     }
     if (_opsi.isEmpty) _opsi = List.generate(4, (_) => TextEditingController());
@@ -110,73 +79,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       if (e.key.contains('index')) return int.tryParse('${e.value}');
     }
     return null;
-  }
-
-  /// Muat kunci jodoh dari format lama maupun baru.
-  /// - format baru (multi-pair): {map: '{"0":"3","1":"1",...}'} — JSON peta A→B (0-based baris)
-  /// - format form lama: {0: idxB_baris, 1: idxB_baris, ...} (0-based terhadap baris B)
-  /// - legacy PG-like: {index: n, jawaban: teks} -> dianggap B[n] cocok utk A1
-  void _loadKunciJodoh(Map kunci) {
-    final n = _pasanganA.length;
-    final barisB = <int, int>{};
-
-    // Format baru: kunci['map'] = JSON string {indexA: indexB} (0-based baris B).
-    if (kunci.containsKey('map')) {
-      try {
-        final m = jsonDecode(kunci['map'].toString());
-        if (m is Map) {
-          m.forEach((k, v) {
-            final ki = int.tryParse(k.toString());
-            final vi = int.tryParse(v.toString());
-            if (ki != null && vi != null && ki >= 0 && ki < n) {
-              barisB[ki] = vi.clamp(0, n - 1);
-            }
-          });
-        }
-      } catch (_) {}
-      for (var i = 0; i < n; i++) {
-        _kunciJodoh[i] = barisB[i] ?? i;
-      }
-      return;
-    }
-
-    // Format form lama / legacy: key numerik atau {index: global}.
-    final hasIndexKey = kunci.containsKey('index');
-    for (var i = 0; i < n; i++) {
-      dynamic val = kunci['$i'];
-      if (val == null) val = kunci[String.fromCharCode(65 + i)];
-      if (val != null) {
-        final v = int.tryParse('${val}');
-        if (v != null) {
-          barisB[i] = (hasIndexKey && v.isOdd) ? (v - 1) ~/ 2 : v.clamp(0, n - 1);
-        }
-      }
-    }
-    if (kunci.containsKey('index')) {
-      final g = int.tryParse('${kunci['index']}');
-      if (g != null) barisB[0] = ((g - 1) ~/ 2).clamp(0, n - 1);
-    }
-    for (var i = 0; i < n; i++) {
-      _kunciJodoh[i] = barisB[i] ?? i;
-    }
-  }
-
-  void _tambahPasangan() {
-    if (_pasanganA.length >= jodohMax) return;
-    setState(() {
-      _pasanganA.add(TextEditingController());
-      _pasanganB.add(TextEditingController());
-      _kunciJodoh.add(_pasanganB.length - 1);
-    });
-  }
-
-  void _hapusPasangan() {
-    if (_pasanganA.length <= jodohMin) return;
-    setState(() {
-      _pasanganA.removeLast().dispose();
-      _pasanganB.removeLast().dispose();
-      _kunciJodoh.removeLast();
-    });
   }
 
   String _charAt(int i) => String.fromCharCode(65 + i);
@@ -196,12 +98,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
     _bobotCtrl.dispose();
     for (final o in _opsi) {
       o.dispose();
-    }
-    for (final a in _pasanganA) {
-      a.dispose();
-    }
-    for (final b in _pasanganB) {
-      b.dispose();
     }
     super.dispose();
   }
@@ -249,41 +145,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
 
         opsi = [for (final o in _opsi) o.text.trim()];
         kunci = {'index': _kunciIdx, 'jawaban': _opsi[_kunciIdx!].text.trim()};
-      } else if (_jenis == 'jodoh') {
-        // Validasi jodoh: A dan B tidak kosong
-        bool allFilled = true;
-        for (var i = 0; i < _pasanganA.length; i++) {
-          if (_pasanganA[i].text.trim().isEmpty || _pasanganB[i].text.trim().isEmpty) {
-            allFilled = false;
-            break;
-          }
-        }
-        if (!allFilled) {
-          setState(() => _loading = false);
-          _snack('Isi semua pasangan A dan B.', error: true);
-          return;
-        }
-
-        // JODOH MULTI-PAIR: 1 soal = N pasangan.
-        // - opsi = [A1, B1, A2, B2, ..., An, Bn] (interleave, index global)
-        // - kunci = {map: {"0": "bIdx", "1": "bIdx", ...}} — PETA A→B BENER.
-        //   Key = index A (0-based), Value = index B (0-based).
-        //   Skoring backend: parse JSON jawaban siswa {indexA: indexB},
-        //   cek apakah SETIAP pasangan cocok sama kunci->'map'.
-        opsi = <String>[
-          for (var i = 0; i < _pasanganA.length; i++) ...[
-            _pasanganA[i].text.trim(),
-            _pasanganB[i].text.trim(),
-          ]
-        ];
-        // _kunciJodoh[i] = index B yg cocok untuk A[i] (0-based, default i).
-        final nB = _pasanganA.length;
-        final kunciMap = <String, String>{
-          for (var i = 0; i < nB; i++)
-            i.toString(): (_kunciJodoh[i].clamp(0, nB - 1)).toString(),
-        };
-        // Simpan: kunci->>'map' = JSON string peta A→B.
-        kunci = {'map': jsonEncode(kunciMap)};
       } else {
         if (_essayKunci.trim().isEmpty) {
           setState(() => _loading = false);
@@ -406,30 +267,19 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                 segments: const [
                   ButtonSegment(value: 'pg', label: Text('PG'), icon: Icon(Icons.radio_button_checked)),
                   ButtonSegment(value: 'essay', label: Text('Essay'), icon: Icon(Icons.edit_note)),
-                  ButtonSegment(value: 'jodoh', label: Text('Jodoh'), icon: Icon(Icons.link)),
                 ],
                 selected: {_jenis},
                 onSelectionChanged: (s) => setState(() => _jenis = s.first),
-                              ),
+              ),
               const SizedBox(height: 16),
-              // "Soal" field: wajib untuk PG/essay. Untuk jodoh opsional (deskripsi singkat),
-              // karena isi utama jodoh sudah ada di Kolom A & B di bawah.
               TextFormField(
                 controller: _soalCtrl,
                 maxLines: 4,
-                decoration: _jenis == 'jodoh'
-                    ? const InputDecoration(
-                        labelText: 'Deskripsi Soal (opsional)',
-                        hintText: 'Contoh: Menjodohkan ibu kota negara',
-                        prefixIcon: Icon(Icons.description_outlined),
-                        helperText: 'Isi utama jodoh ada di Kolom A & B di bawah. Field ini cuma deskripsi singkat (title).',
-                      )
-                    : const InputDecoration(
-                        labelText: 'Soal *',
-                        prefixIcon: Icon(Icons.description_outlined),
-                      ),
+                decoration: const InputDecoration(
+                  labelText: 'Soal *',
+                  prefixIcon: Icon(Icons.description_outlined),
+                ),
                 validator: (v) {
-                  if (_jenis == 'jodoh') return null; // jodoh gak perlu soal teks
                   return (v == null || v.isEmpty) ? 'Isi soal' : null;
                 },
               ),
@@ -569,100 +419,6 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                     ),
                   ),
               ]),
-            ] else if (_jenis == 'jodoh') ...[
-                                      const SizedBox(height: 12),
-                                      _card('Pasangan Jodoh', [
-                                        Row(
-                                          children: [
-                                            const Expanded(child: Text('Kolom A (pernyataan)', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
-                                            const SizedBox(width: 8),
-                                            IconButton(
-                                              tooltip: 'Tambah pasangan',
-                                              icon: const Icon(Icons.add_circle_outline),
-                                              onPressed: _pasanganA.length < jodohMax ? _tambahPasangan : null,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            IconButton(
-                                              tooltip: 'Hapus pasangan terakhir',
-                                              icon: const Icon(Icons.remove_circle_outline),
-                                              onPressed: _pasanganA.length > jodohMin ? _hapusPasangan : null,
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text('Kolom B (jawaban) diacak otomatis saat ujian. Setiap A di baris ini harus dicocokkan dengan B di baris yang sama saat input.', style: const TextStyle(fontSize: 11, color: Colors.grey, height: 1.4)),
-                                        const SizedBox(height: 12),
-                                        for (var i = 0; i < _pasanganA.length; i++)
-                                          Container(
-                                            margin: const EdgeInsets.only(bottom: 12),
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius: BorderRadius.circular(12),
-                                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 26,
-                                                      height: 26,
-                                                      decoration: BoxDecoration(color: const Color(0xFF4338CA), shape: BoxShape.circle),
-                                                      alignment: Alignment.center,
-                                                      child: Text('A${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: TextField(
-                                                        controller: _pasanganA[i],
-                                                        maxLines: null,
-                                                        minLines: 1,
-                                                        style: const TextStyle(fontSize: 14, height: 1.4),
-                                                        decoration: InputDecoration(
-                                                          hintText: 'Pernyataan A${i + 1} (bisa panjang, otomatis wrap)',
-                                                          isDense: true,
-                                                          border: InputBorder.none,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 6),
-                                                Row(
-                                                  children: [
-                                                    Container(
-                                                      width: 26,
-                                                      height: 26,
-                                                      decoration: BoxDecoration(color: const Color(0xFFE0E7FF), shape: BoxShape.circle),
-                                                      alignment: Alignment.center,
-                                                      child: Text('B${i + 1}', style: const TextStyle(color: Color(0xFF4338CA), fontSize: 11, fontWeight: FontWeight.bold)),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Expanded(
-                                                      child: TextField(
-                                                        controller: _pasanganB[i],
-                                                        maxLines: null,
-                                                        minLines: 1,
-                                                        style: const TextStyle(fontSize: 14, height: 1.4),
-                                                        decoration: InputDecoration(
-                                                          hintText: 'Jawaban B${i + 1} (cocok untuk A${i + 1})',
-                                                          isDense: true,
-                                                          border: InputBorder.none,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        Text(
-                                          'Pasangan: ${_pasanganA.length} (min $jodohMin, max $jodohMax). Teks otomatis wrap — tidak akan ketutup.',
-                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                        ),
-                                      ]),
             ] else ...[
               const SizedBox(height: 12),
               _card('Kunci Jawaban Essay', [

@@ -26,21 +26,12 @@ Future<void> main(List<String> args) async {
       File('/data/data/com.termux/files/home/.cache/opencode/tmp/s1.docx').readAsBytesSync());
   stderr.writeln(
       'parse: mapel=${doc.mapel} kelas=${doc.kelas} pg=${doc.pg.length} '
-      'jodoh=${doc.jodoh.length} essay=${doc.essay.length} warn=${doc.warnings}');
+      'essay=${doc.essay.length} warn=${doc.warnings}');
 
   final items = <Map<String, dynamic>>[];
   for (final p in doc.pg) {
     items.add({
       'jenis': 'pg', 'soal': p.soal, 'opsi': p.opsi,
-      'kunci': null, 'bobot': '1',
-    });
-  }
-  for (final j in doc.jodoh) {
-    items.add({
-      'jenis': 'jodoh', 'soal': j.soal,
-      'opsi': j.opsi
-          .map((o) => o.replaceFirst(RegExp(r'^[A-J][.)]\s*'), '').trim())
-          .toList(),
       'kunci': null, 'bobot': '1',
     });
   }
