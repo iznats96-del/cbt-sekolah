@@ -43,7 +43,7 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
     try {
       final rows = await Api.client
           .from('bank_soal')
-          .select('*,mata_pelajaran(nama)')
+          .select('*,mata_pelajaran(nama),kelas(nama)')
           .order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {
@@ -397,6 +397,24 @@ class _MapelCardState extends State<MapelCard> {
                     Text('Bobot: ${s['bobot'] ?? 1}',
                         style: TextStyle(
                             fontSize: 11, color: Colors.grey.shade500)),
+                    if (s['kelas'] is Map &&
+                        (s['kelas'] as Map)['nama'] != null) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDBEAFE),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                            'Kelas: ${(s['kelas'] as Map)['nama']}',
+                            style: const TextStyle(
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1D4ED8))),
+                      ),
+                    ],
                     if (s['gambar_url'] != null &&
                         s['gambar_url'].toString().isNotEmpty) ...[
                       const SizedBox(width: 6),

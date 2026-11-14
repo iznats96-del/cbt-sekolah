@@ -171,18 +171,25 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     } catch (_) {}
   }
 
-  List<Map<String, dynamic>> get _bankSoalMapel =>
-      _mapelId == null
-          ? _bankSoal
-          : _bankSoal
-              .where((s) => '${s['mata_pelajaran']?['id']}' == _mapelId)
-              .toList();
+  List<Map<String, dynamic>> get _bankSoalMapel {
+    final byMapel = _mapelId == null
+        ? _bankSoal
+        : _bankSoal
+            .where((s) => '${s['mata_pelajaran']?['id']}' == _mapelId)
+            .toList();
+    // Filter per-kelas: soal global (kelas_id NULL) + soal khusus kelas yang dipilih
+    final kelasIds = _kelasIds.toSet();
+    return byMapel.where((s) {
+      final sk = '${s['kelas_id'] ?? ''}';
+      return sk.isEmpty || kelasIds.contains(sk);
+    }).toList();
+  }
 
   Future<void> _loadBankSoal() async {
     try {
       final rows = await Api.client
           .from('bank_soal')
-          .select('id,soal,jenis,bobot,mata_pelajaran(*)')
+          .select('id,soal,jenis,bobot,kelas_id,mata_pelajaran(*)')
           .order('created_at', ascending: false);
       if (!mounted) return;
       setState(() => _bankSoal = List<Map<String, dynamic>>.from(rows));
@@ -216,15 +223,20 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
       return;
     }
     final current = _soalPerKelas[kelasId] ?? _selectedSoal;
+    // Strict: soal global (kelas_id NULL) + khusus kelasId ini saja
+    final eligible = _bankSoalMapel.where((s) {
+      final sk = '${s['kelas_id'] ?? ''}';
+      return sk.isEmpty || sk == kelasId;
+    }).toList();
     final result = await showDialog<List<String>>(
       context: context,
       builder: (_) => SoalPickerDialog(
-        allSoal: _bankSoalMapel,
+        allSoal: eligible,
         selected: current,
       ),
     );
     if (result != null) {
-      final legal = _bankSoalMapel.map((s) => '${s['id']}').toSet();
+      final legal = eligible.map((s) => '${s['id']}').toSet();
       final keep = result.where((id) => legal.contains(id)).toList();
       setState(() {
         if (keep.isEmpty) {

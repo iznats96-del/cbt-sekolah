@@ -26,12 +26,14 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
 
   String _jenis = 'pg';
   String? _mapelId;
+  String? _kelasId; // NULL = global semua kelas
   List<TextEditingController> _opsi = [];
   int? _kunciIdx;
   String _essayKunci = '';
 
   bool _loading = false;
   List<DropdownItem> _mapelOptions = [];
+  List<DropdownItem> _kelasOptions = [];
 
   String? _gambarUrl;
   bool _uploading = false;
@@ -40,12 +42,14 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   void initState() {
     super.initState();
     _loadMapel();
+    _loadKelas();
     final init = widget.initial;
     if (init != null) {
       _jenis = init['jenis']?.toString() ?? 'pg';
       // Jenis jodoh sudah dihapus — fallback ke PG supaya form tetap jalan.
       if (_jenis != 'pg' && _jenis != 'essay') _jenis = 'pg';
       _mapelId = init['mapel_id']?.toString();
+      _kelasId = init['kelas_id']?.toString();
       _soalCtrl.text = init['soal']?.toString() ?? '';
       _pembahasanCtrl.text = init['pembahasan']?.toString() ?? '';
       _bobotCtrl.text = '${init['bobot'] ?? 1}';
@@ -88,6 +92,19 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       final options = await fetchDropdown('mata_pelajaran', 'nama', 'id');
       if (!mounted) return;
       setState(() => _mapelOptions = options);
+    } catch (_) {}
+  }
+
+  Future<void> _loadKelas() async {
+    try {
+      final rows = await Api.client.from('kelas').select('id,nama').order('nama');
+      if (!mounted) return;
+      setState(() {
+        _kelasOptions = [
+          ...(rows as List).map((r) => DropdownItem(
+              '${r['id']}', '${r['nama']}')),
+        ];
+      });
     } catch (_) {}
   }
 
@@ -169,6 +186,7 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       final bobot = num.tryParse(_bobotCtrl.text.trim()) ?? 1;
       final data = <String, dynamic>{
         'mapel_id': _mapelId,
+        'kelas_id': _kelasId, // NULL = global semua kelas
         'jenis': _jenis,
         'soal': _soalCtrl.text.trim(),
         'opsi': opsi,
@@ -259,6 +277,22 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                 items: [const DropdownMenuItem(value: null, child: Text('— pilih —')), ..._mapelOptions
                     .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
                 onChanged: (v) => setState(() => _mapelId = v),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: _kelasId,
+                decoration: const InputDecoration(
+                  labelText: 'Kelas',
+                  prefixIcon: Icon(Icons.school_outlined),
+                  helperText: 'Kosong = soal global (semua kelas). Pilih kelas kalau soal khusus kelas itu.',
+                ),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('Semua Kelas (global)')),
+                  ..._kelasOptions
+                      .where((o) => o.value != null)
+                      .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label))),
+                ],
+                onChanged: (v) => setState(() => _kelasId = (v == null || v.isEmpty) ? null : v),
               ),
               const SizedBox(height: 12),
               const Text('Jenis Soal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
