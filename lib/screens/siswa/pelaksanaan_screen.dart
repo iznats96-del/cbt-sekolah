@@ -31,16 +31,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   bool _kiosk = false;
   bool _showPalette = false;
 
-  // ===== JODOH 2 KOLOM (MULTI-PAIR) =====
-// Konsep lu bener: 1 soal jodoh = 1 blok matching dengan N pasangan.
-// - Kolom A (kiri): pernyataan dinomori 1..N
-// - Kolom B (kanan): jawaban berhuruf a..N, DIACAK 1× per load (stable)
-// - Tap A → tap B yang cocok. Tiap B hanya boleh 1× per soal.
-// - Ganti pasangan = lepas B lama.
-// - Simpan: _jodohJawaban[soalId][indexA] = indexB (JSON ke DB).
-// - Teks panjang: auto-wrap, gak ketutup (maxLines: null di form, Expanded di UI).
-final Map<String, Map<int, int>> _jodohJawaban = {}; // soalId -> {indexA: indexB}
-final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B (acak 1×)
+  // ===== JODOH 2 KOLOM =====
+  // - Baris kiri: soal (1..N). Baris kanan: jawaban acak (a..N, DIACAK 1× per load).
+  // - Di bawahnya: input jawaban per soal (siswa ketik huruf a,b,c... atau nomor 1,2,3...).
+  // - Jawaban disimpan di _jawaban['${soalId}_jodoh_${n}'] (bukan JSON map).
+  final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B (acak 1×)
 
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
@@ -252,11 +247,8 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
   /// JODOH: serialize map indexA->indexB ke JSON string di _jawaban[soalId].
   Future<void> _saveJawaban(String soalId, {bool flush = false}) async {
     _belumKirim.add(soalId);
-    // JODOH: simpan map ke _jawaban sebagai JSON biar satu field, backend bisa parse
-    final jm = _jodohJawaban[soalId];
-    if (jm != null) {
-      _jawaban[soalId] = jsonEncode(jm.map((k, v) => MapEntry(k.toString(), v.toString())));
-    }
+    // JODOH: jawaban disimpan per input (_jawaban['${soalId}_jodoh_${n}']),
+    // bukan JSON map. Backend harus parse input per soal.
     await _simpanLokal();
     // flush=true hanya dipakai saat submit (paksa kirim)
     if (flush) await _flushKeServer();
@@ -686,13 +678,8 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
         ],
       );
     } else if (jenis == 'jodoh') {
-      // JODOH MULTI-PAIR: 1 soal = N pasangan (A1..An vs B diacak).
-      // - Kolom A (kiri): pernyataan dinomori 1..N
-      // - Kolom B (kanan): jawaban berhuruf a..N, DIACAK 1× per load (stable)
-      // - Tap A → tap B yang cocok. Tiap B hanya boleh 1× per soal.
-      // - Garis SVG: A↔B yang sudah dipasangkan digambar (curve bezier).
-      // - Simpan: _jodohJawaban[soalId][indexA] = indexB (JSON ke DB).
-      // - Teks panjang: auto-wrap, gak ketutup (maxLines: null di form, Expanded di UI).
+      // JODOH: baris kiri = soal (1..N), baris kanan = jawaban acak (a..N).
+      // Di bawahnya: input jawaban per soal (siswa ketik huruf a,b,c... atau nomor 1,2,3...).
       final nRow = opsiList.isNotEmpty ? opsiList.length ~/ 2 : 0;
       if (nRow == 0) return const SizedBox.shrink();
 
@@ -703,163 +690,98 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
         return idx;
       });
 
-      // Load jawaban jodoh tersimpan (JSON map indexA->indexB).
-      final jodohMap = _jodohJawaban.putIfAbsent(curId, () {
-        final saved = (_jawaban[curId] ?? '').toString();
-        if (saved.isNotEmpty) {
-          try {
-            final m = jsonDecode(saved);
-            if (m is Map) {
-              final r = <int, int>{};
-              m.forEach((k, v) => r[int.parse(k.toString())] = int.parse(v.toString()));
-              return r;
+      // ===== DISPLAY: SOAL (KIRI) + JAWABAN ACAK (KANAN), TANPA TAP =====
+      // Jawaban disimpan sebagai JSON array di _jawaban[soalId]: ["a","b","c"]
+      // (index = nomor soal, value = huruf jawaban yang diketik siswa).
+      // Load jawaban tersimpan ke controller.
+      final savedJodoh = (_jawaban[curId] ?? '').toString();
+      if (savedJodoh.isNotEmpty) {
+        try {
+          final arr = jsonDecode(savedJodoh);
+          if (arr is List) {
+            for (var i = 0; i < nRow; i++) {
+              final key = '${curId}_jodoh_${i + 1}';
+              if (i < arr.length && !(_essayCtrl[key]?.text.isNotEmpty ?? false)) {
+                _ctrlFor(key).text = '${arr[i]}';
+              }
             }
-          } catch (_) {}
-        }
-        return <int, int>{};
-      });
+          }
+        } catch (_) {}
+      }
 
-      // ===== KOORDINAT: pakai GlobalKey per kartu A & B di tiap baris =====
-      // Tiap kartu A & B punya GlobalKey sendiri; saat paint dipanggil,
-      // RenderBox-nya diukur relatif terhadap jodohKey (container Stack).
-      // Ini ngilangin estimasi 48px-per-row yang meleset kalau teks wrap
-      // multi-line — garis selalu nutup di posisi A & B yang beneran.
-      final jodohKey = GlobalKey();
-      final keysA = List<GlobalKey>.generate(nRow, (_) => GlobalKey());
-      final keysB = List<GlobalKey>.generate(nRow, (_) => GlobalKey());
-      // LayoutBuilder gak dipakai lagi (posisi diukur dari GlobalKey,
-      // bukan dari constraints). Dipertahain karena gak nganggu.
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              Container(
-                key: jodohKey,
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ===== INSTRUKSI =====
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'PETUNJUK PENGERJAAN',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '• Hubungkan setiap nomor di kolom A dengan huruf jawaban di kolom B yang paling tepat.\n'
-                            '• Setiap huruf hanya boleh digunakan sekali.\n'
-                            '• Tap nomor di kolom A, lalu tap huruf di kolom B.\n'
-                            '• Garis akan muncul otomatis untuk menunjukkan pasangan.',
-                            style: const TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF475569)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // ===== HEADER 2 KOLOM =====
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            decoration: BoxDecoration(color: const Color(0xFF4338CA), borderRadius: BorderRadius.circular(8)),
-                            alignment: Alignment.center,
-                            child: const Text('Kolom A', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                          ),
+      return Container(
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12)]),
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Kolom soal (kiri): nomor + teks pernyataan
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    children: [
+                      for (var r = 0; r < nRow; r++)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: _buildJodohSoalCard(r, opsiList),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          flex: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            decoration: BoxDecoration(color: const Color(0xFFE0E7FF), borderRadius: BorderRadius.circular(8)),
-                            alignment: Alignment.center,
-                            child: const Text('Kolom B', style: TextStyle(color: Color(0xFF4338CA), fontWeight: FontWeight.bold, fontSize: 13)),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    // ===== 2 KOLOM BERDAMPINGAN =====
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Kolom A (kiri)
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            children: [
-                              for (var r = 0; r < nRow; r++)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Builder(
-                                    key: keysA[r],
-                                    builder: (_) => _buildJodohCardA(r, curId, opsiList, jodohMap),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        // Kolom B (kanan)
-                        Expanded(
-                          flex: 4,
-                          child: Column(
-                            children: [
-                              for (var r = 0; r < nRow; r++)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4),
-                                  child: Builder(
-                                    key: keysB[r],
-                                    builder: (_) => _buildJodohCardB(r, curId, opsiList, shuffledB, jodohMap),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Tap nomor di Kolom A, lalu tap huruf di Kolom B yang cocok. Sudah ${jodohMap.length} dari $nRow pasangan.',
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              // Garis SVG: curve A↔B yang sudah dipasangkan (lapis atas, gak nerima tap).
-              // Posisi A & B diukur dari GlobalKey (bukan estimasi), jadi garis selalu
-              // nutup di kartu yang beneran, meskipun teks multi-line.
-              if (jodohMap.isNotEmpty)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _JodohLinesPainter(
-                        jodohMap: jodohMap,
-                        keysA: keysA,
-                        keysB: keysB,
-                        anchor: jodohKey,
-                        shuffledB: shuffledB,
-                      ),
-                    ),
+                    ],
                   ),
                 ),
+                const SizedBox(width: 12),
+                // Kolom jawaban acak (kanan): huruf + teks jawaban
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    children: [
+                      for (var r = 0; r < nRow; r++)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: _buildJodohJawabanCard(r, opsiList, shuffledB),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // ===== INPUT JAWABAN PER SOAL (DI BAWAH) =====
+            for (var r = 0; r < nRow; r++) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: TextField(
+                  key: ValueKey('jodoh_input_${curId}_$r'),
+                  controller: _ctrlFor('${curId}_jodoh_${r + 1}'),
+                  maxLines: 1,
+                  onChanged: (v) {
+                    // Kumpulkan semua input jodoh jadi JSON array, simpan di _jawaban[soalId]
+                    final arr = <String>[
+                      for (var i = 0; i < nRow; i++)
+                        _ctrlFor('${curId}_jodoh_${i + 1}').text,
+                    ];
+                    _jawaban[curId] = jsonEncode(arr);
+                    _belumKirim.add(curId);
+                    _simpanLokal();
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Jawaban soal ${r + 1}',
+                    hintStyle: TextStyle(color: Colors.grey[400]),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey[200]!)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppTheme.primary, width: 2)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              if (r < nRow - 1) const SizedBox(height: 4),
             ],
-          );
-        },
+          ],
+        ),
       );
     } else if (jenis == 'essay') {
       return Container(
@@ -898,117 +820,68 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
     return const SizedBox.shrink();
   }
 
-  /// Card kolom A: nomor + teks pernyataan. Tap = unpair (lepas B lama).
-  Widget _buildJodohCardA(int rowIndex, String curId, List opsiList, Map<int, int> jodohMap) {
+  /// Card soal (kiri): nomor + teks pernyataan. Display doang, tanpa tap.
+  Widget _buildJodohSoalCard(int rowIndex, List opsiList) {
     final aText = (rowIndex * 2 < opsiList.length) ? opsiList[rowIndex * 2].toString() : '';
-    final isAPaired = jodohMap.containsKey(rowIndex);
-    return Material(
-      color: isAPaired ? AppTheme.primary.withValues(alpha: 0.08) : Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            jodohMap.remove(rowIndex);
-            _jodohJawaban[curId] = jodohMap;
-          });
-          _saveJawaban(curId);
-        },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isAPaired ? AppTheme.primary : const Color(0xFFE2E8F0),
-              width: isAPaired ? 2 : 1,
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(color: const Color(0xFFF1F5F9), shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text('${rowIndex + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF475569))),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              aText,
+              style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF0F172A)),
             ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isAPaired ? AppTheme.primary : const Color(0xFFF1F5F9),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text('${rowIndex + 1}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isAPaired ? Colors.white : const Color(0xFF475569))),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  aText,
-                  style: TextStyle(fontSize: 13, height: 1.4, color: const Color(0xFF0F172A), fontWeight: isAPaired ? FontWeight.w600 : FontWeight.normal),
-                ),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
 
-  /// Card kolom B: huruf + teks jawaban (urutan acak). Tap = pasang ke A di baris sama.
-  Widget _buildJodohCardB(int rowIndex, String curId, List opsiList, List<int> shuffledB, Map<int, int> jodohMap) {
+  /// Card jawaban acak (kanan): huruf + teks jawaban. Display doang, tanpa tap.
+  Widget _buildJodohJawabanCard(int rowIndex, List opsiList, List<int> shuffledB) {
     final bOrigIdx = (rowIndex < shuffledB.length) ? shuffledB[rowIndex] : rowIndex;
     final bText = (bOrigIdx * 2 + 1 < opsiList.length) ? opsiList[bOrigIdx * 2 + 1].toString() : '';
     final bLabel = String.fromCharCode(97 + rowIndex);
-    final bUsedByOther = jodohMap.values.contains(bOrigIdx);
-    final isAPaired = jodohMap.containsKey(rowIndex);
-    final isThisBUsed = bUsedByOther && !isAPaired;
-    return Material(
-      color: isAPaired ? AppTheme.primary.withValues(alpha: 0.08) : isThisBUsed ? const Color(0xFFF1F5F9) : Colors.white,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: () {
-          setState(() {
-            if (isThisBUsed) {
-              jodohMap.removeWhere((_, b) => b == bOrigIdx);
-            }
-            jodohMap[rowIndex] = bOrigIdx;
-            _jodohJawaban[curId] = jodohMap;
-          });
-          _saveJawaban(curId);
-        },
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isAPaired ? AppTheme.primary : isThisBUsed ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
-              width: isAPaired ? 2 : 1,
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(color: const Color(0xFFE0E7FF), shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Text(bLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF4338CA))),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              bText,
+              style: const TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF334155)),
             ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: isAPaired ? AppTheme.primary : isThisBUsed ? const Color(0xFFE2E8F0) : const Color(0xFFF1F5F9),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(bLabel, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: isAPaired ? Colors.white : const Color(0xFF64748B))),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  bText,
-                  style: TextStyle(fontSize: 13, height: 1.4, color: isAPaired ? const Color(0xFF0F172A) : const Color(0xFF334155), fontWeight: isAPaired ? FontWeight.w600 : FontWeight.normal),
-                ),
-              ),
-              if (isAPaired) const Padding(
-                padding: EdgeInsets.only(left: 8),
-                child: Icon(Icons.check_circle, size: 18, color: AppTheme.primary),
-              ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -1296,95 +1169,6 @@ final Map<String, List<int>> _jodohOnggok = {};     // soalId -> urutan index B 
       ),
     );
     if (ok == true) await _submit();
-  }
-}
-
-class _JodohLinesPainter extends CustomPainter {
-  final Map<int, int> jodohMap;
-  final List<GlobalKey> keysA;
-  final List<GlobalKey> keysB;
-  final GlobalKey anchor;
-  final List<int> shuffledB;
-
-  _JodohLinesPainter({
-    required this.jodohMap,
-    required this.keysA,
-    required this.keysB,
-    required this.anchor,
-    required this.shuffledB,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Ukur posisi A & B dari GlobalKey (RenderBox), relatif terhadap
-    // container jodohKey (anchor). Ini ngilangin estimasi tinggi-row
-    // yang meleset buat teks multi-line — garis selalu nutup di posisi
-    // kartu yang beneran.
-    final anchorContext = anchor.currentContext;
-    if (anchorContext == null) return;
-    final anchorBox = anchorContext.findRenderObject() as RenderBox?;
-    if (anchorBox == null) return;
-
-    final dotRadius = 5.0;
-    final strokeWidth = 3.0;
-    final lineColor = const Color(0xFF4338CA);
-
-    for (final MapEntry(key: aIdx, value: bIdx) in jodohMap.entries) {
-      if (aIdx >= keysA.length) continue;
-      final aCtx = keysA[aIdx].currentContext;
-      if (aCtx == null) continue;
-      final aBox = aCtx.findRenderObject() as RenderBox?;
-      if (aBox == null || !aBox.hasSize) continue;
-
-      // Posisi A: tengah-kanan kartu A
-      final aPos = aBox.localToGlobal(Offset.zero, ancestor: anchorBox);
-      final aCenter = Offset(aPos.dx + aBox.size.width, aPos.dy + aBox.size.height / 2);
-
-      // Posisi B: bIdx = index B asli (0..nRow-1). Baris display mana yang
-      // nampilin B itu? shuffledB[displayPos] = bOrigIdx, jadi reverse-kan.
-      int bDisplayPos = -1;
-      for (int i = 0; i < shuffledB.length; i++) {
-        if (shuffledB[i] == bIdx) {
-          bDisplayPos = i;
-          break;
-        }
-      }
-      if (bDisplayPos < 0 || bDisplayPos >= keysB.length) continue;
-      final bCtx = keysB[bDisplayPos].currentContext;
-      if (bCtx == null) continue;
-      final bBox = bCtx.findRenderObject() as RenderBox?;
-      if (bBox == null || !bBox.hasSize) continue;
-
-      final bPos = bBox.localToGlobal(Offset.zero, ancestor: anchorBox);
-      final bCenter = Offset(bPos.dx, bPos.dy + bBox.size.height / 2);
-
-      // Garis bezier: dari (aCenter) ke (bCenter), control point tengah X
-      final midX = (aCenter.dx + bCenter.dx) / 2;
-      final path = Path()
-        ..moveTo(aCenter.dx, aCenter.dy)
-        ..cubicTo(midX, aCenter.dy, midX, bCenter.dy, bCenter.dx, bCenter.dy);
-
-      final paint = Paint()
-        ..color = lineColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round;
-      canvas.drawPath(path, paint);
-
-      // Dot di ujung A
-      canvas.drawCircle(aCenter, dotRadius, Paint()..color = lineColor);
-      // Dot di ujung B
-      canvas.drawCircle(bCenter, dotRadius, Paint()..color = lineColor);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    if (oldDelegate is! _JodohLinesPainter) return true;
-    // Repaint setiap kali jumlah pasangan berubah (map mutasi in-place di
-    // onTap, jadi compare by length). Posisi GlobalKey selalu up-to-date
-    // karena CustomPaint di-rebuild tiap frame layout.
-    return oldDelegate.jodohMap.length != jodohMap.length;
   }
 }
 

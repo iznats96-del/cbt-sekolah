@@ -125,48 +125,33 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     );
   }
 
-  /// Format jodoh multi-pair jadi readable "A1→B3, A2→B1".
-  /// [isKunci] = true -> parse dari kunci ({map: "..."} atau legacy {index, jawaban, ...}).
-  /// [isKunci] = false -> parse dari jawaban siswa (JSON map indexA->indexB atau teks legacy).
-  String _fmtJodoh(String raw, bool isKunci) {
+  /// Format jodoh: jawaban siswa (JSON array ["1","2","3"] atau ["a","b","c"])
+  /// + kunci ({map: "..."}).
+  String _fmtJodohJawaban(String raw) {
     if (raw.isEmpty) return '';
     try {
-      Map<String, String> map;
-      if (isKunci) {
-        // Kunci: {map: '{"0":"3","1":"1"}'} -> parse map.
-        final m = jsonDecode(raw);
-        if (m is Map && m['map'] != null) {
-          final km = jsonDecode(m['map'].toString());
-          map = <String, String>{
-            for (final e in km.entries) e.key.toString(): e.value.toString(),
-          };
-        } else {
-          // Legacy: {index: n, jawaban: teks, 1: n2, ...}
-          map = {};
-          for (final e in m.entries) {
-            final k = e.key.toString();
-            if (k == 'jawaban') continue;
-            map[k] = e.value.toString();
-          }
-        }
-      } else {
-        // Jawaban siswa: {"0":"3","1":"1"}
-        final m = jsonDecode(raw);
-        if (m is Map) {
-          map = {for (final e in m.entries) e.key.toString(): e.value.toString()};
-        } else {
-          // Teks legacy (B tunggal) -> tampilin apa adanya
-          return raw;
+      final arr = jsonDecode(raw);
+      if (arr is List) {
+        return arr.map((e) => e.toString()).join(', ');
+      }
+    } catch (_) {}
+    return raw;
+  }
+
+  String _fmtJodohKunci(String raw) {
+    if (raw.isEmpty) return '';
+    try {
+      final m = jsonDecode(raw);
+      if (m is Map && m['map'] != null) {
+        final km = jsonDecode(m['map'].toString());
+        if (km is Map) {
+          final sorted = km.entries.toList()..sort((a, b) =>
+              (int.tryParse(a.key.toString()) ?? 0).compareTo(int.tryParse(b.key.toString()) ?? 0));
+          return sorted.map((e) => 'A${(int.tryParse(e.key.toString()) ?? 0) + 1}→B${(int.tryParse(e.value.toString()) ?? 0) + 1}').join(', ');
         }
       }
-      // Sort by A index
-      final sorted = map.entries.toList()..sort((a, b) =>
-          (int.tryParse(a.key) ?? 0).compareTo(int.tryParse(b.key) ?? 0));
-      if (sorted.isEmpty) return raw;
-      return sorted.map((e) => 'A${(int.tryParse(e.key) ?? 0) + 1}→B${(int.tryParse(e.value) ?? 0) + 1}').join(', ');
-    } catch (_) {
-      return raw; // fallback: tampilin mentah
-    }
+    } catch (_) {}
+    return raw;
   }
 
   Widget _stat(String label, String val, Color c) {
@@ -191,9 +176,9 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     final jawabBetul = s['benar'];
     final nilaiEsai = s['nilai_esai'];
 
-    // JODOH MULTI-PAIR: format jawaban/kunci jadi "A1→B3, A2→B1" biar readable.
-    final jwbn = jenis == 'jodoh' ? _fmtJodoh(jwbnRaw, false) : jwbnRaw;
-    final kunci = kunciRaw == null ? null : (jenis == 'jodoh' ? _fmtJodoh(kunciRaw, true) : kunciRaw);
+    // JODOH: format jawaban/kunci.
+    final jwbn = jenis == 'jodoh' ? _fmtJodohJawaban(jwbnRaw) : jwbnRaw;
+    final kunci = kunciRaw == null ? null : (jenis == 'jodoh' ? _fmtJodohKunci(kunciRaw) : kunciRaw);
 
     Color warn;
     String badge;
