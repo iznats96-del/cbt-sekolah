@@ -1,0 +1,4 @@
+storeFilePath=../cbt-release.keystore
+storePassword=GANTI_PASSWORD_STORE
+keyAlias=GANTI_ALIAS
+keyPassword=GANTI_PASSWORD_KEY

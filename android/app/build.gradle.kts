@@ -39,20 +39,20 @@ android {
     signingConfigs {
         create("release") {
             if (hasSigning) {
-                storeFile = file(envKeyStorePath!!)
+                storeFile = rootProject.file(envKeyStorePath!!)
                 storePassword = envKeyStorePass
                 keyAlias = envKeyAlias
                 keyPassword = envKeyPass
+                isV1SigningEnabled = true
+                isV2SigningEnabled = true
+                isV3SigningEnabled = true
             }
         }
     }
 
     buildTypes {
         release {
-            signingConfig = if (hasSigning)
-                signingConfigs.getByName("release")
-            else
-                signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

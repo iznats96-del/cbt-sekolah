@@ -740,89 +740,170 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       if (d is Map) pilihan = Map<String, dynamic>.from(d);
     } catch (_) {}
 
-    final scroller = ScrollController();
+    final terisi = pilihan.values.where((v) => v != null && v.toString().isNotEmpty).length;
+    final lengkap = terisi == kiri.length;
+    final tinggiMaks = (MediaQuery.sizeOf(context).height * 0.52).clamp(240.0, 520.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Cbt.label('PILIH PASANGAN YANG TEPAT'),
-        const SizedBox(height: 8),
-        Container(
-          height: 260,
-          decoration: BoxDecoration(
-            color: Cbt.paper,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Cbt.line),
-          ),
+        Row(
+          children: [
+            Cbt.label('PILIH PASANGAN YANG TEPAT'),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: lengkap
+                    ? Cbt.teal.withValues(alpha: 0.14)
+                    : Cbt.blue.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(99),
+              ),
+              child: Text(
+                '$terisi / ${kiri.length} terisi',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: lengkap ? Cbt.teal : Cbt.blue,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          'Pasangkan tiap pernyataan di kiri dengan jawaban yang tepat di kanan.',
+          style: Cbt.caption,
+        ),
+        const SizedBox(height: 12),
+        ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: tinggiMaks.toDouble()),
           child: ListView.separated(
-            controller: scroller,
-            padding: const EdgeInsets.all(12),
+            shrinkWrap: true,
+            padding: const EdgeInsets.all(10),
             itemCount: kiri.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: Cbt.line),
+            separatorBuilder: (_, __) => const SizedBox(height: 4),
             itemBuilder: (context, i) {
-              // Konversi index asli (tersimpan) -> posisi tampil utk initialValue.
               final tersimpan = pilihan['$i']?.toString();
-              final posisiTampil = tersimpan == null ? null : urutan.indexOf(int.tryParse(tersimpan) ?? -1);
-              return Row(
-                children: [
-                  Container(
-                    width: 28, height: 28,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(color: Cbt.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                    child: Text('${i + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Cbt.blue)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(kiri[i].toString(), style: Cbt.option),
-                  ),
-                  const Icon(Icons.arrow_right_alt, size: 16, color: Cbt.muted),
-                  const SizedBox(width: 4),
-                  SizedBox(
-                    width: 132,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: posisiTampil == null || posisiTampil < 0 ? null : '$posisiTampil',
-                      isDense: true,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: Cbt.line)),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(9), borderSide: const BorderSide(color: Cbt.line)),
+              final posisiTampil = tersimpan == null
+                  ? null
+                  : urutan.indexOf(int.tryParse(tersimpan) ?? -1);
+              final sudah = posisiTampil != null && posisiTampil >= 0;
+              final field = DropdownButtonFormField<String>(
+                initialValue: sudah ? '$posisiTampil' : null,
+                isDense: false,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  filled: true,
+                  fillColor: Colors.white,
+                  hintText: 'Pilih pasangan…',
+                  hintStyle: const TextStyle(fontSize: 13, color: Cbt.muted),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(11),
+                      borderSide: const BorderSide(color: Cbt.line)),
+                  enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(11),
+                      borderSide: const BorderSide(color: Cbt.line)),
+                  focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(11),
+                      borderSide: const BorderSide(color: Cbt.blue, width: 1.8)),
+                ),
+                items: [
+                  for (var j = 0; j < urutan.length; j++)
+                    DropdownMenuItem<String>(
+                      value: '$j',
+                      child: Text(
+                        '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, color: Cbt.ink),
                       ),
-                      hint: const Text('Pilih…', style: TextStyle(fontSize: 12)),
-                      items: [
-                        for (var j = 0; j < urutan.length; j++)
-                          DropdownMenuItem<String>(
-                            // value = posisi tampil; label pakai teks item asli.
-                            value: '$j',
-                            child: Text(
-                              '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                      ],
-                      onChanged: (v) {
-                        setState(() {
-                          if (v == null) {
-                            pilihan.remove('$i');
-                          } else {
-                            // Simpan INDEX ASLI item kanan (bukan posisi tampil)
-                            // biar cocok dgn kunci.map di server.
-                            pilihan['$i'] = urutan[int.parse(v)].toString();
-                          }
-                        });
-                        _saveJawaban(curId, value: jsonEncode(pilihan));
-                      },
                     ),
-                  ),
                 ],
+                onChanged: (v) {
+                  setState(() {
+                    if (v == null) {
+                      pilihan.remove('$i');
+                    } else {
+                      pilihan['$i'] = urutan[int.parse(v)].toString();
+                    }
+                  });
+                  _saveJawaban(curId, value: jsonEncode(pilihan));
+                },
+              );
+              final nomor = Container(
+                width: 34,
+                height: 34,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: sudah
+                      ? Cbt.teal.withValues(alpha: 0.14)
+                      : Cbt.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text('${i + 1}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: sudah ? Cbt.teal : Cbt.blue)),
+              );
+              final teks = Expanded(
+                child: Text(
+                  kiri[i].toString(),
+                  style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.35,
+                      fontWeight: FontWeight.w500,
+                      color: Cbt.ink),
+                ),
+              );
+              final centang = Icon(
+                Icons.check_circle_rounded,
+                size: 18,
+                color: sudah ? Cbt.teal : Colors.transparent,
+              );
+              return LayoutBuilder(
+                builder: (context, box) {
+                  final sempit = box.maxWidth < 430;
+                  return Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: sudah
+                          ? Cbt.teal.withValues(alpha: 0.05)
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: sudah
+                            ? Cbt.teal.withValues(alpha: 0.35)
+                            : Cbt.line,
+                      ),
+                    ),
+                    child: sempit
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(children: [nomor, const SizedBox(width: 10), teks, centang]),
+                              const SizedBox(height: 8),
+                              field,
+                            ],
+                          )
+                        : Row(
+                            children: [
+                              nomor,
+                              const SizedBox(width: 10),
+                              teks,
+                              centang,
+                              const SizedBox(width: 12),
+                              SizedBox(width: 190, child: field),
+                            ],
+                          ),
+                  );
+                },
               );
             },
           ),
         ),
-        const SizedBox(height: 8),
-        Text('Peta jawaban lengkap bila semua pasangan sudah dipilih.', style: Cbt.caption),
       ],
     );
   }

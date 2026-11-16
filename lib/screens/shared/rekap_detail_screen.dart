@@ -1,7 +1,34 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+
+/// Ubah peta jodoh {"0":"1",...} jadi teks "1 → pilihan" yang enak dibaca.
+/// [opsi] = {"kiri":[...], "kanan":[...]} dari soal.
+String _formatJodoh(dynamic raw, dynamic opsi) {
+  Map<String, dynamic>? map;
+  if (raw is Map) map = Map<String, dynamic>.from(raw);
+  else if (raw is String) { try { map = Map<String, dynamic>.from(jsonDecode(raw)); } catch (_) {} }
+  if (map == null) return '${raw ?? '—'}';
+  List<dynamic> kiri = const [], kanan = const [];
+  if (opsi is Map) {
+    kiri = opsi['kiri'] is List ? opsi['kiri'] : const [];
+    kanan = opsi['kanan'] is List ? opsi['kanan'] : const [];
+  }
+  final keys = map.keys.toList()..sort((a, b) => int.tryParse(a)!.compareTo(int.tryParse(b)!));
+  final buf = StringBuffer();
+  for (final k in keys) {
+    final ki = int.tryParse(k) ?? 0;
+    final bi = int.tryParse('${map[k]}') ?? 0;
+    final kiriTxt = ki < kiri.length ? kiri[ki] : 'item ${ki + 1}';
+    final kananTxt = bi < kanan.length ? kanan[bi] : '${map[k]}';
+    if (buf.isNotEmpty) buf.writeln();
+    buf.write('${ki + 1}. $kiriTxt → $kananTxt');
+  }
+  return buf.toString();
+}
 
 /// Detail jawaban 1 murid pada 1 ujian (untuk guru/admin) — pakai RPC rekap_detail.
 /// Tampilkan: PG (jawaban murid vs kunci, benar/salah) + esai (jawaban + nilai).
@@ -50,7 +77,12 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     final m = _murid;
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text('Jawaban: ${m?['nama'] ?? '...'}')),
+      appBar: _DetailHeader(
+        nama: '${m?['nama'] ?? '...'}',
+        nis: '${m?['nis'] ?? ''}',
+        status: '${m?['status'] ?? ''}',
+        nilai: m?['nilai'],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _err != null
@@ -140,8 +172,13 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
 
   Widget _soalCard(int no, Map<String, dynamic> s) {
     final jenis = '${s['jenis'] ?? 'pg'}';
-    final jwbn = s['jawaban'] == null ? '' : '${s['jawaban']}';
-    final kunci = s['kunci'] == null ? null : '${s['kunci']}';
+    final isJodoh = jenis == 'jodoh';
+    final jwbn = isJodoh
+        ? _formatJodoh(s['jawaban'], s['opsi'])
+        : (s['jawaban'] == null ? '' : '${s['jawaban']}');
+    final kunci = s['kunci'] == null
+        ? null
+        : (isJodoh ? _formatJodoh(s['kunci'], s['opsi']) : '${s['kunci']}');
     final jawabBetul = s['benar'];
     final nilaiEsai = s['nilai_esai'];
     Color warn;
@@ -152,7 +189,8 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
     } else if (jawabBetul == true) {
       warn = AppTheme.secondary;
       badge = 'BENAR';
-    } else if (jwbn.isEmpty) {
+    } else if (s['jawaban'] == null || '$jwbn'.trim().isEmpty ||
+        (isJodoh && (s['jawaban'] == null || '${s['jawaban']}'.trim().isEmpty))) {
       warn = Colors.grey;
       badge = 'KOSONG';
     } else {
@@ -215,12 +253,164 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
                     const SizedBox(width: 6),
                     Text('Nilai esai (guru): ${nilaiEsai ?? 'belum dinilai'}',
                         style: const TextStyle(fontSize: 12, color: AppTheme.accent, fontWeight: FontWeight.w600)),
+                   ],
+                 ),
+               ),
+           ],
+         ),
+       ),
+     );
+   }
+}
+
+class _DetailHeader extends StatelessWidget implements PreferredSizeWidget {
+  final String nama, nis, status;
+  final dynamic nilai;
+  const _DetailHeader({
+    required this.nama,
+    required this.nis,
+    required this.status,
+    this.nilai,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(122);
+
+  @override
+  Widget build(BuildContext context) {
+    final inisial = nama
+        .trim()
+        .split(RegExp(r'\s+'))
+        .take(2)
+        .map((e) => e.isEmpty ? '' : e[0])
+        .join()
+        .toUpperCase();
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 18, 16),
+          child: Row(
+            children: [
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                tooltip: 'Kembali',
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+              ),
+              const SizedBox(width: 2),
+              Container(
+                width: 46,
+                height: 46,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(14),
+                  border:
+                      Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  inisial.isEmpty ? '?' : inisial,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      'DETAIL JAWABAN SISWA',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.4),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      nama,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (nis.isNotEmpty && nis != 'null') _pill('NIS $nis'),
+                        if (status.isNotEmpty && status != 'null') ...[
+                          const SizedBox(width: 6),
+                          _pill(status),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
-          ],
+              if (nilai != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(12),
+                    border:
+                        Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'NILAI',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1),
+                      ),
+                      Text(
+                        '$nilai',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _pill(String t) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Text(
+          t,
+          style: const TextStyle(
+              color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w600),
+        ),
+      );
 }
