@@ -63,9 +63,6 @@ jobs:
           echo "All $MAX_RETRIES attempts failed"
           exit 1
 
-      - name: Build Web
-        run: flutter build web --release
-
       - name: Upload APK artifact
         if: ${{ !cancelled() }}
         continue-on-error: true
@@ -73,15 +70,6 @@ jobs:
         with:
           name: cbt-sekolah-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 3
-
-      - name: Upload Web artifact
-        if: ${{ !cancelled() }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: cbt-sekolah-web
-          path: build/web/
           retention-days: 3
 
       - name: Release APK
