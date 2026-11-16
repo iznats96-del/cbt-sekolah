@@ -18,7 +18,7 @@ val envKeyAlias = System.getenv("KEYSTORE_ALIAS") ?: keystoreProperties.getPrope
 val envKeyPass = System.getenv("KEYSTORE_KEYPASSWORD") ?: keystoreProperties.getProperty("keyPassword")
 val hasSigning = envKeyStorePath != null && envKeyStorePass != null && envKeyAlias != null
 
-android {
+configure<com.android.build.api.dsl.ApplicationExtension> {
     namespace = "com.cbtsekolah.cbt_sekolah"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -43,9 +43,6 @@ android {
                 storePassword = envKeyStorePass
                 keyAlias = envKeyAlias
                 keyPassword = envKeyPass
-                isV1SigningEnabled = true
-                isV2SigningEnabled = true
-                isV3SigningEnabled = true
             }
         }
     }
@@ -54,6 +51,14 @@ android {
         release {
             signingConfig = signingConfigs.getByName("release")
         }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.signingConfig.enableV1Signing.set(true)
+        variant.signingConfig.enableV2Signing.set(true)
+        variant.signingConfig.enableV3Signing.set(true)
     }
 }
 
