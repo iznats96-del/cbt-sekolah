@@ -22,6 +22,11 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.cbtsekolah.cbt_sekolah/kiosk"
+
+    // Kehilangan fokus yang lasted lebih dari ini dianggap intrusi sungguhan.
+    // Di bawah ini = kejadian wajar (notif shade, dialog sistem, keyboard,
+    // atau applyImmersive() dari enforcer) dan TIDAK boleh dihitung sebagai pelanggaran.
+    private val INTRUSION_MIN_MS = 2500L
     private var isKioskLocked = false
     private var ch: MethodChannel? = null
     private var volumeObserver: ContentObserver? = null
@@ -44,6 +49,10 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun applyImmersive() {
+        // Tandai sedang menerapkan immersive, supaya fokus yang hilang akibat
+        // applyImmersive() tidak salah dihitung sebagai penyontekan.
+        applyingImmersive = true
+        handler.postDelayed({ applyingImmersive = false }, 800)
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 or View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -131,6 +140,8 @@ class MainActivity : FlutterActivity() {
                     stopService(Intent(this, AlarmService::class.java))
                 } catch (_: Exception) {}
             }, 250)
+            // focus balik: batalkan reports intrusi yg masih tertunda
+            cancelPendingIntrusion()
         }
         if (isKioskLocked && !hasFocus) {
             // tutup overlay/floating/chat head yang coba nimpa CBT
@@ -147,8 +158,33 @@ class MainActivity : FlutterActivity() {
                     am.moveTaskToFront(taskId, 0)
                 } catch (_: Exception) {}
             }, 800)
-            reportIntrusion()
+            // JANGAN langsung laporkan intrusi: kehilangan fokus < INTRUSION_MIN_MS
+            // itu kejadian wajar (notif shade, dialog sistem, keyboard, atau
+            // applyImmersive() dari enforcer) BUKAN penyontekan.
+            schedulePendingIntrusion()
         }
+    }
+
+    // ── deteksi intrusi yang tidak salah positives ──────────────────
+    private var pendingIntrusion: Runnable? = null
+    private var applyingImmersive = false
+
+    private fun cancelPendingIntrusion() {
+        pendingIntrusion?.let { handler.removeCallbacks(it) }
+        pendingIntrusion = null
+    }
+
+    private fun schedulePendingIntrusion() {
+        if (pendingIntrusion != null) return
+        val r = Runnable {
+            pendingIntrusion = null
+            // fokus masih hilang setelah durasi minimum -> intrusi sungguhan
+            if (isKioskLocked && !hasWindowFocus() && !applyingImmersive) {
+                reportIntrusion()
+            }
+        }
+        pendingIntrusion = r
+        handler.postDelayed(r, INTRUSION_MIN_MS)
     }
 
     private var lastIntrusionAt = 0L

@@ -9,6 +9,7 @@ import '../../core/config.dart';
 import '../../services/api.dart';
 import '../auth/login_screen.dart';
 import 'pelaksanaan_screen.dart';
+import 'hasil_siswa_screen.dart';
 import '../../widgets/state_views.dart';
 
 class UjianBerandaList extends StatefulWidget {
@@ -144,6 +145,14 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
       ));
     } catch (e) {
       final msg = e.toString();
+      // Sudah selesai -> langsung buka layar Hasil (tanpa pesan error).
+      if (msg.contains('Sudah selesai') || msg.contains('sudah dikumpulkan')) {
+        if (!mounted) return;
+        Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => const HasilSiswaScreen(),
+        ));
+        return;
+      }
       _snack(msg.contains('Sudah mengerjakan')
           ? 'Kamu sudah mengerjakan ujian ini.'
           : msg.contains('luar jadwal') || msg.contains('tidak tersedia')

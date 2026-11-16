@@ -17,6 +17,23 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
   bool _loading = true;
   String? _error;
   String _filterStatus = 'semua';
+  final _cari = TextEditingController();
+
+  /// Hasil filter teks (nama, NIS, kelas, ujian) atas data yang sudah
+  /// difilter sebelumnya oleh status/jurusan/kelas.
+  List<Map<String, dynamic>> get _tampil {
+    final q = _cari.text.trim().toLowerCase();
+    if (q.isEmpty) return _rows;
+    return _rows.where((p) {
+      final s = p['siswa'];
+      final u = p['ujian'];
+      final k = s is Map ? s['kelas'] : null;
+      return '${s is Map ? s['nama'] : ''} ${s is Map ? s['nis'] : ''} '
+              '${k is Map ? k['nama'] : ''} ${u is Map ? u['nama'] : ''} ${p['status'] ?? ''}'
+          .toLowerCase()
+          .contains(q);
+    }).toList();
+  }
   String? _selectedJurusanId;
   String? _selectedKelasId;
 
@@ -107,6 +124,20 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
       appBar: AppBar(title: const Text('Daftar Peserta')),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: TextField(
+              controller: _cari,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: 'Cari nama siswa, NIS, kelas, atau ujian…',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
@@ -207,6 +238,10 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) return ErrorState(message: _error!, onRetry: _load);
+    if (_tampil.isEmpty && _cari.text.trim().isNotEmpty) {
+      return const Center(child: Text('Tidak ada peserta yang cocok.',
+          style: TextStyle(color: Colors.grey)));
+    }
     if (_rows.isEmpty) {
       return Center(
         child: Padding(
@@ -237,10 +272,10 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
       onRefresh: _load,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: _rows.length,
+        itemCount: _tampil.length,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, i) {
-          final p = _rows[i];
+          final p = _tampil[i];
           final siswa = p['siswa'];
           final ujian = p['ujian'];
           final kelasMap =

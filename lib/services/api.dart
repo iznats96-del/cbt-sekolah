@@ -129,6 +129,7 @@ class Api {
 
   /// Record a transient failure; open circuit if threshold reached
   static void _recordFailure(String context) {
+    if (!AppConfig.failoverEnabled) return; // Supabase-only mode
     _consecutiveFailures++;
     if (_consecutiveFailures >= AppConfig.failureThreshold && !_circuitOpen) {
       _circuitOpen = true;
@@ -197,6 +198,19 @@ class Api {
     if (_fallbackToken != null) h['Authorization'] = 'Bearer $_fallbackToken';
     if (contentType != null) h['Content-Type'] = contentType;
     return h;
+  }
+
+  /// GET langsung ke endpoint /api/* server fallback (dashboard, statistik, dll).
+  /// Dipakai layar yang butuh data agregat yang tidak tersedia lewat REST biasa.
+  static Future<dynamic> fallbackGetApi(String path) async {
+    final uri = Uri.parse('${AppConfig.fallbackApiUrl}$path');
+    final res = await http
+        .get(uri, headers: _fallbackHeaders())
+        .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
+    if (res.statusCode != 200) {
+      throw Exception('Fallback GET $path: ${res.statusCode}');
+    }
+    return jsonDecode(res.body);
   }
 
   static Future<List<Map<String, dynamic>>> _fallbackGet(
@@ -350,6 +364,7 @@ class Api {
           continue;
         }
         _recordFailure('SELECT $table');
+        if (!AppConfig.failoverEnabled) rethrow;
         debugPrint(
             '[BackendRouter] ↪️ Fallback SELECT $table after primary failure');
         return await _fallbackGet(table,
@@ -386,6 +401,7 @@ class Api {
           continue;
         }
         _recordFailure('INSERT $table');
+        if (!AppConfig.failoverEnabled) rethrow;
         debugPrint(
             '[BackendRouter] ↪️ Fallback INSERT $table after primary failure');
         return await _fallbackInsert(table, data);
@@ -418,6 +434,7 @@ class Api {
           continue;
         }
         _recordFailure('UPDATE $table');
+        if (!AppConfig.failoverEnabled) rethrow;
         debugPrint(
             '[BackendRouter] ↪️ Fallback UPDATE $table after primary failure');
         return await _fallbackUpdate(table, id, data);
@@ -446,6 +463,7 @@ class Api {
           continue;
         }
         _recordFailure('DELETE $table');
+        if (!AppConfig.failoverEnabled) rethrow;
         debugPrint(
             '[BackendRouter] ↪️ Fallback DELETE $table after primary failure');
         return await _fallbackDelete(table, id);
@@ -475,6 +493,7 @@ class Api {
           continue;
         }
         _recordFailure('RPC $function');
+        if (!AppConfig.failoverEnabled) rethrow;
         debugPrint(
             '[BackendRouter] ↪️ Fallback RPC $function after primary failure');
         return await _fallbackRpc(function, params ?? {});
@@ -530,6 +549,7 @@ class Api {
           continue;
         }
         _recordFailure('Storage upload $bucket/$path');
+        if (!AppConfig.failoverEnabled) rethrow;
         debugPrint(
             '[BackendRouter] ↪️ Fallback storage upload $bucket/$path after primary failure');
         // fallback

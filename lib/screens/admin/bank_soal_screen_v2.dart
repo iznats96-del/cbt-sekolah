@@ -300,7 +300,7 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
     );
     if (ok != true) return;
     try {
-      await Api.client.from('bank_soal').delete().eq('id', soal['id']);
+      await Api.routerDelete('bank_soal', soal['id'] as String);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: const Text('Soal dihapus'), backgroundColor: AppTheme.danger),

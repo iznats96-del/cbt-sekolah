@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/design.dart';
+import '../../services/api.dart';
 import '../home.dart';
 import '../../widgets/state_views.dart';
 import 'data_master_screen.dart';
@@ -70,108 +72,171 @@ class _AdminShellState extends State<AdminShell> {
   }
 }
 
-class _AdminHome extends StatelessWidget {
+class _AdminHome extends StatefulWidget {
   final void Function(int index) go;
   const _AdminHome({required this.go});
 
   @override
+  State<_AdminHome> createState() => _AdminHomeState();
+}
+
+class _AdminHomeState extends State<_AdminHome> {
+  Map<String, dynamic> _stats = {};
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await Api.fallbackGetApi('/api/admin/dashboard');
+      if (!mounted) return;
+      setState(() {
+        _stats = res is Map ? Map<String, dynamic>.from(res['stats'] ?? res) : {};
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Cbt.paper,
       appBar: AppBar(
-        title: const Text('CBT Sekolah'),
+        backgroundColor: Cbt.paper,
+        foregroundColor: Cbt.ink,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('CBT Sekolah', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text('Pusat kendali ujian', style: Cbt.caption),
+          ],
+        ),
         actions: const [LogoutButton()],
       ),
       body: ContentMaxWidth(
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            Card(
-              margin: EdgeInsets.zero,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: const LinearGradient(
-                    colors: [AppTheme.primary, AppTheme.secondary],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text('Selamat datang, Administrator',
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
-                    SizedBox(height: 6),
-                    Text(
-                        'Kelola data ujian, bank soal, dan peserta dari menu di bawah.',
-                        style: TextStyle(color: Colors.white70, fontSize: 13)),
+        child: RefreshIndicator(
+          onRefresh: _load,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            children: [
+              // Header ringkas
+              Cbt.card(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(color: Cbt.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.admin_panel_settings_outlined, color: Cbt.blue, size: 24),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Selamat datang, Administrator',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Cbt.ink)),
+                          SizedBox(height: 3),
+                          Text('Kelola siswa, soal, dan jalannya ujian dari satu tempat.', style: Cbt.caption),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            _ControlCenter(),
-            const SizedBox(height: 16),
-            LayoutBuilder(builder: (context, c) {
-              final cols = (c.maxWidth / 200).floor().clamp(2, 4);
-              return GridView.count(
-                crossAxisCount: cols,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                childAspectRatio: 1.5,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                children: [
-                  _FeatureCard(
-                      icon: Icons.people_outline,
-                      label: 'Siswa',
-                      color: AppTheme.primary,
-                      onTap: () => go(1)),
-                  _FeatureCard(
-                      icon: Icons.person_outline,
-                      label: 'Guru',
-                      color: AppTheme.secondary,
-                      onTap: () => go(1)),
-                  _FeatureCard(
-                      icon: Icons.quiz_outlined,
-                      label: 'Bank Soal',
-                      color: AppTheme.accent,
-                      onTap: () => go(2)),
-                  _FeatureCard(
-                      icon: Icons.assignment_outlined,
-                      label: 'Ujian',
-                      color: AppTheme.danger,
-                      onTap: () => go(3)),
-                  _FeatureCard(
+              const SizedBox(height: 14),
+
+              // Statistik (dari /api/admin/dashboard)
+              _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator(color: Cbt.blue)),
+                    )
+                  : GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      mainAxisSpacing: 9,
+                      crossAxisSpacing: 9,
+                      childAspectRatio: 2,
+                      children: [
+                        _stat('Siswa', _stats['total_siswa'], Icons.people_outline, Cbt.blue),
+                        _stat('Guru', _stats['total_guru'], Icons.person_outline, Cbt.teal),
+                        _stat('Kelas', _stats['total_kelas'], Icons.school_outlined, Cbt.amber),
+                        _stat('Bank soal', _stats['total_soal'], Icons.quiz_outlined, Cbt.blue),
+                      ],
+                    ),
+              const SizedBox(height: 16),
+              _ControlCenter(),
+              const SizedBox(height: 16),
+              Cbt.label('AKSES CEPAT'),
+              const SizedBox(height: 10),
+              LayoutBuilder(builder: (context, c) {
+                final cols = (c.maxWidth / 200).floor().clamp(2, 4);
+                return GridView.count(
+                  crossAxisCount: cols,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  childAspectRatio: 1.5,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  children: [
+                    _FeatureCard(icon: Icons.people_outline, label: 'Siswa', color: Cbt.blue, onTap: () => widget.go(1)),
+                    _FeatureCard(icon: Icons.person_outline, label: 'Guru', color: Cbt.teal, onTap: () => widget.go(1)),
+                    _FeatureCard(icon: Icons.quiz_outlined, label: 'Bank Soal', color: Cbt.amber, onTap: () => widget.go(2)),
+                    _FeatureCard(icon: Icons.assignment_outlined, label: 'Ujian', color: Cbt.red, onTap: () => widget.go(3)),
+                    _FeatureCard(
                       icon: Icons.insert_chart_outlined,
                       label: 'Rekap Nilai',
-                      color: const Color(0xFF7C4DBC),
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => const RekapNilaiScreen()))),
-                  _FeatureCard(
+                      color: Cbt.blue,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RekapNilaiScreen())),
+                    ),
+                    _FeatureCard(
                       icon: Icons.badge_outlined,
                       label: 'Daftar Akun + Password',
-                      color: const Color(0xFF2F6F4F),
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => const DaftarAkunScreen()))),
-                  _FeatureCard(
+                      color: Cbt.teal,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DaftarAkunScreen())),
+                    ),
+                    _FeatureCard(
                       icon: Icons.person_add_outlined,
                       label: 'Akun Guru & Panitia',
-                      color: const Color(0xFFB25C00),
-                      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                          builder: (_) => const UserManagementScreen()))),
-                ],
-              );
-            }),
-          ],
+                      color: Cbt.amber,
+                      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const UserManagementScreen())),
+                    ),
+                  ],
+                );
+              }),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  Widget _stat(String label, dynamic value, IconData icon, Color color) => Cbt.card(
+        padding: const EdgeInsets.all(13),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 17, color: color),
+                const Spacer(),
+                Text('$value', style: Cbt.display.copyWith(fontSize: 24, color: Cbt.ink)),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Text(label, style: Cbt.caption),
+          ],
+        ),
+      );
 }
 
 class _ControlCenter extends StatelessWidget {

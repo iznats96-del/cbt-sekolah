@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/design.dart';
+import '../../services/api.dart';
 import '../home.dart';
 import 'monitoring_ujian_screen.dart';
 import 'peserta_ujian_screen.dart';
@@ -15,191 +17,223 @@ class PanitiaShell extends StatefulWidget {
 
 class _PanitiaShellState extends State<PanitiaShell> {
   int _index = 0;
-
   void _go(int i) => setState(() => _index = i);
 
   @override
   Widget build(BuildContext context) {
-    const pages = [
-      _PanitiaHome(),
-      MonitoringUjianScreen(),
-      PesertaUjianScreen(),
-      RekapPanitiaScreen(),
-      FotoSiswaScreen(),
+    final pages = <Widget>[
+      PanitiaHome(onGo: _go),
+      const MonitoringUjianScreen(),
+      const PesertaUjianScreen(),
+      const RekapPanitiaScreen(),
+      const FotoSiswaScreen(),
     ];
     return Scaffold(
-      body: pages[_index],
+      body: IndexedStack(index: _index, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: _go,
         destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Beranda'),
-          NavigationDestination(
-              icon: Icon(Icons.monitor_heart_outlined),
-              selectedIcon: Icon(Icons.monitor_heart),
-              label: 'Monitoring'),
-          NavigationDestination(
-              icon: Icon(Icons.people_outline),
-              selectedIcon: Icon(Icons.people),
-              label: 'Peserta'),
-          NavigationDestination(
-              icon: Icon(Icons.assessment_outlined),
-              selectedIcon: Icon(Icons.assessment),
-              label: 'Rekap'),
-          NavigationDestination(
-              icon: Icon(Icons.photo_camera_outlined),
-              selectedIcon: Icon(Icons.photo_camera),
-              label: 'Foto'),
+          NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'Ringkasan'),
+          NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'Monitoring'),
+          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Peserta'),
+          NavigationDestination(icon: Icon(Icons.assessment_outlined), selectedIcon: Icon(Icons.assessment), label: 'Rekap'),
+          NavigationDestination(icon: Icon(Icons.photo_camera_outlined), selectedIcon: Icon(Icons.photo_camera), label: 'Foto'),
         ],
       ),
     );
   }
 }
 
-class _PanitiaHome extends StatelessWidget {
-  const _PanitiaHome();
+class PanitiaHome extends StatefulWidget {
+  final ValueChanged<int> onGo;
+  const PanitiaHome({super.key, required this.onGo});
+
+  @override
+  State<PanitiaHome> createState() => _PanitiaHomeState();
+}
+
+class _PanitiaHomeState extends State<PanitiaHome> {
+  Map<String, dynamic>? _stats;
+  List<dynamic> _jadwal = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await Api.fallbackGetApi('/api/panitia/dashboard');
+      if (!mounted) return;
+      setState(() {
+        _stats = res is Map ? Map<String, dynamic>.from(res['stats'] ?? {}) : null;
+        _jadwal = (res is Map ? res['jadwal_hari_ini'] : null) as List? ?? [];
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Cbt.paper,
       appBar: AppBar(
-        title: const Text('Dashboard Panitia'),
+        backgroundColor: Cbt.paper,
+        foregroundColor: Cbt.ink,
+        elevation: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Ringkasan Panitia', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            Text('Pantau pelaksanaan ujian hari ini', style: Cbt.caption),
+          ],
+        ),
         actions: const [LogoutButton()],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1A6DB4), Color(0xFF2E9B8F)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Selamat Datang, Panitia',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Monitor pelaksanaan ujian secara real-time',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
-                ),
-                const SizedBox(height: 32),
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    children: [
-                      _MenuCard(
-                        icon: Icons.monitor_heart,
-                        title: 'Monitoring Ujian',
-                        subtitle: 'Pantau progres peserta',
-                        color: const Color(0xFFE3F2FD),
-                        onTap: () {}, // handled by nav bar
-                      ),
-                      _MenuCard(
-                        icon: Icons.people,
-                        title: 'Daftar Peserta',
-                        subtitle: 'Cek kehadiran & status',
-                        color: const Color(0xFFE8F5E9),
-                        onTap: () {},
-                      ),
-                      _MenuCard(
-                        icon: Icons.assessment,
-                        title: 'Rekap Hasil',
-                        subtitle: 'Lihat nilai & statistik',
-                        color: const Color(0xFFFFF3E0),
-                        onTap: () {},
-                      ),
-                      _MenuCard(
-                        icon: Icons.qr_code_scanner,
-                        title: 'Scan Absen',
-                        subtitle: 'Verifikasi peserta',
-                        color: const Color(0xFFF3E5F5),
-                        onTap: () {
-                          Navigator.of(context).pushNamed('/panitia/scan');
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+          children: [
+            if (_loading)
+              const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(color: Cbt.blue)))
+            else ...[
+              _buildStats(),
+              const SizedBox(height: 18),
+              Cbt.label('JADWAL HARI INI'),
+              const SizedBox(height: 10),
+              _buildJadwal(),
+              const SizedBox(height: 20),
+              Cbt.label('AKSES CEPAT'),
+              const SizedBox(height: 10),
+              _buildMenu(),
+            ],
+          ],
         ),
       ),
     );
   }
-}
 
-class _MenuCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
+  Widget _buildStats() {
+    final s = _stats ?? {};
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.55,
+      children: [
+        _stat('Total siswa', s['total_siswa'], Icons.people_outline, Cbt.blue),
+        _stat('Ujian aktif', s['ujian_aktif'], Icons.assignment_outlined, Cbt.teal),
+        _stat('Selesai', s['selesai_ujian'], Icons.check_circle_outline, Cbt.blue),
+        _stat('Hadir hari ini', s['hadir_hari_ini'], Icons.how_to_reg_outlined, Cbt.amber),
+      ],
+    );
+  }
 
-  const _MenuCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, size: 32, color: const Color(0xFF1A6DB4)),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
-              ),
-            ],
-          ),
+  Widget _stat(String label, dynamic value, IconData icon, Color color) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Cbt.line),
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 17, color: color),
+                const Spacer(),
+                Text('$value', style: Cbt.display.copyWith(fontSize: 24, color: Cbt.ink)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(label, style: Cbt.caption),
+          ],
+        ),
+      );
+
+  Widget _buildJadwal() {
+    if (_jadwal.isEmpty) {
+      return Cbt.card(
+        child: Row(
+          children: [
+            Icon(Icons.event_available_outlined, size: 20, color: Cbt.blue),
+            const SizedBox(width: 10),
+            Expanded(child: Text('Belum ada jadwal aktif hari ini.', style: Cbt.caption)),
+          ],
+        ),
+      );
+    }
+    return Cbt.card(
+      padding: const EdgeInsets.all(4),
+      child: Column(
+        children: _jadwal.take(4).map((j) {
+          final m = j is Map ? Map<String, dynamic>.from(j) : <String, dynamic>{};
+          return ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Cbt.blue.withValues(alpha: 0.1),
+              child: const Icon(Icons.schedule, size: 18, color: Cbt.blue),
+            ),
+            title: Text('${m['nama'] ?? m['ujian_nama'] ?? 'Ujian'}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Cbt.ink)),
+            subtitle: Text('${m['mapel'] ?? ''} ${m['sesi_nama'] ?? ''}', style: Cbt.caption),
+          );
+        }).toList(),
       ),
+    );
+  }
+
+  Widget _buildMenu() {
+    final menu = [
+      (Icons.monitor_heart_outlined, 'Monitoring', Cbt.blue, 1),
+      (Icons.people_outline, 'Peserta ujian', Cbt.teal, 2),
+      (Icons.assessment_outlined, 'Rekap nilai', Cbt.amber, 3),
+      (Icons.qr_code_scanner, 'Scan absen', Cbt.blue, -1),
+    ];
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 2.1,
+      children: menu.map((m) {
+        return Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(13),
+          child: InkWell(
+            onTap: () {
+              if (m.$4 == -1) {
+                Navigator.of(context).pushNamed('/panitia/scan');
+              } else {
+                widget.onGo(m.$4);
+              }
+            },
+            borderRadius: BorderRadius.circular(13),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(border: Border.all(color: Cbt.line), borderRadius: BorderRadius.circular(13)),
+              child: Row(
+                children: [
+                  Icon(m.$1 as IconData, size: 20, color: m.$3 as Color),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(m.$2 as String,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Cbt.ink))),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

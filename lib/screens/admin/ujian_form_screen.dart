@@ -361,7 +361,9 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: _jenisUjianId,
+                      // Guard: kalau nilai tersimpan ga ada di daftar (mis. data
+                      // jenis sudah dihapus), fallback ke null biar ga assert.
+                      initialValue: _jenisOpt.any((o) => o.value == _jenisUjianId) ? _jenisUjianId : null,
                       decoration: const InputDecoration(labelText: 'Jenis Ujian *'),
                       items: [const DropdownMenuItem(value: null, child: Text('— pilih —')), ..._jenisOpt
                           .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
@@ -369,7 +371,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: _mapelId,
+                      initialValue: _mapelOpt.any((o) => o.value == _mapelId) ? _mapelId : null,
                       decoration: const InputDecoration(labelText: 'Mata Pelajaran *'),
                       items: [const DropdownMenuItem(value: null, child: Text('— pilih —')), ..._mapelOpt
                           .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
@@ -409,7 +411,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: _sesiId,
+                      initialValue: _sesiOpt.any((o) => o.value == _sesiId) ? _sesiId : null,
                       decoration: const InputDecoration(labelText: 'Sesi (opsional)'),
                       items: [const DropdownMenuItem(value: null, child: Text('— tidak ada —')), ..._sesiOpt
                           .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))],
@@ -696,7 +698,33 @@ class SoalPickerDialogState extends State<SoalPickerDialog> {
               onChanged: (v) => setState(() => _q = v),
               decoration: const InputDecoration(hintText: 'Cari soal...', prefixIcon: Icon(Icons.search)),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    for (final s in filtered) {
+                      _sel.add(s['id'].toString());
+                    }
+                  }),
+                  icon: const Icon(Icons.select_all, size: 16),
+                  label: const Text('Pilih semua'),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    for (final s in filtered) {
+                      _sel.remove(s['id'].toString());
+                    }
+                  }),
+                  icon: const Icon(Icons.deselect, size: 16),
+                  label: const Text('Hapus semua'),
+                ),
+                const Spacer(),
+                Text('${_sel.length} dipilih',
+                    style: const TextStyle(fontSize: 12, color: AppTheme.secondary)),
+              ],
+            ),
+            const SizedBox(height: 2),
             Expanded(
               child: filtered.isEmpty
                   ? const Center(child: Text('Tidak ada soal'))
@@ -760,7 +788,25 @@ class _KelasMultiPickerState extends State<_KelasMultiPicker> {
         child: Column(
           children: [
             TextField(onChanged: (v) => setState(() => _q = v), decoration: const InputDecoration(hintText: 'Cari rombel / jurusan', prefixIcon: Icon(Icons.search))),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    for (final k in filtered) { _sel.add('${k['id']}'); }
+                  }),
+                  icon: const Icon(Icons.select_all, size: 16),
+                  label: const Text('Pilih semua'),
+                ),
+                TextButton.icon(
+                  onPressed: () => setState(() {
+                    for (final k in filtered) { _sel.remove('${k['id']}'); }
+                  }),
+                  icon: const Icon(Icons.deselect, size: 16),
+                  label: const Text('Hapus semua'),
+                ),
+              ],
+            ),
             Align(alignment: Alignment.centerLeft, child: Text('${_sel.length} dipilih', style: const TextStyle(fontSize: 12, color: AppTheme.secondary))),
             const SizedBox(height: 4),
             Expanded(

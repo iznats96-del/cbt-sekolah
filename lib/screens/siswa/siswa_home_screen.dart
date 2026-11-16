@@ -1,59 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../core/app_theme.dart';
 import '../../services/api.dart';
-import 'ujian_beranda_list.dart';
 import 'kartu_saya_screen.dart';
+import 'ujian_beranda_list.dart';
 import 'jadwal_saya_widget.dart';
 
-/// Thin reactive wrapper: rebuilds when the failover router flips
-/// primary/fallback so the banner below stays accurate.
-class _FailoverStatus extends StatefulWidget {
-  final Widget Function(BuildContext, bool useFallback, String statusText) builder;
-  const _FailoverStatus({required this.builder});
+/// ─────────────────────────────────────────────────────────────
+/// Beranda Siswa — Modern CBT Dashboard (rujukan desain user)
+/// ─────────────────────────────────────────────────────────────
+/// Seluruh data berasal dari DB / RPC (tanpa dummy):
+///  • Identitas  : tabel siswa (nama, nis, nomor_peserta, foto_url, kelas)
+///  • Jadwal     : RPC jadwal_siswa_aktif
+///  • Ujian      : RPC my_ujian_aktif (lewat UjianBerandaList)
+/// Field yang NULL di DB (jam/ruang/sesi) sengaja TIDAK ditampilkan.
+/// ─────────────────────────────────────────────────────────────
 
-  @override
-  State<_FailoverStatus> createState() => _FailoverStatusState();
-}
-
-class _FailoverStatusState extends State<_FailoverStatus> {
-  FallbackStatus _st = Api.getFallbackStatus();
-  @override
-  void initState() {
-    super.initState();
-    Api.addFallbackListener(_onStatus);
-  }
-
-  void _onStatus(FallbackStatus s) {
-    if (!mounted) return;
-    setState(() => _st = s);
-  }
-
-  @override
-  void dispose() {
-    Api.removeFallbackListener(_onStatus);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final useFallback = _st.useFallback;
-    String text;
-    Color color;
-    if (useFallback && _st.state == 'fallback') {
-      text = 'MODE CADANGAN AKTIF — Supabase terputus, koneksi ke server cadangan.';
-      color = Colors.amber.shade900;
-    } else if (useFallback && _st.state == 'recovering') {
-      text = 'Memulihkan koneksi Supabase (data cadangan sedang disinkronkan)...';
-      color = Colors.blueGrey.shade800;
-    } else {
-      text = 'Koneksi normal (Supabase).';
-      color = Colors.green.shade800;
-    }
-    return widget.builder(context, useFallback, text);
-  }
-}
+const _bg = Color(0xFFF4F7FF);
+const _card = Colors.white;
+const _navy = Color(0xFF101F3C);
+const _navySoft = Color(0xFF3B4B6B);
+const _muted = Color(0xFF8A97B1);
+const _blue = Color(0xFF2563EB);
+const _blueDeep = Color(0xFF1D4ED8);
+const _blueLight = Color(0xFFE8F1FF);
+const _green = Color(0xFF22C55E);
+const _amber = Color(0xFFF59E0B);
+const _orange = Color(0xFFFF9F43);
+const _line = Color(0xFFE7EDFA);
 
 class SiswaHomeScreen extends StatefulWidget {
   const SiswaHomeScreen({super.key});
@@ -63,8 +37,387 @@ class SiswaHomeScreen extends StatefulWidget {
 }
 
 class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
-  Map<String, dynamic>? _profil;
   Map<String, dynamic>? _siswaRow;
+  bool _loading = true;
+  final _jadwalKey = GlobalKey();
+  final _ujianKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final rows = await Api.routerSelect(
+      'siswa',
+      select: 'nama,nis,nomor_peserta,foto_url,kelas(nama,jurusan(singkatan))',
+      eq: {'profile_id': Api.user?.id ?? ''},
+    ).catchError((_) => <Map<String, dynamic>>[]);
+    if (!mounted) return;
+    setState(() {
+      if (rows.isNotEmpty) _siswaRow = Map<String, dynamic>.from(rows.first);
+      _loading = false;
+    });
+  }
+
+  void _salin(String n) async {
+    await Clipboard.setData(ClipboardData(text: n));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Nomor tersalin'),
+        backgroundColor: _blue,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _scrollTo(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx,
+          duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: _bg,
+        body: Center(child: CircularProgressIndicator(color: _blue)),
+      );
+    }
+
+    final s = _siswaRow ?? const {};
+    final nama = '${s['nama'] ?? 'Siswa'}';
+    final nis = '${s['nis'] ?? ''}';
+    final nomor = '${s['nomor_peserta'] ?? ''}';
+    final foto = '${s['foto_url'] ?? ''}';
+    final kelasMap = s['kelas'];
+    final kelas = kelasMap is Map ? '${kelasMap['nama'] ?? ''}' : '';
+    final jur = kelasMap is Map && kelasMap['jurusan'] is Map
+        ? '${(kelasMap['jurusan'] as Map)['singkatan'] ?? ''}'
+        : '';
+
+    return Scaffold(
+      backgroundColor: _bg,
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          _Header(nama: nama, nis: nis, kelas: kelas, jur: jur, foto: foto),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
+            child: Transform.translate(
+              offset: const Offset(0, -26),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _InfoPeserta(nomor: nomor, onSalin: () => _salin(nomor)),
+                  const SizedBox(height: 20),
+                  _AksesCepat(
+                    onJadwal: () => _scrollTo(_jadwalKey),
+                    onUjian: () => _scrollTo(_ujianKey),
+                    onKartu: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const KartuSayaScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  KeyedSubtree(key: _jadwalKey, child: _JadwalTerdekatCard()),
+                  const SizedBox(height: 16),
+                  KeyedSubtree(key: _ujianKey, child: const _UjianTersediaCard()),
+                  const SizedBox(height: 16),
+                  const _PesanCard(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Header biru dengan foto, nama, chip NIS & kelas.
+class _Header extends StatelessWidget {
+  final String nama, nis, kelas, jur, foto;
+  const _Header({
+    required this.nama,
+    required this.nis,
+    required this.kelas,
+    required this.jur,
+    required this.foto,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_blueDeep, _blue],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(28),
+          bottomRight: Radius.circular(28),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -40,
+            top: -50,
+            child: Container(
+              width: 180,
+              height: 180,
+              decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.07),
+                  shape: BoxShape.circle),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 28, 20, 56),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                      color: Colors.white, shape: BoxShape.circle),
+                  child: CircleAvatar(
+                    radius: 34,
+                    backgroundColor: _blueLight,
+                    backgroundImage: foto.isNotEmpty ? NetworkImage(foto) : null,
+                    child: foto.isEmpty
+                        ? const Icon(Icons.person_rounded, size: 34, color: _blue)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        nama,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 7,
+                        children: [
+                          if (nis.isNotEmpty) _chip('NIS $nis'),
+                          if (kelas.isNotEmpty)
+                            _chip(jur.isNotEmpty ? '$kelas • $jur' : kelas),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String t) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+        ),
+        child: Text(
+          t,
+          style: const TextStyle(
+              fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
+        ),
+      );
+}
+
+/// wrapper kartu putih neumorphic.
+class _SoftCard extends StatelessWidget {
+  final Widget child;
+  const _SoftCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.07),
+            blurRadius: 24,
+            spreadRadius: 1,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _InfoPeserta extends StatelessWidget {
+  final String nomor;
+  final VoidCallback onSalin;
+  const _InfoPeserta({required this.nomor, required this.onSalin});
+
+  @override
+  Widget build(BuildContext context) {
+    return _SoftCard(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 16, 16, 16),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _blueLight,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.person_rounded, color: _blue, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Informasi Peserta',
+                    style: TextStyle(fontSize: 13, color: _muted),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    nomor.isEmpty ? '-' : nomor,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: _navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: nomor.isEmpty ? null : onSalin,
+              tooltip: 'Salin nomor',
+              icon: const Icon(Icons.copy_all_rounded, color: _blue, size: 22),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AksesCepat extends StatelessWidget {
+  final VoidCallback onJadwal, onUjian, onKartu;
+  const _AksesCepat({
+    required this.onJadwal,
+    required this.onUjian,
+    required this.onKartu,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: const [
+            Icon(Icons.bolt_rounded, color: _amber, size: 20),
+            SizedBox(width: 8),
+            Text(
+              'Akses Cepat',
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w700, color: _navy),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _shortcut(Icons.calendar_month_rounded, 'Jadwal Ujian',
+                  _blue, onJadwal),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _shortcut(Icons.description_rounded, 'Ujian Tersedia',
+                  _green, onUjian),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _shortcut(Icons.qr_code_2_rounded, 'Kartu & QR',
+                  _orange, onKartu),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _shortcut(IconData icon, String label, Color color, VoidCallback onTap) {
+    return _SoftCard(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
+            child: Column(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(height: 9),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: _navySoft,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _JadwalTerdekatCard extends StatefulWidget {
+  @override
+  State<_JadwalTerdekatCard> createState() => _JadwalTerdekatCardState();
+}
+
+class _JadwalTerdekatCardState extends State<_JadwalTerdekatCard> {
+  List<dynamic> _rows = [];
   bool _loading = true;
 
   @override
@@ -74,251 +427,209 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
   }
 
   Future<void> _load() async {
-    final p = await Api.currentProfile();
-    Map<String, dynamic>? row;
     try {
-      final rows = await Api.routerSelect(
-          'siswa',
-          select: 'nama,nis,nomor_peserta,foto_url,aktive_ok,kelas(nama,jurusan(singkatan))',
-          eq: {'profile_id': Api.user?.id ?? ''});
-      if (rows.isNotEmpty) row = Map<String, dynamic>.from(rows.first as Map);
-    } catch (_) {}
-    if (!mounted) return;
-    setState(() {
-      _profil = p;
-      _siswaRow = row;
-      _loading = false;
-    });
-  }
-
-  void _salinNomor(String n) async {
-    await Clipboard.setData(ClipboardData(text: n));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Nomor peserta tersalin'),
-        backgroundColor: AppTheme.secondary));
+      final raw = await Api.routerRpc('jadwal_siswa_aktif');
+      setState(() {
+        _rows = raw is List ? raw : const [];
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    final nomor = '${_siswaRow?['nomor_peserta'] ?? ''}';
-    final nama = _siswaRow?['nama']?.toString() ??
-        _profil?['nama']?.toString() ??
-        'Siswa';
-    final nis = '${_siswaRow?['nis'] ?? _profil?['nis'] ?? '-'}';
-    final kelasVal = _siswaRow?['kelas'] is Map
-        ? '${(_siswaRow!['kelas'] as Map)['nama'] ?? ''}'
-        : '';
-    final jur = _siswaRow?['kelas'] is Map &&
-            (_siswaRow!['kelas']['jurusan'] is Map)
-        ? '${(_siswaRow!['kelas']['jurusan'] as Map)['singkatan'] ?? ''}'
+    final j = _rows.isNotEmpty ? _rows.first : null;
+    final mapel = j is Map ? '${j['mapel'] ?? ''}' : '';
+    final tanggal = j is Map ? '${j['tanggal'] ?? ''}' : '';
+    final jamMulai = j is Map ? '${j['jam_mulai'] ?? ''}' : '';
+    final jamSelesai = j is Map ? '${j['jam_selesai'] ?? ''}' : '';
+    final ruang = j is Map ? '${j['ruang_nama'] ?? ''}' : '';
+    final jam = (jamMulai.isNotEmpty && jamSelesai.isNotEmpty &&
+            jamMulai != 'null' && jamSelesai != 'null')
+        ? '$jamMulai – $jamSelesai'
         : '';
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF1A6DB4), Color(0xFF2E9B8F)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                  color: const Color(0xFF1A6DB4).withValues(alpha: 0.25),
-                  blurRadius: 12,
-                  offset: const Offset(0, 6))
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 8)
-                          ]),
-                      child: CircleAvatar(
-                        radius: 26,
-                        backgroundColor: const Color(0xFFEAF3FB),
-                        backgroundImage:
-                            '${_siswaRow?['foto_url'] ?? ''}'.isNotEmpty
-                                ? NetworkImage('${_siswaRow?['foto_url']}')
-                                : null,
-                        child:
-                            '${_siswaRow?['foto_url'] ?? ''}'.isNotEmpty
-                                ? null
-                                : const Icon(Icons.person,
-                                    size: 30, color: AppTheme.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(nama,
-                              style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white)),
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              _chipWhite(
-                                  Icons.badge_outlined, 'NIS $nis'),
-                              if (kelasVal.isNotEmpty)
-                                _chipWhite(Icons.groups_outlined,
-                                    jur.isNotEmpty ? '$kelasVal • $jur' : kelasVal),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: nomor.isEmpty
-                      ? const Row(
-                          children: [
-                            Icon(Icons.info_outline,
-                                size: 18, color: Colors.grey),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                  'Nomor peserta belum terbit — hubungi wali/admin',
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
-                            ),
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(Icons.confirmation_number_outlined,
-                                    size: 14, color: AppTheme.primary),
-                                SizedBox(width: 6),
-                                Text('NOMOR PESERTA',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppTheme.primary,
-                                        letterSpacing: 1.2)),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.end,
-                              children: [
-                                Expanded(
-                                  child: Text(nomor,
-                                      style: const TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFF0F172A),
-                                          letterSpacing: 1.2)),
-                                ),
-                                IconButton(
-                                  tooltip: 'Salin nomor',
-                                  visualDensity:
-                                      VisualDensity.compact,
-                                  onPressed: () => _salinNomor(nomor),
-                                  icon: const Icon(
-                                      Icons.copy_outlined,
-                                      size: 18,
-                                      color: AppTheme.primary),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: AppTheme.primary,
-                                  side: const BorderSide(
-                                      color: Color(0xFFE2E8F0)),
-                                  padding: const EdgeInsets.symmetric(
-                                      vertical: 10),
-                                ),
-                                onPressed: () => Navigator.of(context)
-                                    .push(MaterialPageRoute(
-                                        builder: (_) =>
-                                            const KartuSayaScreen())),
-                                icon: const Icon(Icons.qr_code_2,
-                                    size: 18),
-                                label: const Text('Lihat Kartu dan QR',
-                                    style: TextStyle(fontSize: 12)),
-                              ),
-                            ),
-                          ],
-                        ),
+    return _SoftCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+            child: Row(
+              children: const [
+                Icon(Icons.calendar_month_rounded, color: _blue, size: 20),
+                SizedBox(width: 9),
+                Text(
+                  'Jadwal Ujian Terdekat',
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700, color: _navy),
                 ),
               ],
             ),
           ),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: CircularProgressIndicator(color: _blue)),
+            )
+          else if (j == null)
+            const Padding(
+              padding: EdgeInsets.fromLTRB(18, 4, 18, 18),
+              child: Text('Belum ada jadwal ujian untuk kelasmu.',
+                  style: TextStyle(fontSize: 13, color: _muted)),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
+              child: Row(
+                children: [
+                  _tanggalBadge(tanggal),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mapel.isEmpty ? 'Ujian' : mapel,
+                          style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _navy),
+                        ),
+                        const SizedBox(height: 6),
+                        if (jam.isNotEmpty)
+                          _meta(Icons.schedule_rounded, jam),
+                        if (ruang.isNotEmpty && ruang != 'null')
+                          _meta(Icons.meeting_room_outlined, ruang),
+                        if (jam.isEmpty && (ruang.isEmpty || ruang == 'null'))
+                          _meta(Icons.event_rounded, tanggal),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tanggalBadge(String tanggal) {
+    final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(tanggal);
+    final hari = m != null ? m.group(3)! : '--';
+    const bulan = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    final bl = m != null ? int.tryParse(m.group(2)!) ?? 0 : 0;
+    return Container(
+      width: 58,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: _blueLight,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(hari,
+              style: const TextStyle(
+                  fontSize: 22, fontWeight: FontWeight.w800, color: _blue)),
+          Text(bl > 0 && bl < bulan.length ? bulan[bl] : '',
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: _navySoft)),
+        ],
+      ),
+    );
+  }
+
+  Widget _meta(IconData icon, String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: _muted),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(text,
+                  style: const TextStyle(fontSize: 12, color: _navySoft)),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        const JadwalSayaWidget(),
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 8, top: 16),
-          child: Text('UJIAN TERSEDIA',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey,
-                  letterSpacing: 1)),
+      );
+}
+
+class _UjianTersediaCard extends StatelessWidget {
+  const _UjianTersediaCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: Row(
+            children: const [
+              Icon(Icons.rocket_launch_rounded, color: _blue, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'Ujian Tersedia',
+                style:
+                    TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _navy),
+              ),
+            ],
+          ),
         ),
+        const SizedBox(height: 10),
         const UjianBerandaList(),
-        const SizedBox(height: 20),
       ],
     );
   }
 }
 
-Widget _chipWhite(IconData icon, String t) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: Colors.white.withValues(alpha: 0.18),
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 11, color: Colors.white),
-        const SizedBox(width: 4),
-        Text(t,
-            style: const TextStyle(
-                fontSize: 10.5,
-                color: Colors.white,
-                fontWeight: FontWeight.w600)),
-      ],
-    ),
-  );
+class _PesanCard extends StatelessWidget {
+  const _PesanCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [_blue, Color(0xFF60A5FA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -10,
+            bottom: -20,
+            child: Opacity(
+              opacity: 0.25,
+              child: Icon(Icons.emoji_events_rounded,
+                  size: 120, color: Colors.white.withValues(alpha: 0.9)),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 22, 80, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Selamat mengerjakan,\nSemoga sukses!',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

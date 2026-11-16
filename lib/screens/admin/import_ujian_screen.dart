@@ -172,6 +172,30 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
           'bobot': '1',
         });
       }
+      for (final j in doc.jodoh) {
+        // 1 grup jodoh = 1 soal di bank. kunci.map diisi dari pasangan
+        // yang benar bila dokumen menyediakannya; kalau tidak, guru isi manual.
+        final kiri = j.kiri;
+        final kanan = j.kanan;
+        final map = <String, String>{};
+        // Coba parse kunci dari teks kayak "1-A, 2-B, 3-C"
+        if (j.kunciText != null) {
+          for (final m in RegExp(r'(\d+)\s*[-.:=]\s*([A-J])', caseSensitive: false).allMatches(j.kunciText!)) {
+            final a = (int.tryParse(m.group(1)!) ?? 0) - 1;
+            final b = m.group(2)!.toUpperCase().codeUnitAt(0) - 65;
+            if (a >= 0 && a < kiri.length && b >= 0 && b < kanan.length) {
+              map['$a'] = '$b';
+            }
+          }
+        }
+        items.add({
+          'jenis': 'jodoh',
+          'soal': 'Jodohkan pasangan berikut:',
+          'opsi': {'kiri': kiri, 'kanan': kanan},
+          'kunci': map.isEmpty ? null : {'map': map},
+          'bobot': '1',
+        });
+      }
 
       final payload = <String, dynamic>{
         'mapel': _mapelCtrl.text.trim(),
@@ -243,8 +267,8 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                   const Text(
                     'Format: naskah ujian sekolah (.docx) yang berisi kop, "Mata Pelajaran:", '
                     '"Kelas/Kompetensi keahlian:", "Waktu: 60 menit", sesi "PILIHAN GANDA" '
-                    '(opsi a. A. ... s.d. e. E.), "C. Essay", dan '
-                    '"KUNCI JAWABAN" (1. B, dst). Seksi Menjodohkan di-skip otomatis.',
+                    '(opsi a. A. ... s.d. e. E.), tabel "MENJODOHKAN" (Soal | Pilihan Jawaban | Jawaban), '
+                    '"Essay Uraian", dan "KUNCI JAWABAN" (1. B, dst).',
                     style: TextStyle(fontSize: 12, height: 1.5),
                   ),
                   const SizedBox(height: 12),
@@ -309,6 +333,7 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, children: [
                       Chip(label: Text('${doc.pg.length} PG'), avatar: const Icon(Icons.radio_button_checked, size: 16)),
+                      Chip(label: Text('${doc.jodoh.length} Jodoh'), avatar: const Icon(Icons.link, size: 16)),
                       Chip(label: Text('${doc.essay.length} Essay'), avatar: const Icon(Icons.edit_note, size: 16)),
                       if (doc.images.isNotEmpty)
                         Chip(label: Text('${doc.images.length} gambar'), avatar: const Icon(Icons.image, size: 16)),
@@ -376,19 +401,41 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
                   ],
                 ),
               ),
+            if (doc.jodoh.isNotEmpty)
+              Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ExpansionTile(
+                  title: Text('Pratinjau ${doc.jodoh.length} grup Jodoh ('
+                      '${doc.jodoh.fold<int>(0, (s, j) => s + j.kiri.length)} item)',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  children: [
+                    for (var i = 0; i < doc.jodoh.length; i++)
+                      ListTile(
+                        dense: true,
+                        title: Text('Grup ${i + 1}', style: const TextStyle(fontSize: 12)),
+                        subtitle: Text(
+                          'Kiri: ${doc.jodoh[i].kiri.join(' | ')}\n'
+                          'Kanan: ${doc.jodoh[i].kanan.join(' | ')}',
+                          style: const TextStyle(fontSize: 10), maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 24),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
                 style: FilledButton.styleFrom(backgroundColor: AppTheme.secondary),
-                onPressed: _importing || doc.pg.isEmpty && doc.essay.isEmpty
+                onPressed: _importing || (doc.pg.isEmpty && doc.essay.isEmpty && doc.jodoh.isEmpty)
                     ? null
                     : _import,
                 icon: _importing
                     ? const SizedBox(height: 18, width: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.cloud_upload_outlined),
-                label: Text('IMPORT ${doc.pg.length + doc.essay.length} SOAL '
+                label: Text('IMPORT ${doc.pg.length + doc.essay.length + doc.jodoh.length} SOAL '
                     '(+ mapel & ujian draft)'),
               ),
             ),

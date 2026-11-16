@@ -26,10 +26,16 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
 
   String _jenis = 'pg';
   String? _mapelId;
-  String? _kelasId; // NULL = global semua kelas
+  String? _kelasId; // kompat lama (1 kelas)
+  // Multi-kelas: daftar id kelas yang boleh memakai soal ini.
+  List<String> _kelasIds = []; // kosong = global semua kelas
   List<TextEditingController> _opsi = [];
   int? _kunciIdx;
   String _essayKunci = '';
+  // jodoh: daftar kiri/kanan + peta index kiri -> index kanan
+  List<TextEditingController> _kiri = [];
+  List<TextEditingController> _kanan = [];
+  Map<int, int> _pasangan = {};
 
   bool _loading = false;
   List<DropdownItem> _mapelOptions = [];
@@ -46,10 +52,13 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
     final init = widget.initial;
     if (init != null) {
       _jenis = init['jenis']?.toString() ?? 'pg';
-      // Jenis jodoh sudah dihapus — fallback ke PG supaya form tetap jalan.
-      if (_jenis != 'pg' && _jenis != 'essay') _jenis = 'pg';
+      // Jenis yang dikenal: pg, essay, jodoh (menjodohkan).
+      if (_jenis != 'pg' && _jenis != 'essay' && _jenis != 'jodoh') _jenis = 'pg';
       _mapelId = init['mapel_id']?.toString();
       _kelasId = init['kelas_id']?.toString();
+      final ids = init['kelas_ids'];
+      if (ids is List) _kelasIds = ids.map((x) => x.toString()).toList();
+      if (_kelasIds.isEmpty && _kelasId != null) _kelasIds = [_kelasId!];
       _soalCtrl.text = init['soal']?.toString() ?? '';
       _pembahasanCtrl.text = init['pembahasan']?.toString() ?? '';
       _bobotCtrl.text = '${init['bobot'] ?? 1}';
@@ -66,6 +75,28 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
           _opsi = m.entries.map((e) => TextEditingController(text: e.value.toString())).toList();
         }
         if (kunci is Map) _kunciIdx = _parseIndex(kunci);
+      } else if (_jenis == 'jodoh') {
+        final opsi = init['opsi'];
+        if (opsi is Map) {
+          final k = opsi['kiri'];
+          final v = opsi['kanan'];
+          if (k is List) _kiri = k.map((x) => TextEditingController(text: x.toString())).toList();
+          if (v is List) _kanan = v.map((x) => TextEditingController(text: x.toString())).toList();
+        }
+        if (kunci is Map && kunci['map'] != null) {
+          dynamic mm = kunci['map'];
+          if (mm is String) {
+            try { mm = jsonDecode(mm); } catch (_) { mm = null; }
+          }
+          if (mm is Map) {
+            _pasangan = mm.map((key, value) => MapEntry(
+              int.tryParse(key.toString()) ?? 0,
+              int.tryParse(value.toString()) ?? 0,
+            ));
+          }
+        }
+        if (_kiri.isEmpty) _kiri = List.generate(3, (_) => TextEditingController());
+        if (_kanan.isEmpty) _kanan = List.generate(3, (_) => TextEditingController());
       } else if (_jenis == 'essay') {
         // Essay kunci: teks biasa (old rows may still hold a JSON map — unwrap it).
         dynamic k = kunci;
@@ -162,6 +193,25 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
 
         opsi = [for (final o in _opsi) o.text.trim()];
         kunci = {'index': _kunciIdx, 'jawaban': _opsi[_kunciIdx!].text.trim()};
+      } else if (_jenis == 'jodoh') {
+        if (_kiri.any((c) => c.text.trim().isEmpty) ||
+            _kanan.any((c) => c.text.trim().isEmpty)) {
+          setState(() => _loading = false);
+          _snack('Semua teks kiri & kanan wajib diisi.', error: true);
+          return;
+        }
+        if (_pasangan.length != _kiri.length) {
+          setState(() => _loading = false);
+          _snack('Pilih pasangan untuk setiap item di kolom kiri.', error: true);
+          return;
+        }
+        opsi = {
+          'kiri': [for (final c in _kiri) c.text.trim()],
+          'kanan': [for (final c in _kanan) c.text.trim()],
+        };
+        kunci = {
+          'map': _pasangan.map((k, v) => MapEntry(k.toString(), v.toString())),
+        };
       } else {
         if (_essayKunci.trim().isEmpty) {
           setState(() => _loading = false);
@@ -186,7 +236,8 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
       final bobot = num.tryParse(_bobotCtrl.text.trim()) ?? 1;
       final data = <String, dynamic>{
         'mapel_id': _mapelId,
-        'kelas_id': _kelasId, // NULL = global semua kelas
+        'kelas_id': _kelasIds.isNotEmpty ? _kelasIds.first : _kelasId, // kompat lama
+        'kelas_ids': _kelasIds.isEmpty ? null : _kelasIds, // NULL = global
         'jenis': _jenis,
         'soal': _soalCtrl.text.trim(),
         'opsi': opsi,
@@ -269,7 +320,7 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
             // Kartu 1: Informasi utama
             _card('Informasi Soal', [
               DropdownButtonFormField<String>(
-                initialValue: _mapelId,
+                initialValue: _mapelOptions.any((o) => o.value == _mapelId) ? _mapelId : null,
                 decoration: const InputDecoration(
                   labelText: 'Mata Pelajaran *',
                   prefixIcon: Icon(Icons.menu_book_outlined),
@@ -279,20 +330,61 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                 onChanged: (v) => setState(() => _mapelId = v),
               ),
               const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _kelasId,
-                decoration: const InputDecoration(
-                  labelText: 'Kelas',
-                  prefixIcon: Icon(Icons.school_outlined),
-                  helperText: 'Kosong = soal global (semua kelas). Pilih kelas kalau soal khusus kelas itu.',
+              // Multi-pilih kelas: bisa lebih dari satu, kosong = global.
+              Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                items: [
-                  const DropdownMenuItem(value: '', child: Text('Semua Kelas (global)')),
-                  ..._kelasOptions
-                      .where((o) => o.value != null)
-                      .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label))),
-                ],
-                onChanged: (v) => setState(() => _kelasId = (v == null || v.isEmpty) ? null : v),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.school_outlined, size: 18, color: AppTheme.primary),
+                          SizedBox(width: 8),
+                          Text('Kelas yang boleh pakai soal ini',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        _kelasIds.isEmpty
+                            ? 'Belum dipilih = otomatis dipakai semua kelas.'
+                            : '${_kelasIds.length} kelas dipilih.',
+                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        FilterChip(
+                          label: const Text('Semua Kelas'),
+                          selected: _kelasIds.isEmpty,
+                          onSelected: (_) => setState(() => _kelasIds = []),
+                        ),
+                        ..._kelasOptions.where((o) => o.value != null).map(
+                          (o) => FilterChip(
+                            label: Text(o.label),
+                            selected: _kelasIds.contains(o.value),
+                            onSelected: (on) => setState(() {
+                              if (on) {
+                                if (!_kelasIds.contains(o.value)) _kelasIds.add(o.value!);
+                              } else {
+                                _kelasIds.remove(o.value);
+                              }
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               const Text('Jenis Soal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -301,6 +393,7 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                 segments: const [
                   ButtonSegment(value: 'pg', label: Text('PG'), icon: Icon(Icons.radio_button_checked)),
                   ButtonSegment(value: 'essay', label: Text('Essay'), icon: Icon(Icons.edit_note)),
+                  ButtonSegment(value: 'jodoh', label: Text('Jodohkan'), icon: Icon(Icons.link)),
                 ],
                 selected: {_jenis},
                 onSelectionChanged: (s) => setState(() => _jenis = s.first),
@@ -327,19 +420,29 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _bobotCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Bobot / skor',
-                        prefixIcon: Icon(Icons.star_outline),
+              // Bobot dihitung OTOMATIS oleh server dari kategori mapel + jenis
+              // (instruksi kepsek: PG 60 / Jodoh 20 / Essay 20 = 100).
+              // Guru tidak perlu mengisi/manual bobot.
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.info_outline, size: 18, color: AppTheme.primary),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Bobot nilai dihitung otomatis dari jenis soal & kategori mapel (umum/produktif). Total nilai maksimal 100.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF17324D)),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
               // Gambar
@@ -452,6 +555,100 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                       child: const Text('Hapus opsi terakhir'),
                     ),
                   ),
+              ]),
+            ] else if (_jenis == 'jodoh') ...[
+              const SizedBox(height: 12),
+              _card('Pasangan Jodoh', [
+                const Text(
+                  'Tulis item di kolom kiri, lalu pasangkan dengan pilihan di kolom kanan.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 10),
+                for (var i = 0; i < _kiri.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 22, child: Text('${i + 1}.', style: const TextStyle(fontWeight: FontWeight.bold))),
+                        Expanded(
+                          child: TextField(
+                            controller: _kiri[i],
+                            decoration: InputDecoration(
+                              isDense: true,
+                              labelText: 'Item kiri ${i + 1}',
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                            ),
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Icon(Icons.arrow_right_alt, color: AppTheme.primary),
+                        ),
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            initialValue: _pasangan[i],
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              labelText: 'Pasangan',
+                              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                            ),
+                            items: [
+                              const DropdownMenuItem<int>(value: null, child: Text('— pilih —')),
+                              for (var j = 0; j < _kanan.length; j++)
+                                DropdownMenuItem<int>(
+                                  value: j,
+                                  child: Text(
+                                    '${String.fromCharCode(65 + j)}. ${_kanan[j].text.isEmpty ? "(...)" : _kanan[j].text}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                            onChanged: (v) => setState(() {
+                              if (v == null) _pasangan.remove(i);
+                              else _pasangan[i] = v;
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _kiri.add(TextEditingController())),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Tambah pasangan'),
+                ),
+                const Divider(height: 22),
+                const Text('Pilihan kolom kanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                const SizedBox(height: 6),
+                for (var i = 0; i < _kanan.length; i++)
+                  Row(
+                    children: [
+                      SizedBox(width: 22, child: Text('${String.fromCharCode(65 + i)}.', style: const TextStyle(fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: TextField(
+                          controller: _kanan[i],
+                          onChanged: (_) => setState(() {}),
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          ),
+                        ),
+                      ),
+                      if (_kanan.length > 2)
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 18),
+                          onPressed: () => setState(() {
+                            _kanan.removeAt(i);
+                            _pasangan.remove(i);
+                          }),
+                        ),
+                    ],
+                  ),
+                TextButton.icon(
+                  onPressed: () => setState(() => _kanan.add(TextEditingController())),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Tambah pilihan kanan'),
+                ),
               ]),
             ] else ...[
               const SizedBox(height: 12),

@@ -20,7 +20,35 @@ class HybridApi {
   // ─── AUTH ───────────────────────────────────────────────
 
   /// Login: coba Supabase dulu, fallback ke local API
+  /// Kalau Supabase dimatiin (PRIMARY_FALLBACK=true), SDK diarahkan ke server
+  /// cadangan (config.dart) sehingga login lewat SDK tetap aman dan session-nya
+  /// tersimpan di SDK — semua panggilan Api.client.from(...) jadi ikut memakai
+  /// token fallback.
   static Future<Map<String, dynamic>> login(String email, String password) async {
+    if (AppConfig.supabaseDisabled) {
+      // SDK -> server fallback: login via SDK supaya session + refresh token
+      // tersimpan (dibutuhkan oleh 34 call Api.client.from(...)).
+      try {
+        final res = await _supa.auth.signInWithPassword(
+          email: email,
+          password: password,
+        ).timeout(const Duration(seconds: 8));
+        if (res.user != null) {
+          _fallbackActive = true;
+          _fallbackToken = res.session?.accessToken;
+          _fallbackUser = <String, dynamic>{
+            'id': res.user!.id,
+            'email': res.user!.email,
+            'role': (res.user!.userMetadata?['role'] ?? res.user!.appMetadata?['role'] ?? ''),
+          };
+          debugPrint('HybridApi: Fallback login SUCCESS (via SDK)');
+          return {'source': 'fallback', 'user': _fallbackUser};
+        }
+      } catch (e) {
+        debugPrint('HybridApi: SDK->fallback login failed ($e), trying raw HTTP...');
+      }
+      return await _fallbackLogin(email, password);
+    }
     try {
       final res = await _supa.auth.signInWithPassword(
         email: email,
@@ -33,6 +61,7 @@ class HybridApi {
       }
       throw Exception('Supabase login returned null user');
     } catch (e) {
+      if (!AppConfig.failoverEnabled) rethrow; // Supabase-only mode
       debugPrint('HybridApi: Supabase login failed ($e), trying fallback...');
       return await _fallbackLogin(email, password);
     }
@@ -81,6 +110,7 @@ class HybridApi {
         );
         return result;
       } catch (e) {
+        if (!AppConfig.failoverEnabled) rethrow; // Supabase-only mode
         debugPrint('HybridApi: RPC $function failed on Supabase ($e), switching to fallback');
         _fallbackActive = true;
       }
@@ -128,6 +158,7 @@ class HybridApi {
         final rows = await q.timeout(const Duration(seconds: 10));
         return List<Map<String, dynamic>>.from(rows);
       } catch (e) {
+        if (!AppConfig.failoverEnabled) rethrow; // Supabase-only mode
         debugPrint('HybridApi: SELECT $table failed on Supabase ($e), switching to fallback');
         _fallbackActive = true;
       }
@@ -165,6 +196,7 @@ class HybridApi {
         final rows = await _supa.from(table).insert(data).select().timeout(const Duration(seconds: 10));
         return Map<String, dynamic>.from(rows.first);
       } catch (e) {
+        if (!AppConfig.failoverEnabled) rethrow; // Supabase-only mode
         debugPrint('HybridApi: INSERT $table failed on Supabase ($e), switching to fallback');
         _fallbackActive = true;
       }
@@ -194,6 +226,7 @@ class HybridApi {
         await _supa.from(table).update(data).eq('id', id).timeout(const Duration(seconds: 10));
         return;
       } catch (e) {
+        if (!AppConfig.failoverEnabled) rethrow; // Supabase-only mode
         debugPrint('HybridApi: UPDATE $table failed on Supabase ($e), switching to fallback');
         _fallbackActive = true;
       }
@@ -218,6 +251,7 @@ class HybridApi {
         await _supa.from(table).delete().eq('id', id).timeout(const Duration(seconds: 10));
         return;
       } catch (e) {
+        if (!AppConfig.failoverEnabled) rethrow; // Supabase-only mode
         debugPrint('HybridApi: DELETE $table failed on Supabase ($e), switching to fallback');
         _fallbackActive = true;
       }

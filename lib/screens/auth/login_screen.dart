@@ -47,6 +47,28 @@ class _LoginScreenState extends State<LoginScreen> {
       _attempt = 0;
     });
     try {
+      // MODE FALLBACK TOTAL: skip Supabase SDK entirely, langsung ke fallback server
+      if (AppConfig.supabaseDisabled) {
+        final fallbackRes = await HybridApi.login(loginEmail, pass);
+        final source = fallbackRes['source'] as String?;
+        final user = fallbackRes['user'];
+        if (source == 'fallback' && user is Map<String, dynamic>) {
+          try {
+            final p = await Api.currentProfile();
+            final profileRole = p?['role'] as String?;
+            final metaRole = user['role'] as String?;
+            Api.setRole(profileRole ?? metaRole);
+          } catch (_) {
+            Api.setRole(user['role'] as String?);
+          }
+          await Api.init();
+          if (!mounted) return;
+          _goToRole();
+          return;
+        }
+        throw Exception('Fallback login failed');
+      }
+
       final res = await _loginResilient(loginEmail, pass);
       if (res.user != null) {
         // Ambil role dari BOTH sources: GoTrue metadata + profiles table
