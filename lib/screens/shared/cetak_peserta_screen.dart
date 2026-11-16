@@ -1,7 +1,12 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
@@ -22,6 +27,9 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
   String? _error;
   String _q = '';
   String _sekolah = 'SMK YP 79 Majalaya';
+  String _kepala = '';
+  String _nip = '';
+  Map<String, String> _pwByProfile = {};
 
   String get _ujianId => '${widget.ujian['id']}';
   String get _ujianNama => '${widget.ujian['nama'] ?? 'Ujian'}';
@@ -42,19 +50,46 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
         Api.client
             .from('peserta_ujian')
             .select(
-                'id,nomor_peserta,status,siswa(nama,nis,kelas(nama,jurusan(singkatan,nama)))')
+                'id,nomor_peserta,status,foto_url,siswa(profile_id,nama,nis,foto_url,kelas(nama,jurusan(singkatan,nama)))')
             .eq('ujian_id', _ujianId)
             .order('nomor_peserta', ascending: true),
-        Api.client.from('sekolah').select('nama').limit(1),
+        Api.client
+            .from('sekolah')
+            .select('nama,kepala_sekolah,nip_kepala')
+            .limit(1),
       ]);
       final p = List<Map<String, dynamic>>.from(rows[0] as List);
       final s = rows[1] as List;
+      final ids = <String>[];
+      for (final x in p) {
+        final sw = x['siswa'];
+        if (sw is Map && '${sw['profile_id']}'.isNotEmpty) {
+          ids.add('${sw['profile_id']}');
+        }
+      }
+      Map<String, String> pwMap = {};
+      if (ids.isNotEmpty) {
+        try {
+          final pr = await Api.client
+              .from('profiles')
+              .select('id,pw_default')
+              .filter('id', 'in', ids);
+          pwMap = {
+            for (final r in (pr as List))
+              '${r['id']}': '${r['pw_default'] ?? ''}'
+          };
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _peserta = p;
-        if (s.isNotEmpty && '${s.first['nama']}'.isNotEmpty) {
-          _sekolah = '${s.first['nama']}';
+        if (s.isNotEmpty) {
+          final sm = Map<String, dynamic>.from(s.first as Map);
+          if ('${sm['nama']}'.isNotEmpty) _sekolah = '${sm['nama']}';
+          _kepala = '${sm['kepala_sekolah'] ?? ''}';
+          _nip = '${sm['nip_kepala'] ?? ''}';
         }
+        _pwByProfile = pwMap;
         _loading = false;
       });
     } catch (e) {
@@ -208,89 +243,203 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
         name: 'nominatif-${_ujianNama.replaceAll(RegExp(r'[^A-Za-z0-9]+'), '-')}');
   }
 
+  Future<Uint8List?> _assetBytes(String path) async {
+    try {
+      final d = await rootBundle.load(path);
+      return d.buffer.asUint8List(d.offsetInBytes, d.lengthInBytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Uint8List?> _urlBytes(String? url) async {
+    if (url == null || url.isEmpty || url == 'null') return null;
+    try {
+      final r = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
+      return r.statusCode == 200 ? r.bodyBytes : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<Uint8List?> _qrBytes(String data) async {
+    try {
+      final b = await QrPainter(data: data, version: QrVersions.auto)
+          .toImageData(120);
+      return b?.buffer.asUint8List(b.offsetInBytes, b.lengthInBytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _tahunAjaran() {
+    DateTime d = DateTime.now();
+    final raw = widget.ujian['tanggal'];
+    if (raw != null && '$raw'.isNotEmpty) {
+      final p = DateTime.tryParse('$raw');
+      if (p != null) d = p;
+    }
+    return d.month >= 7 ? '${d.year}/${d.year + 1}' : '${d.year - 1}/${d.year}';
+  }
+
+  pw.Widget _field(String label, String value, {bool bold = false}) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 2),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.SizedBox(
+                width: 70,
+                child: pw.Text('$label :',
+                    style: const pw.TextStyle(
+                        fontSize: 6.5, color: PdfColors.grey700))),
+            pw.Expanded(
+                child: pw.Text(
+                    value.isEmpty || value == 'null' ? '-' : value,
+                    style: pw.TextStyle(
+                        fontSize: 6.8,
+                        fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal))),
+          ],
+        ),
+      );
+
   // ================= PDF: KARTU PESERTA =================
   Future<void> _printKartu() async {
     final doc = pw.Document();
+    final logoBytes = await _assetBytes('assets/images/logo_yp.png');
+    final logo = logoBytes == null ? null : pw.MemoryImage(logoBytes);
     final list = _shown;
-    const perPage = 8; // 2 kolom x 4 baris
+    final tahun = _tahunAjaran();
+    const perPage = 8;
     for (var i = 0; i < list.length; i += perPage) {
       final chunk = list.sublist(
           i, i + perPage > list.length ? list.length : i + perPage);
-      doc.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(16),
-          build: (_) => pw.Column(
+      final cards = <pw.Widget>[];
+      for (final p in chunk) {
+        final sw = p['siswa'] is Map
+            ? Map<String, dynamic>.from(p['siswa'] as Map)
+            : <String, dynamic>{};
+        final nis = '${sw['nis'] ?? '-'}';
+        final profId = '${sw['profile_id'] ?? ''}';
+        final pass = _pwByProfile[profId] ?? '';
+        final foto = await _urlBytes('${sw['foto_url'] ?? p['foto_url'] ?? ''}');
+        final qr = await _qrBytes('${p['nomor_peserta'] ?? nis}');
+        cards.add(pw.Container(
+          padding: const pw.EdgeInsets.all(6),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey800, width: 0.8),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
             children: [
-              pw.Text('KARTU PESERTA UJIAN — ${_ujianNama.toUpperCase()}',
-                  style: pw.TextStyle(
-                      fontSize: 11, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_sekolah,
-                  style: const pw.TextStyle(fontSize: 9)),
-              pw.SizedBox(height: 10),
-              pw.GridView(
-                crossAxisCount: 2,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 1.55,
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  for (final p in chunk)
-                    pw.Container(
-                      padding: const pw.EdgeInsets.all(10),
-                      decoration: pw.BoxDecoration(
-                        border: pw.Border.all(
-                            color: PdfColors.blue900, width: 1.2),
-                        borderRadius: pw.BorderRadius.circular(8),
-                      ),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Row(
-                            mainAxisAlignment:
-                                pw.MainAxisAlignment.spaceBetween,
-                            children: [
-                              pw.Text(_sekolah.toUpperCase(),
-                                  style: pw.TextStyle(
-                                      fontSize: 7,
-                                      fontWeight: pw.FontWeight.bold,
-                                      color: PdfColors.blue900)),
-                              pw.Text('PESERTA',
-                                  style: pw.TextStyle(
-                                      fontSize: 7,
-                                      fontWeight: pw.FontWeight.bold)),
-                            ],
-                          ),
-                          pw.Divider(color: PdfColors.blue900, height: 8),
-                          pw.Center(
-                            child: pw.Text(
-                                '${p['nomor_peserta'] ?? '-'}',
-                                style: pw.TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: pw.FontWeight.bold)),
-                          ),
-                          pw.SizedBox(height: 4),
-                          pw.Center(
-                              child: pw.Text(_nama(p),
-                                  style: pw.TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: pw.FontWeight.bold))),
-                          pw.Center(
-                              child: pw.Text(
-                                  'NIS ${_nis(p)} • ${_kelas(p)}',
-                                  style: const pw.TextStyle(fontSize: 8))),
-                          pw.Spacer(),
-                          pw.Text(_ujianNama,
-                              style: const pw.TextStyle(
-                                  fontSize: 7, color: PdfColors.grey700)),
-                        ],
-                      ),
+                  if (logo != null)
+                    pw.Image(logo, width: 26, height: 26)
+                  else
+                    pw.SizedBox(width: 26, height: 26),
+                  pw.SizedBox(width: 4),
+                  pw.Expanded(
+                    child: pw.Column(
+                      children: [
+                        pw.Text('KARTU PESERTA CBT UM',
+                            style: pw.TextStyle(
+                                fontSize: 8.5,
+                                fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.center),
+                        pw.Text(_sekolah.toUpperCase(),
+                            style: pw.TextStyle(
+                                fontSize: 7, fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.center),
+                        pw.Text('TAHUN PELAJARAN $tahun',
+                            style: const pw.TextStyle(fontSize: 6.2),
+                            textAlign: pw.TextAlign.center),
+                      ],
                     ),
+                  ),
+                  pw.SizedBox(width: 4),
+                  if (logo != null)
+                    pw.Image(logo, width: 26, height: 26)
+                  else
+                    pw.SizedBox(width: 26, height: 26),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Container(
+                    width: 50,
+                    height: 60,
+                    decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.grey400)),
+                    child: foto == null
+                        ? pw.Center(
+                            child: pw.Text('FOTO',
+                                style: pw.TextStyle(
+                                    fontSize: 6, color: PdfColors.grey)))
+                        : pw.Image(pw.MemoryImage(foto),
+                            fit: pw.BoxFit.cover, width: 50, height: 60),
+                  ),
+                  pw.SizedBox(width: 7),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _field('No Peserta', '${p['nomor_peserta'] ?? '-'}'),
+                        _field('Nama', _nama(p), bold: true),
+                        _field('Kelas / Sesi', _kelas(p)),
+                        _field('Username', nis),
+                        _field('Password', pass),
+                        _field(
+                            'Ruang', '${p['ruang'] ?? p['ruang_nama'] ?? '-'}'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  if (qr != null)
+                    pw.Image(pw.MemoryImage(qr), width: 40, height: 40)
+                  else
+                    pw.SizedBox(width: 40, height: 40),
+                  pw.Spacer(),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text('Kepala Sekolah',
+                          style: const pw.TextStyle(fontSize: 6.5)),
+                      pw.SizedBox(height: 13),
+                      pw.Text(
+                          _kepala.isEmpty ? '......................' : _kepala,
+                          style: pw.TextStyle(
+                              fontSize: 6.3, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(_nip.isEmpty ? '' : 'NIP. $_nip',
+                          style: const pw.TextStyle(fontSize: 5.3)),
+                    ],
+                  ),
                 ],
               ),
             ],
           ),
+        ));
+      }
+      doc.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(14),
+        build: (_) => pw.GridView(
+          crossAxisCount: 2,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 1.42,
+          children: cards,
         ),
-      );
+      ));
     }
     await Printing.layoutPdf(
         onLayout: (_) async => doc.save(),

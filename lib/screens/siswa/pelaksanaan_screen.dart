@@ -23,7 +23,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   final int _penaltyLimit = 5;
   // Durasi minimal di luar aplikasi sebelum dianggap sengaja keluar.
   // Di bawah ini = kejadian sistem yang wajar, bukan pelanggaran.
-  static const Duration _minAwayDuration = Duration(seconds: 4);
+  static const Duration _minAwayDuration = Duration(seconds: 5);
   late int _durasiDetik;
   Timer? _timer;
   int _sisaDetik = 0;
@@ -41,6 +41,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   DateTime? _keluarPada;
   // satu pelanggaran per siklus keluar-masuk (jangan dobel hitung)
   bool _sudahDihitungSiklusIni = false;
+  DateTime? _terakhirPelanggaran;
 
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
@@ -178,7 +179,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   void _onIntrusion() {
-    if (!_kiosk || !mounted) return;
+    if (!_kiosk || !mounted || _showPalette || _submitting) return;
     // Native sudah menyaring fokus hilang < 2.5 detik (notif shade, dialog,
     // keyboard, immersive flicker) -> event ini = intrusi sungguhan.
     _hitungPelanggaran('tab_switch');
@@ -221,16 +222,14 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     // - hanya 'paused'/'hidden' (app benar-benar di belakang/lock) yang dicatat,
     //   dan hanya bila berlangsung > _minAwayDuration.
     if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
-      if (_kiosk && !_sudahDihitungSiklusIni) {
+      if (_kiosk) {
+        _sudahDihitungSiklusIni = false;
         _keluarPada = DateTime.now();
         if (_sisaDetik > 0) Kiosk.alarmStart(maxVolume: true);
       }
     } else if (state == AppLifecycleState.resumed) {
       Kiosk.alarmStop();
-      if (_kiosk) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-        _evaluasiKeluar();
-      }
+      if (_kiosk) _evaluasiKeluar();
     }
   }
 
@@ -246,6 +245,13 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     _hitungPelanggaran('keluar_app');
   }
   void _hitungPelanggaran(String jenis) {
+    if (!_kiosk || !mounted) return;
+    final now = DateTime.now();
+    if (_terakhirPelanggaran != null &&
+        now.difference(_terakhirPelanggaran!) < const Duration(seconds: 10)) {
+      return;
+    }
+    _terakhirPelanggaran = now;
     _juangPaused++;
     _catatPelanggaran(jenis);
     setState(() {});
@@ -1002,7 +1008,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
             SizedBox(
               width: 104,
               child: OutlinedButton.icon(
-                onPressed: _idx == 0 ? null : () => setState(() => _idx--),
+                onPressed: _idx == 0
+                    ? null
+                    : () {
+                        FocusScope.of(context).unfocus();
+                        setState(() => _idx--);
+                      },
                 icon: const Icon(Icons.arrow_back_ios_new, size: 14),
                 label: const Text('Sebelum', style: TextStyle(fontSize: 12)),
                 style: OutlinedButton.styleFrom(
@@ -1019,7 +1030,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 color: Cbt.paper,
                 borderRadius: BorderRadius.circular(11),
                 child: InkWell(
-                  onTap: () => setState(() => _showPalette = true),
+                  onTap: () {
+                    FocusScope.of(context).unfocus();
+                    setState(() => _showPalette = true);
+                  },
                   borderRadius: BorderRadius.circular(11),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1058,7 +1072,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       ),
                     )
                   : FilledButton.icon(
-                      onPressed: () => setState(() => _idx++),
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        setState(() => _idx++);
+                      },
                       icon: const Icon(Icons.arrow_forward_ios, size: 14),
                       label: const Text('Berikut', style: TextStyle(fontSize: 12)),
                       style: FilledButton.styleFrom(
@@ -1136,6 +1153,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: () {
+                        FocusScope.of(context).unfocus();
                         setState(() {
                           _idx = i;
                           _showPalette = false;
@@ -1180,6 +1198,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   }
 
   Future<void> _confirmSubmit() async {
+    FocusScope.of(context).unfocus();
     final belum = _soal.length - _jawaban.values.where((v) => v != null && v.isNotEmpty).length;
     final ok = await showDialog<bool>(
       context: context,

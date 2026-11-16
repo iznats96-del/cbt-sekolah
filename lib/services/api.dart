@@ -8,6 +8,43 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config.dart';
 import 'hybrid_api.dart';
 
+class FailoverHttpClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) {
+    final primary = Uri.parse(AppConfig.supabaseUrl);
+    if (!Api.isFallbackActive || request.url.host != primary.host) {
+      return _inner.send(request);
+    }
+    final fb = Uri.parse(AppConfig.fallbackApiUrl);
+    final target = request.url.replace(
+      scheme: fb.scheme,
+      host: fb.host,
+      port: fb.port,
+    );
+    http.BaseRequest out;
+    if (request is http.MultipartRequest) {
+      final r = http.MultipartRequest(request.method, target)
+        ..fields.addAll(request.fields)
+        ..files.addAll(request.files)
+        ..followRedirects = request.followRedirects
+        ..maxRedirects = request.maxRedirects;
+      out = r;
+    } else if (request is http.Request) {
+      final r = http.Request(request.method, target)
+        ..bodyBytes = request.bodyBytes
+        ..followRedirects = request.followRedirects
+        ..maxRedirects = request.maxRedirects;
+      out = r;
+    } else {
+      return _inner.send(request);
+    }
+    out.headers.addAll(request.headers);
+    return _inner.send(out);
+  }
+}
+
 /// BackendRouter: Active-Passive Automatic Failover
 ///
 /// PRIMARY: Supabase Cloud (via supabase_flutter SDK)
@@ -24,6 +61,12 @@ class Api {
   // ─── SUPABASE CLIENT ──────────────────────────────────────
   static SupabaseClient get client => Supabase.instance.client;
   static User? get user => client.auth.currentUser;
+
+  /// HTTP client yang dipakai SDK Supabase. Saat circuit breaker open,
+  /// seluruh request (termasuk layar yang memanggil Api.client langsung)
+  /// diarahkan ke server fallback — primary tetap Supabase.
+  static final FailoverHttpClient httpClient = FailoverHttpClient();
+  static bool get isFallbackActive => _circuitOpen;
 
   // ─── ROLE CACHE ───────────────────────────────────────────
   static String? _cachedRole;

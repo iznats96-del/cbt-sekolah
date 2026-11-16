@@ -14,6 +14,7 @@ Future<void> main() async {
   await Supabase.initialize(
     url: AppConfig.supabaseUrl,
     anonKey: AppConfig.supabaseAnonKey,
+    httpClient: Api.httpClient,
   );
   // Start periodic health check for automatic failover circuit breaker
   Api.startHealthCheck();

@@ -26,7 +26,7 @@ class MainActivity : FlutterActivity() {
     // Kehilangan fokus yang lasted lebih dari ini dianggap intrusi sungguhan.
     // Di bawah ini = kejadian wajar (notif shade, dialog sistem, keyboard,
     // atau applyImmersive() dari enforcer) dan TIDAK boleh dihitung sebagai pelanggaran.
-    private val INTRUSION_MIN_MS = 2500L
+    private val INTRUSION_MIN_MS = 5000L
     private var isKioskLocked = false
     private var ch: MethodChannel? = null
     private var volumeObserver: ContentObserver? = null
@@ -34,6 +34,7 @@ class MainActivity : FlutterActivity() {
     private var volumeEnforcer: Runnable? = null
     private var immersiveEnforcer: Runnable? = null
     private var lockTaskEnforcer: Runnable? = null
+    private var lockTaskAttempted = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,10 +50,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun applyImmersive() {
-        // Tandai sedang menerapkan immersive, supaya fokus yang hilang akibat
-        // applyImmersive() tidak salah dihitung sebagai penyontekan.
-        applyingImmersive = true
-        handler.postDelayed({ applyingImmersive = false }, 800)
+        suppressIntrusionUntil = System.currentTimeMillis() + 1500
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                 or View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -81,8 +79,12 @@ class MainActivity : FlutterActivity() {
         immersiveEnforcer = object : Runnable {
             override fun run() {
                 if (isKioskLocked) {
-                    applyImmersive()
-                    handler.postDelayed(this, 500)
+                    if (hasWindowFocus()) {
+                        applyImmersive()
+                        handler.postDelayed(this, 3000)
+                    } else {
+                        handler.postDelayed(this, 1000)
+                    }
                 }
             }
         }
@@ -109,16 +111,17 @@ class MainActivity : FlutterActivity() {
         stopLockTaskEnforcer()
         lockTaskEnforcer = object : Runnable {
             override fun run() {
-                if (isKioskLocked && !isInLockTask()) {
+                val owner = isDeviceOwner()
+                if (isKioskLocked && !isInLockTask() && (owner || !lockTaskAttempted)) {
+                    lockTaskAttempted = true
                     try {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                             startLockTask()
                         }
                     } catch (_: Exception) {}
-                    // No thanks = cuma peringatan, tanpa alarm bising
                     try { ch?.invokeMethod("onPinningWarning", null) } catch (_: Exception) {}
                 }
-                if (isKioskLocked) handler.postDelayed(this, 1200)
+                if (isKioskLocked && owner) handler.postDelayed(this, 1200)
             }
         }
         handler.postDelayed(lockTaskEnforcer!!, 1000)
@@ -167,7 +170,7 @@ class MainActivity : FlutterActivity() {
 
     // ── deteksi intrusi yang tidak salah positives ──────────────────
     private var pendingIntrusion: Runnable? = null
-    private var applyingImmersive = false
+    private var suppressIntrusionUntil = 0L
 
     private fun cancelPendingIntrusion() {
         pendingIntrusion?.let { handler.removeCallbacks(it) }
@@ -179,7 +182,8 @@ class MainActivity : FlutterActivity() {
         val r = Runnable {
             pendingIntrusion = null
             // fokus masih hilang setelah durasi minimum -> intrusi sungguhan
-            if (isKioskLocked && !hasWindowFocus() && !applyingImmersive) {
+            if (isKioskLocked && !hasWindowFocus() &&
+                System.currentTimeMillis() > suppressIntrusionUntil) {
                 reportIntrusion()
             }
         }
@@ -190,7 +194,7 @@ class MainActivity : FlutterActivity() {
     private var lastIntrusionAt = 0L
     private fun reportIntrusion() {
         val now = System.currentTimeMillis()
-        if (now - lastIntrusionAt < 3000) return
+        if (now - lastIntrusionAt < 10000) return
         lastIntrusionAt = now
         try {
             enforceMaxVolume()
@@ -226,7 +230,7 @@ class MainActivity : FlutterActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         if (isKioskLocked) {
-            reportIntrusion()
+            schedulePendingIntrusion()
             handler.postDelayed({
                 try {
                     val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -268,7 +272,7 @@ class MainActivity : FlutterActivity() {
                     am.moveTaskToFront(taskId, 0)
                 } catch (_: Exception) {}
             }
-            if (isKioskLocked) reportIntrusion()
+            if (isKioskLocked) schedulePendingIntrusion()
         }
     }
 
@@ -371,6 +375,7 @@ class MainActivity : FlutterActivity() {
         stopLockTaskEnforcer()
         window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN)
         try {
             val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
             val admin = ComponentName(this, CbtDeviceAdminReceiver::class.java)
