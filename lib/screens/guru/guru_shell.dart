@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
 import 'bank_soal_screen.dart';
@@ -61,8 +62,38 @@ class _GuruShellState extends State<GuruShell> {
   }
 }
 
-class _GuruHome extends StatelessWidget {
+class _GuruHome extends StatefulWidget {
   const _GuruHome();
+
+  @override
+  State<_GuruHome> createState() => _GuruHomeState();
+}
+
+class _GuruHomeState extends State<_GuruHome> {
+  Map<String, dynamic> _stats = {};
+  List<dynamic> _jadwal = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final res = await Api.fallbackGetApi('/api/guru/dashboard');
+      if (!mounted) return;
+      setState(() {
+        _stats = res is Map ? Map<String, dynamic>.from(res['stats'] ?? {}) : {};
+        final j = res is Map ? res['jadwal_hari_ini'] : null;
+        _jadwal = j is List ? j : const [];
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -105,7 +136,14 @@ class _GuruHome extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _TodayFocus(),
+            _GuruRingkasan(
+              stats: _stats,
+              jadwal: _jadwal,
+              loading: _loading,
+              refresh: _load,
+            ),
+            const SizedBox(height: 16),
+            _TodayFocus(jadwal: _jadwal),
             const SizedBox(height: 16),
             LayoutBuilder(builder: (context, c) {
               final cols = (c.maxWidth / 200).floor().clamp(2, 4);
@@ -147,8 +185,97 @@ class _GuruHome extends StatelessWidget {
   }
 }
 
+class _GuruRingkasan extends StatelessWidget {
+  final Map<String, dynamic> stats;
+  final List<dynamic> jadwal;
+  final bool loading;
+  final VoidCallback refresh;
+  const _GuruRingkasan({
+    required this.stats,
+    required this.jadwal,
+    required this.loading,
+    required this.refresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    String val(String k) => '${stats[k] ?? 0}';
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.insights, size: 18, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                const Text('Ringkasan mengajar',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                const Spacer(),
+                IconButton(
+                  onPressed: refresh,
+                  tooltip: 'Muat ulang',
+                  icon: const Icon(Icons.refresh, size: 18),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _stat('Mapel diampu', val('mapel_diampu'), AppTheme.primary),
+                const SizedBox(width: 8),
+                _stat('Ujian aktif', val('ujian_aktif'), AppTheme.secondary),
+                const SizedBox(width: 8),
+                _stat('Esai menunggu', val('esai_menunggu_koreksi'), AppTheme.accent),
+              ],
+            ),
+            if (jadwal.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text('${jadwal.length} ujian terjadwal hari ini',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _stat(String label, String value, Color color) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Column(
+            children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 19, fontWeight: FontWeight.w800, color: color)),
+              const SizedBox(height: 3),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 10.5, color: Colors.grey)),
+            ],
+          ),
+        ),
+      );
+}
+
 class _TodayFocus extends StatelessWidget {
-  const _TodayFocus();
+  final List<dynamic> jadwal;
+  const _TodayFocus({this.jadwal = const []});
 
   @override
   Widget build(BuildContext context) {
@@ -159,10 +286,16 @@ class _TodayFocus extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Fokus hari ini', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        SizedBox(height: 5),
-        Text('Siapkan soal, cek jadwal, lalu pantau nilai dan absensi dari shortcut di bawah.', style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Fokus hari ini',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 5),
+        Text(
+          jadwal.isEmpty
+              ? 'Siapkan soal, cek jadwal, lalu pantau nilai dan absensi dari shortcut di bawah.'
+              : '${jadwal.length} ujian hari ini — cek jadwal & pantau nilai di bawah.',
+          style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+        ),
       ]),
     );
   }

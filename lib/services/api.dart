@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config.dart';
+import 'hybrid_api.dart';
 
 /// BackendRouter: Active-Passive Automatic Failover
 ///
@@ -191,7 +192,7 @@ class Api {
   }
   // ─── FALLBACK HTTP HELPERS ────────────────────────────────
   static String? get _fallbackToken =>
-      client.auth.currentSession?.accessToken;
+      HybridApi.fallbackToken ?? client.auth.currentSession?.accessToken;
 
   static Map<String, String> _fallbackHeaders({String? contentType}) {
     final h = <String, String>{};

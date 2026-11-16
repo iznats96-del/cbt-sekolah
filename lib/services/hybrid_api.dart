@@ -17,6 +17,9 @@ class HybridApi {
   /// Cek apakah sedang dalam mode fallback
   static bool get isUsingFallback => _fallbackActive;
 
+  /// Token hasil login fallback (dipakai Api untuk header HTTP fallback).
+  static String? get fallbackToken => _fallbackToken;
+
   // ─── AUTH ───────────────────────────────────────────────
 
   /// Login: coba Supabase dulu, fallback ke local API
