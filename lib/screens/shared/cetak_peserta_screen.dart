@@ -393,8 +393,6 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                         _field('Kelas / Sesi', _kelas(p)),
                         _field('Username', nis),
                         _field('Password', pass),
-                        _field(
-                            'Ruang', '${p['ruang'] ?? p['ruang_nama'] ?? '-'}'),
                       ],
                     ),
                   ),
