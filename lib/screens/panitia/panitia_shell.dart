@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/design.dart';
 import '../../services/api.dart';
+import '../../widgets/cetak_kartu_helper.dart';
 import '../home.dart';
 import 'monitoring_ujian_screen.dart';
 import 'peserta_ujian_screen.dart';
@@ -198,6 +199,7 @@ class _PanitiaHomeState extends State<PanitiaHome> {
       (Icons.people_outline, 'Peserta ujian', Cbt.teal, 2),
       (Icons.assessment_outlined, 'Rekap nilai', Cbt.amber, 3),
       (Icons.qr_code_scanner, 'Scan absen', Cbt.blue, -1),
+      (Icons.print_outlined, 'Cetak kartu', Cbt.teal, -2),
     ];
     return GridView.count(
       crossAxisCount: 2,
@@ -214,6 +216,8 @@ class _PanitiaHomeState extends State<PanitiaHome> {
             onTap: () {
               if (m.$4 == -1) {
                 Navigator.of(context).pushNamed('/panitia/scan');
+              } else if (m.$4 == -2) {
+                pilihDanCetakKartu(context);
               } else {
                 widget.onGo(m.$4);
               }

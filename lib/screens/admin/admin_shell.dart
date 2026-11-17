@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../core/design.dart';
 import '../../services/api.dart';
 import '../home.dart';
+import '../../widgets/cetak_kartu_helper.dart';
 import '../../widgets/state_views.dart';
 import 'data_master_screen.dart';
 import 'bank_soal_screen.dart';
@@ -191,6 +192,12 @@ class _AdminHomeState extends State<_AdminHome> {
                     _FeatureCard(icon: Icons.person_outline, label: 'Guru', color: Cbt.teal, onTap: () => widget.go(1)),
                     _FeatureCard(icon: Icons.quiz_outlined, label: 'Bank Soal', color: Cbt.amber, onTap: () => widget.go(2)),
                     _FeatureCard(icon: Icons.assignment_outlined, label: 'Ujian', color: Cbt.red, onTap: () => widget.go(3)),
+                    _FeatureCard(
+                      icon: Icons.print_outlined,
+                      label: 'Cetak Kartu',
+                      color: Cbt.blue,
+                      onTap: () => pilihDanCetakKartu(context),
+                    ),
                     _FeatureCard(
                       icon: Icons.insert_chart_outlined,
                       label: 'Rekap Nilai',
