@@ -316,8 +316,9 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
 
   @override
   Widget build(BuildContext context) {
-    final pgCount = _soal.where((s) => (s['jenis'] ?? 'pg').toString() != 'essay').length;
-    final essayCount = _soal.length - pgCount;
+    final pgCount = _soal.where((s) => (s['jenis'] ?? 'pg').toString() == 'pg').length;
+    final jodohCount = _soal.where((s) => s['jenis']?.toString() == 'jodoh').length;
+    final essayCount = _soal.where((s) => s['jenis']?.toString() == 'essay').length;
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(title: Text(widget.mapelNama)),
@@ -359,6 +360,8 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
                     () => setState(() => _filterJenis = 'semua')),
                 _chip('PG ($pgCount)', _filterJenis == 'pg',
                     () => setState(() => _filterJenis = 'pg')),
+                _chip('Jodoh ($jodohCount)', _filterJenis == 'jodoh',
+                    () => setState(() => _filterJenis = 'jodoh')),
                 _chip('Essay ($essayCount)', _filterJenis == 'essay',
                     () => setState(() => _filterJenis = 'essay')),
               ],
@@ -406,6 +409,11 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
   Widget _soalRow(Map<String, dynamic> s) {
     final jenis = (s['jenis'] ?? 'pg').toString();
     final isEssay = jenis == 'essay';
+    final isJodoh = jenis == 'jodoh';
+    final badgeColor = isEssay
+        ? const Color(0xFFF4A940)
+        : (isJodoh ? const Color(0xFF8B5CF6) : AppTheme.primary);
+    final badgeText = isEssay ? 'ESSAY' : (isJodoh ? 'JODOH' : 'PG');
     final kelasNama = s['kelas'] is Map ? '${(s['kelas'] as Map)['nama'] ?? ''}' : '';
     return GestureDetector(
       onTap: () => Navigator.of(context)
@@ -426,17 +434,16 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
               width: 44,
               padding: const EdgeInsets.symmetric(vertical: 5),
               decoration: BoxDecoration(
-                color: (isEssay ? const Color(0xFFF4A940) : AppTheme.primary)
-                    .withValues(alpha: 0.12),
+                color: badgeColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
               alignment: Alignment.center,
               child: Text(
-                isEssay ? 'ESSAY' : 'PG',
+                badgeText,
                 style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: isEssay ? const Color(0xFFF4A940) : AppTheme.primary),
+                    color: badgeColor),
               ),
             ),
             const SizedBox(width: 10),
