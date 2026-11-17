@@ -614,7 +614,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
 
   // ── Kartu soal: menyerupai kertas dengan pinggiran biru ──────
   Widget _buildSoalCard(Map<String, dynamic> soal, String curId, String jenis, List opsiList) {
-    final teks = (soal['soal'] ?? '').toString();
+    final isJodoh = jenis == 'jodoh' || jenis == 'menjodohkan';
+    final teks = isJodoh
+        ? 'Pasangkan setiap item di kolom kiri dengan jawaban yang sesuai di kolom kanan.'
+        : (soal['soal'] ?? '').toString();
     final opsiRaw = soal['opsi'];
     final gambar = soal['gambar_url']?.toString();
     return Container(

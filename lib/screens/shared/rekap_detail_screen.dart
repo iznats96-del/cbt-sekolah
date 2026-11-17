@@ -197,6 +197,18 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
       warn = AppTheme.danger;
       badge = 'SALAH';
     }
+    final benarItem = s['benar_item'] as num?;
+    final jmlItem = s['jml_item'] as num?;
+    final nilaiSoal = s['nilai_soal'] as num?;
+    final bobotSoal = s['bobot'] as num?;
+    if (isJodoh && benarItem != null && jmlItem != null) {
+      final rasio = jmlItem > 0 ? benarItem / jmlItem : 0;
+      warn = rasio >= 1
+          ? AppTheme.secondary
+          : (rasio > 0 ? AppTheme.accent : AppTheme.danger);
+      badge = '${benarItem.toInt()}/${jmlItem.toInt()} pasangan';
+    }
+    String fmtNum(num v) => v.toStringAsFixed(1).replaceFirst('.', ',');
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -244,6 +256,32 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
                 ],
               ),
             ],
+            if (isJodoh && benarItem != null && jmlItem != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: warn.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: warn.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Pasangan benar: ${benarItem.toInt()} dari ${jmlItem.toInt()}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 3),
+                      Text('Bobot maksimal: ${bobotSoal ?? '-'}',
+                          style: const TextStyle(fontSize: 11.5, color: Colors.grey)),
+                      const SizedBox(height: 3),
+                      Text('Nilai diperoleh: ${nilaiSoal == null ? '-' : fmtNum(nilaiSoal)} / ${bobotSoal ?? '-'}',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: warn)),
+                    ],
+                  ),
+                ),
+              ),
             if (jenis == 'essay')
               Padding(
                 padding: const EdgeInsets.only(top: 6),

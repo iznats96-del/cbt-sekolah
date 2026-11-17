@@ -399,17 +399,31 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                 onSelectionChanged: (s) => setState(() => _jenis = s.first),
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _soalCtrl,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Soal *',
-                  prefixIcon: Icon(Icons.description_outlined),
+              if (_jenis != 'jodoh')
+                TextFormField(
+                  controller: _soalCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    labelText: 'Soal *',
+                    prefixIcon: Icon(Icons.description_outlined),
+                  ),
+                  validator: (v) {
+                    return (v == null || v.isEmpty) ? 'Isi soal' : null;
+                  },
                 ),
-                validator: (v) {
-                  return (v == null || v.isEmpty) ? 'Isi soal' : null;
-                },
-              ),
+              if (_jenis == 'jodoh')
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Text(
+                    'Item di kolom kiri adalah soal. Isi item kiri dan pilihan kanan, lalu tentukan pasangan yang benar.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF17324D)),
+                  ),
+                ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _pembahasanCtrl,
