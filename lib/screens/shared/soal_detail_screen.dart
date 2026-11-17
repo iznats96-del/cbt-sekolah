@@ -210,6 +210,15 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (soal.trim().isNotEmpty) ...[
+                      Text(soal,
+                          style: const TextStyle(
+                              fontSize: 14,
+                              height: 1.5,
+                              color: Color(0xFF0F172A),
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 8),
+                    ],
                     Text(SoalJodoh.instruksi,
                         style: const TextStyle(
                             fontSize: 12.5,

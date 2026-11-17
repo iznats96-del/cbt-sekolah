@@ -54,7 +54,8 @@ class SoalJodoh {
   }
 
   /// Judul preview untuk daftar soal.
-  /// Jodoh  -> "Menjodohkan: Phishing, Malware, Trojan, +2 lainnya"
+  /// Jodoh  -> pakai judul soal bila masih ada (data lama), kalau kosong
+  ///          fallback ke "Menjodohkan: Phishing, Malware, Trojan, +2 lainnya"
   /// Lainnya-> teks soal seperti biasa.
   static String judul(
     dynamic jenis,
@@ -63,7 +64,9 @@ class SoalJodoh {
     int maxItem = 3,
     int maxPanjangItem = 28,
   }) {
-    if (!isJodoh(jenis)) return (soal ?? '').toString().trim();
+    final judulLama = (soal ?? '').toString().trim();
+    if (!isJodoh(jenis)) return judulLama;
+    if (judulLama.isNotEmpty) return judulLama;
     final k = kiri(opsi);
     if (k.isEmpty) return 'Menjodohkan';
     final tampil = k.take(maxItem).map((e) {
