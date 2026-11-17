@@ -106,24 +106,40 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
     }
   }
 
-  Future<void> _salinSemua() async {
+  String _formatDaftar(String kelas, List<dynamic> baris) {
     final buf = StringBuffer()
-      ..writeln('DAFTAR AKUN LOGIN CBT — SMK YP 79 MAJALAYA')
-      ..writeln('Login: email/username = NIS, password sesuai tabel');
-    String? lastK;
-    for (final r in _shown) {
-      final k = '${r['kelas'] ?? '-'}';
-      if (k != lastK) {
-        buf.writeln('\n== $k ==');
-        lastK = k;
-      }
-      buf.writeln('${r['nomor'] ?? '-'}  ${r['nis']}  ${r['nama']}  ${r['pw'] ?? '(belum tercatat)'}');
+      ..writeln('Daftar Akun Kelas $kelas')
+      ..writeln();
+    for (final r in baris) {
+      buf
+        ..writeln('Nama: ${r['nama'] ?? '-'}')
+        ..writeln('Nis: ${r['nis'] ?? '-'} - password: ${r['pw'] ?? '(belum tercatat)'}')
+        ..writeln();
     }
-    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    return buf.toString().trimRight();
+  }
+
+  Future<void> _salinSemua() async {
+    final groups = <String, List<dynamic>>{};
+    final urutan = <String>[];
+    for (final r in _shown) {
+      final k = '${r['kelas'] ?? '(tanpa kelas)'}';
+      if (!groups.containsKey(k)) {
+        groups[k] = <dynamic>[];
+        urutan.add(k);
+      }
+      groups[k]!.add(r);
+    }
+    final buf = StringBuffer();
+    for (final k in urutan) {
+      if (buf.isNotEmpty) buf.writeln();
+      buf.writeln(_formatDaftar(k, groups[k]!));
+    }
+    await Clipboard.setData(ClipboardData(text: buf.toString().trimRight()));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Daftar tersalin ke clipboard'),
+        SnackBar(
+            content: Text('Daftar ${_rows.length} akun tersalin ke clipboard'),
             backgroundColor: AppTheme.secondary));
   }
 
@@ -131,13 +147,8 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
   Future<void> _salinPerKelas(String kelas) async {
     final baris = _shown.where((r) => '${r['kelas']}' == kelas).toList();
     if (baris.isEmpty) return;
-    final buf = StringBuffer()
-      ..writeln('DAFTAR AKUN LOGIN CBT — ROMBEL $kelas')
-      ..writeln('Login: username = NIS, password sesuai tabel');
-    for (final r in baris) {
-      buf.writeln('${r['nomor'] ?? '-'}  ${r['nis']}  ${r['nama']}  ${r['pw'] ?? '(belum tercatat)'}');
-    }
-    await Clipboard.setData(ClipboardData(text: buf.toString()));
+    await Clipboard.setData(
+        ClipboardData(text: _formatDaftar(kelas, baris)));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

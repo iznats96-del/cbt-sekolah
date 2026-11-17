@@ -179,7 +179,7 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
                             child: TextField(
                               onChanged: (v) => setState(() => _cari = v),
                               decoration: InputDecoration(
-                                hintText: 'Cari nama, NIS, atau kelasâ€¦',
+                                hintText: 'Cari nama, NIS, atau kelas',
                                 prefixIcon: const Icon(Icons.search_rounded,
                                     color: Color(0xFF2563EB)),
                                 border: InputBorder.none,

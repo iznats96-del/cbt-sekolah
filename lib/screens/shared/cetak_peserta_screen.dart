@@ -617,7 +617,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                                             BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                          '${p['nomor_peserta'] ?? 'â€”'}',
+                                          '${p['nomor_peserta'] ?? '-'}',
                                           style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,

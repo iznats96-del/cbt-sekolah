@@ -209,7 +209,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               child: Text(
                 keluarApp
                     ? 'App sempat tertutup. Kembali ke ujian ya.'
-                    : 'Terdeteksi jendela/overlay lain! Alarm aktif â€” kembali fokus ke ujian.',
+                    : 'Terdeteksi jendela/overlay lain! Alarm aktif - kembali fokus ke ujian.',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -375,7 +375,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Jaringan bermasalah â€” jawaban TERSIMPAN di server. Tap "Kumpulkan" lagi saat sinyal pulih.'),
+            content: Text('Jaringan bermasalah - jawaban TERSIMPAN di server. Tap "Kumpulkan" lagi saat sinyal pulih.'),
             backgroundColor: AppTheme.danger, duration: Duration(seconds: 8)),
       );
       return;
@@ -494,7 +494,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  // â”€â”€ Kondisi awal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ---- Kondisi awal ----â”€â”€â”€â”€
   Widget _buildLoading() => const Scaffold(
         backgroundColor: const Color(0xFFF4F7FF),
         body: Center(
@@ -508,7 +508,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               SizedBox(height: 20),
               Text('Menyiapkan ujian', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Cbt.ink)),
               SizedBox(height: 6),
-              Text('Lingkungan terkunci â€¢ pengawas aktif', style: Cbt.caption),
+              Text('Lingkungan terkunci - pengawas aktif', style: Cbt.caption),
             ],
           ),
         ),
@@ -534,7 +534,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ),
       );
 
-  // â”€â”€ Header: judul + jam (elemen paling penting) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ---- Header: judul + jam ----
   Widget _buildHeader(bool low, bool critical) {
     final jam = _formatJam(_sisaDetik);
     final warnaJam = critical ? Cbt.red : (low ? Cbt.amber : Colors.white);
@@ -637,7 +637,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ],
       );
 
-  // â”€â”€ Kartu soal: menyerupai kertas dengan pinggiran biru â”€â”€â”€â”€â”€â”€
+  // ---- Kartu soal ----
   Widget _buildSoalCard(Map<String, dynamic> soal, String curId, String jenis, List opsiList) {
     final isJodoh = SoalJodoh.isJodoh(jenis);
     final teks = isJodoh
@@ -699,8 +699,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         style: Cbt.option,
         decoration: InputDecoration(
           hintText: jenis == 'essay'
-              ? 'Tulis jawabanmu di siniâ€¦'
-              : 'Tulis pasangan jawaban (mis. 1-B, 2-A, 3-C)â€¦',
+              ? 'Tulis jawabanmu di sini...'
+              : 'Tulis pasangan jawaban (mis. 1-B, 2-A, 3-C)...',
           hintStyle: const TextStyle(color: Cbt.muted),
           filled: true,
           fillColor: Cbt.paper,
@@ -730,7 +730,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   /// Soal menjodohkan: tiap item kiri dipasangkan ke salah satu pilihan kanan.
   /// Jawaban disimpan sebagai JSON peta {"0":"1", ...} (index kiri -> index kanan
   /// ASLI di data soal), sesuai format yang dicek di server (kunci.map).
-  /// Kolom kanan DIOCAK tampilnya (deterministik per soal â€” seed dari id soal)
+  /// Kolom kanan diacak tampilnya (deterministik per soal - seed dari id soal)
   /// supaya murid ga bisa nebak pola 1-A 2-B 3-C. Yang disimpan tetap index asli.
   Widget _buildJodoh(String curId, dynamic opsiRaw) {
     List<dynamic> kiri = const [];
@@ -795,6 +795,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
           SoalJodoh.instruksi,
           style: Cbt.caption,
         ),
+        const SizedBox(height: 4),
+        const Text(
+          'Pasangan yang sudah dipilih tidak ditampilkan di pilihan lain.',
+          style: TextStyle(fontSize: 11, color: Cbt.muted),
+        ),
         const SizedBox(height: 12),
         ConstrainedBox(
           constraints: BoxConstraints(maxHeight: tinggiMaks.toDouble()),
@@ -809,6 +814,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   ? null
                   : urutan.indexOf(int.tryParse(tersimpan) ?? -1);
               final sudah = posisiTampil != null && posisiTampil >= 0;
+              final dipakai = <String>{};
+              for (final e in pilihan.entries) {
+                if (e.key == '$i') continue;
+                final v = e.value?.toString();
+                if (v != null && v.isNotEmpty) dipakai.add(v);
+              }
               final field = DropdownButtonFormField<String>(
                 initialValue: sudah ? '$posisiTampil' : null,
                 isDense: false,
@@ -818,7 +829,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   filled: true,
                   fillColor: Colors.white,
-                  hintText: 'Pilih pasanganâ€¦',
+                  hintText: 'Pilih pasangan',
                   hintStyle: const TextStyle(fontSize: 13, color: Cbt.muted),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(11),
@@ -832,14 +843,15 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 ),
                 items: [
                   for (var j = 0; j < urutan.length; j++)
-                    DropdownMenuItem<String>(
-                      value: '$j',
-                      child: Text(
-                        '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 14, color: Cbt.ink),
+                    if (!dipakai.contains(urutan[j].toString()))
+                      DropdownMenuItem<String>(
+                        value: '$j',
+                        child: Text(
+                          '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 14, color: Cbt.ink),
+                        ),
                       ),
-                    ),
                 ],
                 onChanged: (v) {
                   setState(() {
@@ -1006,7 +1018,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  // â”€â”€ Bilah bawah: navigasi + lembar jawaban â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ---- Bilah bawah: navigasi + lembar jawaban ----â”€â”€â”€â”€â”€â”€
   Widget _buildBottomBar(int answered, int flagged) {
     return Container(
       decoration: BoxDecoration(
@@ -1063,7 +1075,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                         Text('LJK ${_idx + 1}/${_soal.length}',
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Cbt.ink)),
                         const SizedBox(width: 6),
-                        Text('â€¢ $answeredâœ“ ${flagged > 0 ? '$flaggedâš‘' : ''}',
+                        Text('$answered terjawab${flagged > 0 ? " - $flagged ragu" : ''}',
                             style: const TextStyle(fontSize: 11, color: Cbt.muted)),
                       ],
                     ),
