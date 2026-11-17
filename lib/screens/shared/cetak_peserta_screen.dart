@@ -417,7 +417,8 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                           _kepala.isEmpty ? '......................' : _kepala,
                           style: pw.TextStyle(
                               fontSize: 6.3, fontWeight: pw.FontWeight.bold)),
-                      pw.Text(_nip.isEmpty ? '' : 'NIP. $_nip',
+                      pw.Text(
+                          _nip.isEmpty ? 'NIP. ....................' : 'NIP. $_nip',
                           style: const pw.TextStyle(fontSize: 5.3)),
                     ],
                   ),
