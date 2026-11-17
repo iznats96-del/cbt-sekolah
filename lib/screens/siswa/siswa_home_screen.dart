@@ -37,7 +37,7 @@ class SiswaHomeScreen extends StatefulWidget {
 }
 
 class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
-  Map<String, dynamic>? _siswaRow;
+  Map<String, dynamic> _dash = {};
   bool _loading = true;
   final _jadwalKey = GlobalKey();
   final _ujianKey = GlobalKey();
@@ -49,14 +49,22 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
   }
 
   Future<void> _load() async {
-    final rows = await Api.routerSelect(
-      'siswa',
-      select: 'nama,nis,nomor_peserta,foto_url,kelas(nama,jurusan(singkatan))',
-      eq: {'profile_id': Api.user?.id ?? ''},
-    ).catchError((_) => <Map<String, dynamic>>[]);
+    final stats = <String, dynamic>{};
+    try {
+      final res = await Api.fallbackGetApi('/api/siswa/dashboard');
+      if (res is Map) stats.addAll(Map<String, dynamic>.from(res));
+    } catch (_) {}
+    if (stats.isEmpty) {
+      final rows = await Api.routerSelect(
+        'siswa',
+        select: 'nama,nis,nomor_peserta,foto_url,kelas(nama,jurusan(singkatan))',
+        eq: {'profile_id': Api.user?.id ?? ''},
+      ).catchError((_) => <Map<String, dynamic>>[]);
+      if (rows.isNotEmpty) stats.addAll(Map<String, dynamic>.from(rows.first));
+    }
     if (!mounted) return;
     setState(() {
-      if (rows.isNotEmpty) _siswaRow = Map<String, dynamic>.from(rows.first);
+      _dash = stats;
       _loading = false;
     });
   }
@@ -90,15 +98,15 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
       );
     }
 
-    final s = _siswaRow ?? const {};
+    final s = _dash;
     final nama = '${s['nama'] ?? 'Siswa'}';
     final nis = '${s['nis'] ?? ''}';
     final nomor = '${s['nomor_peserta'] ?? ''}';
     final foto = '${s['foto_url'] ?? ''}';
     final kelasMap = s['kelas'];
     final kelas = kelasMap is Map ? '${kelasMap['nama'] ?? ''}' : '';
-    final jur = kelasMap is Map && kelasMap['jurusan'] is Map
-        ? '${(kelasMap['jurusan'] as Map)['singkatan'] ?? ''}'
+    final jur = kelasMap is Map
+        ? '${kelasMap['singkatan'] ?? ''}'
         : '';
 
     return Scaffold(
@@ -115,6 +123,8 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _InfoPeserta(nomor: nomor, onSalin: () => _salin(nomor)),
+                  const SizedBox(height: 12),
+                  _RingkasanSiswa(stats: s['stats']),
                   const SizedBox(height: 20),
                   _AksesCepat(
                     onJadwal: () => _scrollTo(_jadwalKey),
@@ -323,6 +333,56 @@ class _InfoPeserta extends StatelessWidget {
       ),
     );
   }
+}
+
+class _RingkasanSiswa extends StatelessWidget {
+  final dynamic stats;
+  const _RingkasanSiswa({this.stats});
+
+  @override
+  Widget build(BuildContext context) {
+    final m = stats is Map ? Map<String, dynamic>.from(stats) : <String, dynamic>{};
+    final nilai = m['rata_nilai'];
+    final nilaiTeks = nilai == null
+        ? '-'
+        : (nilai is num ? nilai.toStringAsFixed(1) : '$nilai');
+    return Row(
+      children: [
+        _stat('Total ujian', '${m['total_ujian'] ?? 0}', _blue),
+        const SizedBox(width: 8),
+        _stat('Selesai', '${m['ujian_selesai'] ?? 0}', _green),
+        const SizedBox(width: 8),
+        _stat('Rata nilai', nilaiTeks, _orange),
+      ],
+    );
+  }
+
+  Widget _stat(String label, String value, Color color) => Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: _card,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Text(value,
+                  style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+              const SizedBox(height: 3),
+              Text(label,
+                  style: const TextStyle(fontSize: 10.5, color: _muted)),
+            ],
+          ),
+        ),
+      );
 }
 
 class _AksesCepat extends StatelessWidget {

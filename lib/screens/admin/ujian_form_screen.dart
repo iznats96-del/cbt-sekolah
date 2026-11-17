@@ -188,10 +188,13 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
 
   Future<void> _loadBankSoal() async {
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('bank_soal')
-          .select('id,soal,jenis,bobot,kelas_id,mata_pelajaran(*)')
-          .order('created_at', ascending: false);
+          .select('id,soal,jenis,bobot,kelas_id,guru_id,mata_pelajaran(*)');
+      if (Api.role == 'guru') {
+        q = q.eq('guru_id', Api.user?.id ?? '');
+      }
+      final rows = await q.order('created_at', ascending: false);
       if (!mounted) return;
       setState(() => _bankSoal = List<Map<String, dynamic>>.from(rows));
     } catch (_) {}

@@ -233,11 +233,14 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
       _error = null;
     });
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('bank_soal')
           .select('*,mata_pelajaran(nama),kelas(nama)')
-          .eq('mapel_id', widget.mapelId)
-          .order('created_at', ascending: false);
+          .eq('mapel_id', widget.mapelId);
+      if (Api.role == 'guru') {
+        q = q.eq('guru_id', Api.user?.id ?? '');
+      }
+      final rows = await q.order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {
         _soal = List<Map<String, dynamic>>.from(rows);
