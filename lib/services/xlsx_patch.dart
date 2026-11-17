@@ -76,6 +76,24 @@ class XlsxPatch {
       }
       if (rNum < 18) continue;
 
+      for (final c in cells.values) {
+        final f = c.findElements('f').firstOrNull;
+        if (f == null) continue;
+        final rumus = f.innerText;
+        if (rumus.isNotEmpty && !rumus.startsWith('IFERROR(')) {
+          f.children.clear();
+          f.children.add(xml.XmlText('IFERROR($rumus,"")'));
+          c.attributes.removeWhere((a) => a.localName == 't');
+          c.attributes.add(xml.XmlAttribute(nm('t'), 'str'));
+        }
+        if (c.getAttribute('t') == 'e') {
+          c.attributes.removeWhere((a) => a.localName == 't');
+          c.attributes.add(xml.XmlAttribute(nm('t'), 'str'));
+          final cached = c.findElements('v').firstOrNull;
+          if (cached != null) cached.children.clear();
+        }
+      }
+
       final nameCell = cells['C$rNum'];
       if (nameCell == null) continue;
       final name = _cellText(nameCell, shared).trim().toUpperCase();
