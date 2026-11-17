@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../services/api.dart';
 import '../../services/file_saver.dart';
@@ -90,7 +90,7 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
     return KartuSiswaData(
       noPeserta: '${s['nomor_peserta'] ?? ''}',
       nama: '${s['nama'] ?? ''}',
-      kelas: jur.isNotEmpty ? '$kelas • $jur' : kelas,
+      kelas: jur.isNotEmpty ? '$kelas â€¢ $jur' : kelas,
       username: nis,
       password: _pw['${s['profile_id']}'] ?? '',
       fotoUrl: '${s['foto_url'] ?? ''}',
@@ -139,7 +139,7 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
         children: [
           DashboardHeader(
             title: 'CETAK KARTU SISWA',
-            subtitle: 'Kartu Peserta CBT • ${KartuSiswaPdf.tahunAjaran()}',
+            subtitle: 'Kartu Peserta CBT â€¢ ${KartuSiswaPdf.tahunAjaran()}',
             showBack: true,
             stats: [
               ('siswa', '${_siswa.length}'),
@@ -182,7 +182,7 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
                             child: TextField(
                               onChanged: (v) => setState(() => _cari = v),
                               decoration: InputDecoration(
-                                hintText: 'Cari nama, NIS, atau kelas…',
+                                hintText: 'Cari nama, NIS, atau kelasâ€¦',
                                 prefixIcon: const Icon(Icons.search_rounded,
                                     color: Color(0xFF2563EB)),
                                 border: InputBorder.none,
@@ -377,7 +377,7 @@ class _SiswaRow extends StatelessWidget {
                           color: Color(0xFF101F3C))),
                   const SizedBox(height: 4),
                   Text(
-                    'NIS ${data['nis']} • ${jur.isNotEmpty ? '$kelas • $jur' : kelas}',
+                    'NIS ${data['nis']} â€¢ ${jur.isNotEmpty ? '$kelas â€¢ $jur' : kelas}',
                     style: const TextStyle(fontSize: 11, color: Color(0xFF8A97B1)),
                   ),
                 ],
@@ -417,3 +417,4 @@ class _SiswaRow extends StatelessWidget {
     );
   }
 }
+

@@ -84,49 +84,73 @@ class KartuSiswaPdf {
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-            if (logo != null)
-              pw.Image(logo, width: 26, height: 26)
-            else
-              pw.SizedBox(width: 26, height: 26),
-            pw.SizedBox(width: 4),
-            pw.Expanded(
-              child: pw.Column(children: [
-                pw.Text('KARTU PESERTA CBT UM',
-                    style: pw.TextStyle(
-                        fontSize: 8.5, fontWeight: pw.FontWeight.bold),
-                    textAlign: pw.TextAlign.center),
-                pw.Text(sekolah.toUpperCase(),
-                    style: pw.TextStyle(
-                        fontSize: 7, fontWeight: pw.FontWeight.bold),
-                    textAlign: pw.TextAlign.center),
-                pw.Text('TAHUN PELAJARAN $tahun',
-                    style: pw.TextStyle(fontSize: 6.2),
-                    textAlign: pw.TextAlign.center),
-              ]),
-            ),
-            pw.SizedBox(width: 4),
-            if (logo != null)
-              pw.Image(logo, width: 26, height: 26)
-            else
-              pw.SizedBox(width: 26, height: 26),
-          ]),
-          pw.SizedBox(height: 4),
-          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Container(
-              width: 50,
-              height: 60,
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: PdfColors.grey400),
+          pw.Container(
+            padding: pw.EdgeInsets.only(bottom: 4),
+            decoration: pw.BoxDecoration(
+              border: pw.Border(
+                bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.6),
               ),
-              child: foto == null
-                  ? pw.Center(
-                      child: pw.Text('FOTO',
-                          style: pw.TextStyle(fontSize: 6, color: PdfColors.grey)))
-                  : pw.Image(pw.MemoryImage(foto),
-                      fit: pw.BoxFit.cover, width: 50, height: 60),
             ),
-            pw.SizedBox(width: 7),
+            child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+              if (logo != null)
+                pw.Image(logo, width: 28, height: 28)
+              else
+                pw.SizedBox(width: 28, height: 28),
+              pw.SizedBox(width: 4),
+              pw.Expanded(
+                child: pw.Column(children: [
+                  pw.Text('KARTU PESERTA CBT UM',
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold),
+                      textAlign: pw.TextAlign.center),
+                  pw.Text(sekolah.toUpperCase(),
+                      style: pw.TextStyle(
+                          fontSize: 7.2, fontWeight: pw.FontWeight.bold),
+                      textAlign: pw.TextAlign.center),
+                  pw.Text('TAHUN PELAJARAN $tahun',
+                      style: pw.TextStyle(fontSize: 6.4),
+                      textAlign: pw.TextAlign.center),
+                ]),
+              ),
+              pw.SizedBox(width: 4),
+              if (logo != null)
+                pw.Image(logo, width: 28, height: 28)
+              else
+                pw.SizedBox(width: 28, height: 28),
+            ]),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.SizedBox(
+              width: 68,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Container(
+                    width: 56,
+                    height: 70,
+                    decoration: pw.BoxDecoration(
+                      border: pw.Border.all(color: PdfColors.grey400),
+                    ),
+                    child: foto == null
+                        ? pw.Center(
+                            child: pw.Text('FOTO',
+                                style: pw.TextStyle(
+                                    fontSize: 6, color: PdfColors.grey)))
+                        : pw.Image(pw.MemoryImage(foto),
+                            fit: pw.BoxFit.cover, width: 56, height: 70),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 6),
+                    child: qr != null
+                        ? pw.Image(pw.MemoryImage(qr), width: 46, height: 46)
+                        : pw.SizedBox(width: 46, height: 46),
+                  ),
+                ],
+              ),
+            ),
+            pw.SizedBox(width: 6),
             pw.Expanded(
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -136,29 +160,33 @@ class KartuSiswaPdf {
                   _field('Kelas / Sesi', c.kelas.isEmpty ? '-' : c.kelas),
                   _field('Username', c.username.isEmpty ? '-' : c.username),
                   _field('Password', c.password.isEmpty ? '-' : c.password),
+                  pw.SizedBox(height: 12),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.center,
+                        children: [
+                          pw.Text('Kepala Sekolah',
+                              style: pw.TextStyle(fontSize: 6.5)),
+                          pw.SizedBox(height: 13),
+                          pw.Text(
+                              kepala.isEmpty ? '......................' : kepala,
+                              style: pw.TextStyle(
+                                  fontSize: 6.3,
+                                  fontWeight: pw.FontWeight.bold)),
+                          pw.Text(
+                              nip.isEmpty
+                                  ? 'NIP. ....................'
+                                  : 'NIP. $nip',
+                              style: pw.TextStyle(fontSize: 5.3)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-          ]),
-          pw.SizedBox(height: 4),
-          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-            pw.Padding(
-              padding: const pw.EdgeInsets.only(left: 6, bottom: 2),
-              child: qr != null
-                  ? pw.Image(pw.MemoryImage(qr), width: 42, height: 42)
-                  : pw.SizedBox(width: 42, height: 42),
-            ),
-            pw.Spacer(),
-            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-              pw.Text('Kepala Sekolah',
-                  style: pw.TextStyle(fontSize: 6.5)),
-              pw.SizedBox(height: 13),
-              pw.Text(kepala.isEmpty ? '......................' : kepala,
-                  style: pw.TextStyle(
-                      fontSize: 6.3, fontWeight: pw.FontWeight.bold)),
-              pw.Text(nip.isEmpty ? 'NIP. ....................' : 'NIP. $nip',
-                  style: pw.TextStyle(fontSize: 5.3)),
-            ]),
           ]),
         ],
       ),

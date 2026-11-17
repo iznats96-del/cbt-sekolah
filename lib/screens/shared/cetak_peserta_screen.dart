@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -109,7 +109,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(
-            'Nomor terbit ${m['total'] ?? 0} • format ${m['format'] ?? ''} • cth ${m['contoh'] ?? ''}'),
+            'Nomor terbit ${m['total'] ?? 0} â€¢ format ${m['format'] ?? ''} â€¢ cth ${m['contoh'] ?? ''}'),
         backgroundColor: AppTheme.secondary,
         duration: const Duration(seconds: 5),
       ));
@@ -148,7 +148,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
     final k = s is Map ? s['kelas'] : null;
     if (k is Map) {
       final j = k['jurusan'];
-      final js = j is Map && j['singkatan'] != null ? ' • ${j['singkatan']}' : '';
+      final js = j is Map && j['singkatan'] != null ? ' â€¢ ${j['singkatan']}' : '';
       return '${k['nama'] ?? ''}$js';
     }
     return '-';
@@ -230,7 +230,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
               ),
               pw.Spacer(),
               pw.Text(
-                  'Format: KODE-S-YYZZ-NN • S=1 Ganjil/2 Genap • NN=urut abjad per jurusan • Hal ${(i ~/ perPage) + 1}',
+                  'Format: KODE-S-YYZZ-NN â€¢ S=1 Ganjil/2 Genap â€¢ NN=urut abjad per jurusan â€¢ Hal ${(i ~/ perPage) + 1}',
                   style: const pw.TextStyle(
                       fontSize: 7, color: PdfColors.grey600)),
             ],
@@ -601,7 +601,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                                             fontWeight: FontWeight.w600,
                                             fontSize: 13)),
                                     subtitle: Text(
-                                        'NIS ${_nis(p)} • ${_kelas(p)}',
+                                        'NIS ${_nis(p)} â€¢ ${_kelas(p)}',
                                         style: const TextStyle(
                                             fontSize: 11)),
                                     trailing: Container(
@@ -616,7 +616,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
                                             BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                          '${p['nomor_peserta'] ?? '—'}',
+                                          '${p['nomor_peserta'] ?? 'â€”'}',
                                           style: const TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.bold,
@@ -632,3 +632,4 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
     );
   }
 }
+
