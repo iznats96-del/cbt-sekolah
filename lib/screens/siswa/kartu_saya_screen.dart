@@ -1,15 +1,18 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../services/file_saver.dart';
+import '../../services/kartu_pdf.dart';
 
-/// ─────────────────────────────────────────────────────────────
-/// Kartu Absensi Siswa — Modern CBT (rujukan desain user)
-/// ─────────────────────────────────────────────────────────────
+/// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/// Kartu Absensi Siswa â€” Modern CBT (rujukan desain user)
+/// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /// Data asli dari tabel siswa: nama, nis, nomor_peserta, foto_url, kelas.
-/// QR berisi NIS (sama seperti sebelumnya) — dipakai guru saat scan absen.
+/// QR berisi NIS (sama seperti sebelumnya) â€” dipakai guru saat scan absen.
 /// Field yang NULL tidak ditampilkan. Tidak ada data dummy.
-/// ─────────────────────────────────────────────────────────────
+/// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const _bg = Color(0xFFF4F7FF);
 const _navy = Color(0xFF101F3C);
@@ -30,6 +33,7 @@ class KartuSayaScreen extends StatefulWidget {
 class _KartuSayaScreenState extends State<KartuSayaScreen> {
   Map<String, dynamic>? _siswa;
   bool _loading = true;
+  bool _printing = false;
 
   @override
   void initState() {
@@ -49,6 +53,64 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
       if (rows.isNotEmpty) _siswa = Map<String, dynamic>.from(rows.first);
       _loading = false;
     });
+  }
+
+  Future<void> _cetak() async {
+    setState(() => _printing = true);
+    try {
+      final s = _siswa ?? const {};
+      final prof = await Api.routerSelect('profiles',
+              select: 'pw_default',
+              eq: {'id': Api.user?.id ?? ''},
+              limit: 1)
+          .catchError((_) => <Map<String, dynamic>>[]);
+      final pass =
+          prof.isNotEmpty ? '${prof.first['pw_default'] ?? ''}' : '';
+      final sk = await Api.routerSelect('sekolah',
+              select: 'nama,kepala_sekolah,nip_kepala', limit: 1)
+          .catchError((_) => <Map<String, dynamic>>[]);
+      final sm = sk.isNotEmpty
+          ? Map<String, dynamic>.from(sk.first)
+          : <String, dynamic>{};
+      final km = s['kelas'];
+      final kelas = km is Map ? '${km['nama'] ?? ''}' : '';
+      final jur = km is Map && km['jurusan'] is Map
+          ? '${(km['jurusan'] as Map)['singkatan'] ?? ''}'
+          : '';
+      final nis = '${s['nis'] ?? ''}';
+      final nomor = '${s['nomor_peserta'] ?? ''}';
+
+      final pdf = await KartuPdf.build(
+        cards: [
+          KartuData(
+            nomor: nomor,
+            nama: '${s['nama'] ?? ''}',
+            kelas: jur.isNotEmpty ? '$kelas â€¢ $jur' : kelas,
+            username: nis,
+            password: pass,
+            fotoUrl: '${s['foto_url'] ?? ''}',
+            qrData: nomor.isNotEmpty ? nomor : nis,
+          ),
+        ],
+        sekolah: '${sm['nama'] ?? 'SMK YP 79 Majalaya'}',
+        kepala: '${sm['kepala_sekolah'] ?? ''}',
+        nip: '${sm['nip_kepala'] ?? ''}',
+      );
+      await saveBytes(pdf, 'KARTU PESERTA ${nis.isEmpty ? 'SISWA' : nis}.pdf');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Kartu peserta siap dicetak'),
+        backgroundColor: AppTheme.secondary,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Gagal buat kartu: $e'),
+        backgroundColor: Colors.red,
+      ));
+    } finally {
+      if (mounted) setState(() => _printing = false);
+    }
   }
 
   @override
@@ -97,7 +159,11 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          _AppBar(namaHalaman: 'Kartu Absensi'),
+          _AppBar(
+            namaHalaman: 'Kartu Absensi',
+            onCetak: _cetak,
+            printing: _printing,
+          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
             child: Transform.translate(
@@ -120,7 +186,13 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
 
 class _AppBar extends StatelessWidget {
   final String namaHalaman;
-  const _AppBar({required this.namaHalaman});
+  final VoidCallback? onCetak;
+  final bool printing;
+  const _AppBar({
+    required this.namaHalaman,
+    this.onCetak,
+    this.printing = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -170,7 +242,17 @@ class _AppBar extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 40),
+                IconButton(
+                  onPressed: printing ? null : onCetak,
+                  tooltip: 'Cetak kartu',
+                  icon: printing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.print_outlined, color: Colors.white),
+                ),
               ],
             ),
           ),
@@ -257,8 +339,8 @@ class _Kartu extends StatelessWidget {
                 [
                   'NIS $nis',
                   if (kelas.isNotEmpty)
-                    (jur.isNotEmpty ? '$kelas • $jur' : kelas),
-                ].join('  •  '),
+                    (jur.isNotEmpty ? '$kelas â€¢ $jur' : kelas),
+                ].join('  â€¢  '),
                 style: const TextStyle(fontSize: 13, color: _navySoft),
               ),
               const SizedBox(height: 22),
@@ -346,3 +428,4 @@ class _Kartu extends StatelessWidget {
     );
   }
 }
+
