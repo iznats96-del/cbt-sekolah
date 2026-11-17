@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../screens/shared/update_screen.dart';
 import '../services/app_update.dart';
@@ -23,6 +24,7 @@ class _UpdateCheckerState extends State<UpdateChecker> {
 
   Future<void> _maybeCheck() async {
     if (kIsWeb || _shown) return;
+    if (Supabase.instance.client.auth.currentSession == null) return;
     if (!await AppUpdate.autoEnabled()) return;
     await Future.delayed(const Duration(seconds: 3));
     final info = await AppUpdate.check();

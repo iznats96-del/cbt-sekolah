@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/design.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
 import 'siswa_home_screen.dart';
@@ -24,52 +25,16 @@ class _SiswaShellState extends State<SiswaShell> {
     SiswaHomeScreen(),
     HasilSiswaScreen(),
     PengumumanSiswaScreen(),
-    KartuSayaScreen(),
+    KartuSayaScreen(embedded: true),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF4F7FF),
-        foregroundColor: Cbt.ink,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.only(
-            bottomLeft: Radius.circular(18),
-            bottomRight: Radius.circular(18),
-          ),
-        ),
-        leading: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 9, 0, 9),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Cbt.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: const Icon(Icons.school_rounded, color: Cbt.blue, size: 20),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              _titles[_index],
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-            ),
-            const Text(
-              'Portal Siswa • SMK YP 79',
-              style: TextStyle(fontSize: 10.5, color: Cbt.muted),
-            ),
-          ],
-        ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 8),
-            child: LogoutButton(),
-          ),
-        ],
+      appBar: DashboardHeader(
+        title: _titles[_index].toUpperCase(),
+        subtitle: 'Portal Siswa • SMK YP 79',
+        actions: const [LogoutButton()],
       ),
       body: ContentMaxWidth(child: _pages[_index]),
       bottomNavigationBar: AppBottomNav(

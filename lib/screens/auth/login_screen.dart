@@ -287,9 +287,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextField(
                                 controller: _pass,
                                 obscureText: _obscure,
+                                autocorrect: false,
+                                enableSuggestions: false,
+                                textInputAction: TextInputAction.done,
                                 onSubmitted: (_) => _login(),
                                 style: const TextStyle(fontSize: 14),
                                 decoration: _input('Password', Icons.lock_outline).copyWith(
+                                  suffixIconConstraints: const BoxConstraints(
+                                      minWidth: 44, maxHeight: 44),
                                   suffixIcon: IconButton(
                                     icon: Icon(
                                       _obscure

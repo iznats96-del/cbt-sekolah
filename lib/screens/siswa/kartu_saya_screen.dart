@@ -21,7 +21,8 @@ const _blueLight = Color(0xFFE8F1FF);
 const _line = Color(0xFFE7EDFA);
 
 class KartuSayaScreen extends StatefulWidget {
-  const KartuSayaScreen({super.key});
+  final bool embedded;
+  const KartuSayaScreen({super.key, this.embedded = false});
 
   @override
   State<KartuSayaScreen> createState() => _KartuSayaScreenState();
@@ -54,10 +55,10 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(
-        backgroundColor: _bg,
-        body: Center(child: CircularProgressIndicator(color: _blue)),
-      );
+      final loading = Center(
+          child: CircularProgressIndicator(color: _blue));
+      if (widget.embedded) return loading;
+      return Scaffold(backgroundColor: _bg, body: loading);
     }
 
     final s = _siswa ?? const {};
@@ -72,6 +73,18 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
         : '';
 
     if (nis.isEmpty) {
+      if (widget.embedded) {
+        return const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Data siswa belum terhubung.\nHubungi admin/wali kelas.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: _muted),
+            ),
+          ),
+        );
+      }
       return Scaffold(
         backgroundColor: _bg,
         appBar: AppBar(
@@ -92,29 +105,41 @@ class _KartuSayaScreenState extends State<KartuSayaScreen> {
       );
     }
 
-    return Scaffold(
-      backgroundColor: _bg,
-      body: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          _AppBar(namaHalaman: 'Kartu Absensi'),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-            child: Transform.translate(
-              offset: const Offset(0, -22),
-              child: _Kartu(
-                nama: nama,
-                nis: nis,
-                nomor: nomor,
-                foto: foto,
-                kelas: kelas,
-                jur: jur,
-              ),
-            ),
-          ),
-        ],
-      ),
+    final content = ListView(
+      padding: widget.embedded
+          ? const EdgeInsets.fromLTRB(16, 12, 16, 28)
+          : EdgeInsets.zero,
+      children: [
+        if (!widget.embedded) _AppBar(namaHalaman: 'Kartu Absensi'),
+        Padding(
+          padding: widget.embedded
+              ? EdgeInsets.zero
+              : const EdgeInsets.fromLTRB(16, 0, 16, 28),
+          child: widget.embedded
+              ? _Kartu(
+                  nama: nama,
+                  nis: nis,
+                  nomor: nomor,
+                  foto: foto,
+                  kelas: kelas,
+                  jur: jur,
+                )
+              : Transform.translate(
+                  offset: const Offset(0, -22),
+                  child: _Kartu(
+                    nama: nama,
+                    nis: nis,
+                    nomor: nomor,
+                    foto: foto,
+                    kelas: kelas,
+                    jur: jur,
+                  ),
+                ),
+        ),
+      ],
     );
+    if (widget.embedded) return content;
+    return Scaffold(backgroundColor: _bg, body: content);
   }
 }
 
