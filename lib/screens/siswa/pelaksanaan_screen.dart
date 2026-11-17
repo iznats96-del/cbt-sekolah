@@ -668,7 +668,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               children: [
                 Cbt.label('PERTANYAAN ${_idx + 1}'),
                 const SizedBox(height: 10),
-                Text(teks, style: Cbt.question),
+                Text(teks, style: Cbt.question, softWrap: true, maxLines: null),
                 if (gambar != null && gambar.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   ClipRRect(
@@ -695,7 +695,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       return TextField(
         controller: c,
         onChanged: (v) => _saveJawaban(curId),
-        maxLines: jenis == 'essay' ? 6 : 4,
+        maxLines: jenis == 'essay' ? 8 : 4,
         style: Cbt.option,
         decoration: InputDecoration(
           hintText: jenis == 'essay'
@@ -846,10 +846,18 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                     if (!dipakai.contains(urutan[j].toString()))
                       DropdownMenuItem<String>(
                         value: '$j',
-                        child: Text(
-                          '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 14, color: Cbt.ink),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 90),
+                          child: SingleChildScrollView(
+                            primary: false,
+                            child: Text(
+                              '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
+                              softWrap: true,
+                              maxLines: null,
+                              style: const TextStyle(
+                                  fontSize: 14, color: Cbt.ink),
+                            ),
+                          ),
                         ),
                       ),
                 ],
@@ -883,6 +891,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               final teks = Expanded(
                 child: Text(
                   kiri[i].toString(),
+                  softWrap: true,
+                  maxLines: null,
                   style: const TextStyle(
                       fontSize: 15,
                       height: 1.35,
@@ -971,7 +981,12 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   )),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: Text(teks, style: Cbt.option)),
+                Expanded(
+                  child: Text(teks,
+                      style: Cbt.option,
+                      softWrap: true,
+                      maxLines: null),
+                ),
                 if (_ragu[curId] == true)
                   const Icon(Icons.flag_rounded, size: 16, color: Cbt.amber),
               ],
