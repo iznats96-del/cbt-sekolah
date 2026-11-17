@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../services/file_saver.dart';
+import '../../services/nilai_xlsx.dart';
 import '../home.dart';
 import 'rekap_detail_screen.dart';
 
@@ -117,13 +119,127 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
     return null;
   }
 
+  String _tingkatDariUjian(Map<String, dynamic> u) {
+    final k = u['kelas'];
+    final nama = (k is Map ? '${k['nama'] ?? ''}' : '').toUpperCase();
+    if (nama.startsWith('XII')) return 'XII';
+    if (nama.startsWith('XI')) return 'XI';
+    return 'X';
+  }
+
+  Future<void> _exportXlsx() async {
+    final u = _selected;
+    if (u == null) return;
+    var tingkat = _tingkatDariUjian(u);
+    var sheets = await NilaiXlsx.sheetNames(tingkat);
+    String? sheet = sheets.isNotEmpty ? sheets.first : null;
+    if (!mounted) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(builder: (c, setS) {
+        return AlertDialog(
+          title: const Text('Export Nilai ASTS (XLSX)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: tingkat,
+                decoration: const InputDecoration(labelText: 'Tingkat'),
+                items: ['X', 'XI', 'XII']
+                    .map((t) => DropdownMenuItem(value: t, child: Text('Kelas $t')))
+                    .toList(),
+                onChanged: (v) async {
+                  if (v == null) return;
+                  setS(() {
+                    tingkat = v;
+                    sheet = null;
+                  });
+                  final s = await NilaiXlsx.sheetNames(v);
+                  if (!c.mounted) return;
+                  setS(() {
+                    sheets = s;
+                    sheet = s.isNotEmpty ? s.first : null;
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: sheet,
+                decoration: const InputDecoration(labelText: 'Sheet / Rombel'),
+                items: sheets
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .toList(),
+                onChanged: (v) => setS(() => sheet = v),
+              ),
+              const SizedBox(height: 10),
+              Text('${_peserta.length} peserta di ujian ini',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(c, false),
+                child: const Text('Batal')),
+            FilledButton(
+              onPressed: sheet == null ? null : () => Navigator.pop(c, true),
+              child: const Text('Export'),
+            ),
+          ],
+        );
+      }),
+    );
+    if (ok != true || sheet == null || !mounted) return;
+
+    final nilai = <String, num>{};
+    for (final p in _peserta) {
+      final s = p['siswa'];
+      final h = p['hasil_ujian'];
+      if (s is Map && h is Map && h['nilai'] != null) {
+        final n = num.tryParse('${h['nilai']}');
+        if (n != null) nilai['${s['nama']}'] = n;
+      }
+    }
+    final mp = u['mata_pelajaran'];
+    final mapel = mp is Map ? '${mp['nama'] ?? ''}' : '';
+
+    try {
+      final bytes = await NilaiXlsx.build(
+        tingkat: tingkat,
+        sheetName: sheet!,
+        mapel: mapel,
+        nilaiByNama: nilai,
+      );
+      await saveBytes(bytes, 'NILAI ASTS ${mapel.toUpperCase()} - $sheet.xlsx');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('XLSX siap — semua sheet & format template dipertahankan'),
+        backgroundColor: AppTheme.secondary,
+      ));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Gagal export: $e'),
+        backgroundColor: AppTheme.danger,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
         title: const Text('Rekap Nilai per Rombel'),
-        actions: [if (!Navigator.of(context).canPop()) const LogoutButton()],
+        actions: [
+          if (_selected != null)
+            IconButton(
+              tooltip: 'Export Nilai XLSX',
+              icon: const Icon(Icons.file_download_outlined),
+              onPressed: _exportXlsx,
+            ),
+          if (!Navigator.of(context).canPop()) const LogoutButton(),
+        ],
         bottom: (_ujian.isEmpty || _loadingUjian)
             ? null
             : PreferredSize(
