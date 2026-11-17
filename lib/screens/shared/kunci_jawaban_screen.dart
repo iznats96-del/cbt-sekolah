@@ -62,7 +62,12 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
         if (k is Map) {
           if (jenis != 'essay') {
             final idx = k['index'];
-            if (idx is int) _pilihIdx[s['id'].toString()] = idx;
+            final parsed = idx is int
+                ? idx
+                : (idx is String ? int.tryParse(idx) : null);
+            if (parsed != null && parsed >= 0) {
+              _pilihIdx[s['id'].toString()] = parsed;
+            }
           } else {
             // Essay: terima 'pedoman' (format baru) maupun 'kunci' (legacy JSON).
             final pedoman =
