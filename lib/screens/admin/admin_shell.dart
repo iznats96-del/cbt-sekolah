@@ -5,6 +5,7 @@ import '../../core/design.dart';
 import '../../services/api.dart';
 import '../home.dart';
 import '../../widgets/cetak_kartu_helper.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/state_views.dart';
 import 'data_master_screen.dart';
 import 'bank_soal_screen.dart';
@@ -108,17 +109,14 @@ class _AdminHomeState extends State<_AdminHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Cbt.paper,
-      appBar: AppBar(
-        backgroundColor: Cbt.paper,
-        foregroundColor: Cbt.ink,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('CBT Sekolah', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            Text('Pusat kendali ujian', style: Cbt.caption),
-          ],
-        ),
+      appBar: DashboardHeader(
+        title: 'CBT SEKOLAH',
+        subtitle: 'Pusat kendali ujian',
+        stats: [
+          ('siswa', '${_stats['total_siswa'] ?? 0}'),
+          ('guru', '${_stats['total_guru'] ?? 0}'),
+          ('kelas', '${_stats['total_kelas'] ?? 0}'),
+        ],
         actions: const [LogoutButton()],
       ),
       body: ContentMaxWidth(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/design.dart';
 import '../../services/api.dart';
 import '../../widgets/cetak_kartu_helper.dart';
+import '../../widgets/dashboard_header.dart';
 import '../home.dart';
 import 'monitoring_ujian_screen.dart';
 import 'peserta_ujian_screen.dart';
@@ -83,17 +84,14 @@ class _PanitiaHomeState extends State<PanitiaHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Cbt.paper,
-      appBar: AppBar(
-        backgroundColor: Cbt.paper,
-        foregroundColor: Cbt.ink,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Ringkasan Panitia', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            Text('Pantau pelaksanaan ujian hari ini', style: Cbt.caption),
-          ],
-        ),
+      appBar: DashboardHeader(
+        title: 'RINGKASAN PANITIA',
+        subtitle: 'Pantau pelaksanaan ujian hari ini',
+        stats: [
+          ('ujian aktif', '${(_stats ?? {})['ujian_aktif'] ?? 0}'),
+          ('selesai', '${(_stats ?? {})['selesai_ujian'] ?? 0}'),
+          ('hadir', '${(_stats ?? {})['hadir_hari_ini'] ?? 0}'),
+        ],
         actions: const [LogoutButton()],
       ),
       body: RefreshIndicator(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../services/api.dart';
 import '../../services/file_saver.dart';
 import '../../services/kartu_siswa_pdf.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Cetak KARTU PESERTA CBT per siswa (bukan kartu ujian).
 /// Sumber: tabel siswa, profiles.pw_default, sekolah.
@@ -136,10 +137,21 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
       backgroundColor: const Color(0xFFF4F7FF),
       body: Column(
         children: [
-          _Header(
-            total: _siswa.length,
-            selected: _pilih.length,
-            onRefresh: _load,
+          DashboardHeader(
+            title: 'CETAK KARTU SISWA',
+            subtitle: 'Kartu Peserta CBT • ${KartuSiswaPdf.tahunAjaran()}',
+            showBack: true,
+            stats: [
+              ('siswa', '${_siswa.length}'),
+              ('dipilih', '${_pilih.length}'),
+            ],
+            actions: [
+              IconButton(
+                onPressed: _load,
+                tooltip: 'Muat ulang',
+                icon: const Icon(Icons.refresh, color: Colors.white),
+              ),
+            ],
           ),
           Expanded(
             child: _loading
@@ -289,104 +301,6 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF2563EB))),
-        ),
-      );
-}
-
-class _Header extends StatelessWidget {
-  final int total, selected;
-  final VoidCallback onRefresh;
-  const _Header({
-    required this.total,
-    required this.selected,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(26),
-          bottomRight: Radius.circular(26),
-        ),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 18, 18, 22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    tooltip: 'Kembali',
-                    icon: const Icon(Icons.arrow_back_ios_new,
-                        color: Colors.white, size: 20),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: const [
-                        Text('CETAK KARTU SISWA',
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white)),
-                        SizedBox(height: 3),
-                        Text('Kartu Peserta CBT',
-                            style: TextStyle(
-                                fontSize: 11, color: Colors.white70)),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: onRefresh,
-                    tooltip: 'Muat ulang',
-                    icon: const Icon(Icons.refresh, color: Colors.white),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  _pill(Icons.people_outline, '$total siswa'),
-                  const SizedBox(width: 8),
-                  _pill(Icons.check_circle_outline, '$selected dipilih'),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _pill(IconData icon, String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(99),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 13, color: Colors.white),
-            const SizedBox(width: 6),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
-          ],
         ),
       );
 }

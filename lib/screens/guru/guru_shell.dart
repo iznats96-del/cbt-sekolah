@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
 import 'bank_soal_screen.dart';
@@ -100,10 +101,16 @@ class _GuruHomeState extends State<_GuruHome> {
     void push(Widget page) =>
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('CBT Guru'),
-        actions: const [LogoutButton()],
-      ),
+      appBar: DashboardHeader(
+           title: 'CBT GURU',
+           subtitle: 'Kelola soal, jadwal, nilai & absensi',
+           stats: [
+             ('mapel', '${_stats['mapel_diampu'] ?? 0}'),
+             ('ujian aktif', '${_stats['ujian_aktif'] ?? 0}'),
+             ('esai', '${_stats['esai_menunggu_koreksi'] ?? 0}'),
+           ],
+           actions: const [LogoutButton()],
+         ),
       body: ContentMaxWidth(
         child: ListView(
           padding: const EdgeInsets.all(12),
