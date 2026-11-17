@@ -3,17 +3,9 @@
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 
-/// ─────────────────────────────────────────────────────────────
-/// Hasil Siswa — Pastel Neumorphic (rujukan desain user)
-/// ─────────────────────────────────────────────────────────────
-/// Karakter visual:
-///  • Latar biru sangat muda (#F4F7FF), kartu putih radius ~24 dgn
-///    bayang lembut menyebar (neumorphic).
-///  • Tipografi navy tebal (#101F3C), aksen biru (#2563EB), ungu,
-///    hijau, merah; pill status merah muda.
-///  • Hero = angka besar + progress cincin "17 / 100" + badge status.
-///  • Kartu stat 3 kolom + kartu Riwayat + kartu Informasi biru muda.
-/// ─────────────────────────────────────────────────────────────
+/// Hasil Siswa — rekap per mapel.
+/// Satu kartu = satu mapel, nilai = rata-rata dari nilai ujian yang benar-benar
+/// diperoleh siswa, status dibandingkan dengan KKM mapel.
 
 const _bg = Color(0xFFF4F7FF);
 const _card = Colors.white;
@@ -25,7 +17,6 @@ const _blueLight = Color(0xFFE8F1FF);
 const _purple = Color(0xFF7C4DFF);
 const _green = Color(0xFF22C55E);
 const _red = Color(0xFFEF4444);
-const _redPill = Color(0xFFFFE4E6);
 const _track = Color(0xFFE7EDFA);
 
 num? _num(dynamic v) {
@@ -45,6 +36,7 @@ class HasilSiswaScreen extends StatefulWidget {
 
 class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
   List<Map<String, dynamic>> _rows = [];
+  Map<String, double> _kkmByMapel = {};
   bool _loading = true;
   String? _error;
 
@@ -60,10 +52,24 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.routerRpc('my_hasil');
+      final results = await Future.wait([
+        Api.routerRpc('my_hasil'),
+        Api.routerSelect('mata_pelajaran', select: 'id,nama,kkm')
+            .catchError((_) => <Map<String, dynamic>>[]),
+      ]);
+      final rows = results[0] as List;
+      final mapels = results[1] as List;
+      final kkm = <String, double>{};
+      for (final m in mapels) {
+        final mm = m as Map;
+        final nama = '${mm['nama'] ?? ''}'.trim();
+        final nilai = _num(mm['kkm']);
+        if (nama.isNotEmpty && nilai != null) kkm[nama] = nilai.toDouble();
+      }
       if (!mounted) return;
       setState(() {
-        _rows = List<Map<String, dynamic>>.from(rows as List);
+        _rows = List<Map<String, dynamic>>.from(rows);
+        _kkmByMapel = kkm;
         _loading = false;
       });
     } catch (e) {
@@ -74,6 +80,26 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
       });
     }
   }
+
+  Map<String, List<Map<String, dynamic>>> get _groups {
+    final out = <String, List<Map<String, dynamic>>>{};
+    for (final r in _rows) {
+      final nama = '${r['mapel'] ?? '-'}'.trim();
+      out.putIfAbsent(nama.isEmpty ? '-' : nama, () => []).add(r);
+    }
+    return out;
+  }
+
+  int _rata(List<Map<String, dynamic>> rows) {
+    final vals = rows
+        .where((r) => _num(r['nilai']) != null)
+        .map((r) => _nilaiBulat(r['nilai']))
+        .toList();
+    if (vals.isEmpty) return 0;
+    return (vals.fold<int>(0, (a, b) => a + b) / vals.length).round();
+  }
+
+  double _kkm(String mapel) => _kkmByMapel[mapel] ?? 75;
 
   @override
   Widget build(BuildContext context) {
@@ -108,9 +134,10 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                         fontSize: 18, fontWeight: FontWeight.w700, color: _navy)),
                 SizedBox(height: 8),
                 Text(
-                    'Nilaimu akan muncul di sini setelah kamu mengumpulkan ujian.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: _muted)),
+                  'Nilaimu akan muncul di sini setelah kamu mengumpulkan ujian.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: _muted),
+                ),
               ],
             ),
           ),
@@ -118,16 +145,15 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
       );
     }
 
-    final dinilaiCount = _rows.where((r) => r['dinilai'] == true).length;
-    final tuntas = _rows
-        .where((r) => r['dinilai'] == true && _nilaiBulat(r['nilai']) >= 75)
-        .length;
-    final bernilai = _rows.where((r) => r['nilai'] != null).toList();
-    final rata = bernilai.isEmpty
-        ? 0
-        : (bernilai.fold<int>(0, (s, r) => s + _nilaiBulat(r['nilai'])) /
-                bernilai.length)
-            .round();
+    final groups = _groups;
+    final names = groups.keys.toList()..sort();
+    final bernilai = _rows.where((r) => _num(r['nilai']) != null).toList();
+    final rata = _rata(bernilai);
+    final rataKkm = names.isEmpty
+        ? 75.0
+        : names.fold<double>(0, (s, n) => s + _kkm(n)) / names.length;
+    final tuntas =
+        names.where((n) => _rata(groups[n]!) >= _kkm(n)).length;
 
     return Scaffold(
       backgroundColor: _bg,
@@ -141,8 +167,8 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
               _Neumorphic(
                 child: _HeroCard(
                   rata: rata,
-                  total: _rows.length,
-                  dinilai: dinilaiCount,
+                  kkm: rataKkm.round(),
+                  total: names.length,
                   tuntas: tuntas,
                 ),
               ),
@@ -152,8 +178,19 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                   Expanded(
                     child: _Neumorphic(
                       child: _StatCard(
-                        icon: Icons.check,
+                        icon: Icons.menu_book_rounded,
                         color: _blue,
+                        value: '${names.length}',
+                        label: 'Mapel',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _Neumorphic(
+                      child: _StatCard(
+                        icon: Icons.assignment_outlined,
+                        color: _purple,
                         value: '${_rows.length}',
                         label: 'Ujian',
                       ),
@@ -163,18 +200,7 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                   Expanded(
                     child: _Neumorphic(
                       child: _StatCard(
-                        icon: Icons.bar_chart_rounded,
-                        color: _purple,
-                        value: '$dinilaiCount',
-                        label: 'Dinilai',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _Neumorphic(
-                      child: _StatCard(
-                        icon: Icons.schedule,
+                        icon: Icons.check,
                         color: _green,
                         value: '$tuntas',
                         label: 'Tuntas',
@@ -183,7 +209,28 @@ class _HasilSiswaScreenState extends State<HasilSiswaScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 10),
+                child: Text(
+                  'NILAI PER MAPEL',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: _muted,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              for (final nama in names) ...[
+                _MapelCard(
+                  mapel: nama,
+                  rows: groups[nama]!,
+                  rata: _rata(groups[nama]!),
+                  kkm: _kkm(nama),
+                ),
+                const SizedBox(height: 14),
+              ],
               _InfoCard(),
             ],
           ),
@@ -224,23 +271,23 @@ class _Neumorphic extends StatelessWidget {
   }
 }
 
-/// Hero: judul + angka besar + badge status + cincin progres merah.
+/// Hero ringkasan keseluruhan.
 class _HeroCard extends StatelessWidget {
   final int rata;
+  final int kkm;
   final int total;
-  final int dinilai;
   final int tuntas;
 
   const _HeroCard({
     required this.rata,
+    required this.kkm,
     required this.total,
-    required this.dinilai,
     required this.tuntas,
   });
 
   @override
   Widget build(BuildContext context) {
-    final perluLatihan = rata < 75;
+    final perluLatihan = rata < kkm;
     final warnaStatus = perluLatihan ? _red : _green;
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 24),
@@ -256,9 +303,9 @@ class _HeroCard extends StatelessWidget {
                     _BarIcon(),
                     SizedBox(width: 10),
                     Text(
-                      'Rata-Rata Nilai',
+                      'Rata-Rata Semua Mapel',
                       style: TextStyle(
-                        fontSize: 17,
+                        fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: _navy,
                       ),
@@ -287,8 +334,13 @@ class _HeroCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.warning_rounded,
-                          size: 17, color: warnaStatus),
+                      Icon(
+                        perluLatihan
+                            ? Icons.warning_rounded
+                            : Icons.check_circle_rounded,
+                        size: 17,
+                        color: warnaStatus,
+                      ),
                       const SizedBox(width: 7),
                       Text(
                         perluLatihan ? 'Perlu Latihan' : 'Tuntas',
@@ -305,14 +357,13 @@ class _HeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          _ProgressRing(rata: rata),
+          _ProgressRing(rata: rata, kkm: kkm),
         ],
       ),
     );
   }
 }
 
-/// Ikon tiga batang naik (bar chart) — pertama pendek, terakhir tertinggi.
 class _BarIcon extends StatelessWidget {
   const _BarIcon();
 
@@ -343,15 +394,15 @@ class _BarIcon extends StatelessWidget {
       );
 }
 
-/// Cincin progres: track abu muda + busur merah sesuai nilai, tengah "n / 100".
 class _ProgressRing extends StatelessWidget {
   final int rata;
-  const _ProgressRing({required this.rata});
+  final int kkm;
+  const _ProgressRing({required this.rata, required this.kkm});
 
   @override
   Widget build(BuildContext context) {
     final value = (rata / 100).clamp(0.0, 1.0).toDouble();
-    final warna = rata < 75 ? _red : _green;
+    final warna = rata < kkm ? _red : _green;
     return SizedBox(
       width: 142,
       height: 142,
@@ -397,7 +448,6 @@ class _ProgressRing extends StatelessWidget {
   }
 }
 
-/// Kartu stat kecil: lingkaran ikon warna + angka + label.
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
@@ -431,20 +481,158 @@ class _StatCard extends StatelessWidget {
                 Text(
                   value,
                   style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: _navy,
-                    height: 1,
-                  ),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: _navy,
+                      height: 1),
                 ),
                 const SizedBox(height: 5),
+                Text(label,
+                    style: const TextStyle(fontSize: 13, color: _navySoft)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Kartu satu mapel: rata-rata + status, bisa dibuka untuk lihat daftar ujian.
+class _MapelCard extends StatelessWidget {
+  final String mapel;
+  final List<Map<String, dynamic>> rows;
+  final int rata;
+  final double kkm;
+
+  const _MapelCard({
+    required this.mapel,
+    required this.rows,
+    required this.rata,
+    required this.kkm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tuntas = rata >= kkm;
+    final warna = tuntas ? _green : _red;
+    final sorted = List<Map<String, dynamic>>.from(rows)
+      ..sort((a, b) => '${b['tanggal'] ?? ''}'.compareTo('${a['tanggal'] ?? ''}'));
+
+    return _Neumorphic(
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        iconColor: _blue,
+        collapsedIconColor: _muted,
+        leading: Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: _blueLight,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: const Icon(Icons.menu_book_rounded, color: _blue, size: 24),
+        ),
+        title: Text(
+          mapel,
+          style: const TextStyle(
+              fontSize: 15, fontWeight: FontWeight.w800, color: _navy),
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: Row(
+            children: [
+              Text(
+                '${rows.length} ujian • KKM ${kkm.round()}',
+                style: const TextStyle(fontSize: 11.5, color: _muted),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: warna.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+                child: Text(
+                  tuntas ? 'Tuntas' : 'Perlu Latihan',
+                  style: TextStyle(
+                      fontSize: 10, fontWeight: FontWeight.w700, color: warna),
+                ),
+              ),
+            ],
+          ),
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$rata',
+              style: TextStyle(
+                  fontSize: 24, fontWeight: FontWeight.w800, color: warna),
+            ),
+            const SizedBox(width: 6),
+            const Icon(Icons.keyboard_arrow_down_rounded),
+          ],
+        ),
+        children: [
+          const Divider(height: 1, color: _track),
+          for (final r in sorted) _UjianRow(data: r, kkm: kkm),
+        ],
+      ),
+    );
+  }
+}
+
+class _UjianRow extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final double kkm;
+  const _UjianRow({required this.data, required this.kkm});
+
+  @override
+  Widget build(BuildContext context) {
+    final nilai = _nilaiBulat(data['nilai']);
+    final warna = nilai >= kkm ? _green : _red;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: _blueLight,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(Icons.assignment_turned_in_outlined,
+                size: 19, color: _blue),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  label,
-                  style: const TextStyle(fontSize: 13, color: _navySoft),
+                  '${data['ujian'] ?? '-'}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _navy),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${data['tanggal'] ?? ''}  •  B ${data['benar'] ?? 0} / S ${data['salah'] ?? 0} / K ${data['kosong'] ?? 0}',
+                  style: const TextStyle(fontSize: 10.5, color: _muted),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          Text('$nilai',
+              style: TextStyle(
+                  fontSize: 19, fontWeight: FontWeight.w800, color: warna)),
         ],
       ),
     );
@@ -498,26 +686,26 @@ class _InfoCard extends StatelessWidget {
                         color: Colors.white, size: 27),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Informasi',
                           style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: _navy,
-                          ),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: _navy),
                         ),
-                        const SizedBox(height: 6),
+                        SizedBox(height: 6),
                         Text(
-                          'Hasil ujian ini adalah hasil akhir dari ujian yang telah Anda kerjakan.',
+                          'Nilai per mapel adalah rata-rata dari seluruh ujian '
+                          'mapel tersebut. Ketuk kartu mapel untuk melihat '
+                          'nilai tiap ujian.',
                           style: TextStyle(
-                            fontSize: 13,
-                            color: _navySoft.withValues(alpha: 0.85),
-                            height: 1.5,
-                          ),
+                              fontSize: 13,
+                              color: _navySoft,
+                              height: 1.5),
                         ),
                       ],
                     ),
