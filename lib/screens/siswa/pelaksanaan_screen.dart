@@ -639,10 +639,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
 
   // ---- Kartu soal ----
   Widget _buildSoalCard(Map<String, dynamic> soal, String curId, String jenis, List opsiList) {
-    final isJodoh = SoalJodoh.isJodoh(jenis);
-    final teks = isJodoh
-        ? SoalJodoh.instruksi
-        : (soal['soal'] ?? '').toString();
+    final teks = (soal['soal'] ?? '').toString().trim();
     final opsiRaw = soal['opsi'];
     final gambar = soal['gambar_url']?.toString();
     return Container(
@@ -668,7 +665,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               children: [
                 Cbt.label('PERTANYAAN ${_idx + 1}'),
                 const SizedBox(height: 10),
-                Text(teks, style: Cbt.question, softWrap: true, maxLines: null),
+                if (teks.isNotEmpty)
+                  Text(teks,
+                      style: Cbt.question,
+                      softWrap: true,
+                      maxLines: null),
                 if (gambar != null && gambar.isNotEmpty) ...[
                   const SizedBox(height: 14),
                   ClipRRect(
@@ -769,7 +770,6 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       children: [
         Row(
           children: [
-            Cbt.label('PILIH PASANGAN YANG TEPAT'),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -790,17 +790,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        const Text(
-          SoalJodoh.instruksi,
-          style: Cbt.caption,
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'Pasangan yang sudah dipilih tidak ditampilkan di pilihan lain.',
-          style: TextStyle(fontSize: 11, color: Cbt.muted),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         ConstrainedBox(
           constraints: BoxConstraints(maxHeight: tinggiMaks.toDouble()),
           child: ListView.separated(
@@ -829,7 +819,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   filled: true,
                   fillColor: Colors.white,
-                  hintText: 'Pilih pasangan',
+                  hintText: 'Pilih jawaban',
                   hintStyle: const TextStyle(fontSize: 13, color: Cbt.muted),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(11),
