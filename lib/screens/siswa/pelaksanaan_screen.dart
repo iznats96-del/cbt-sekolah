@@ -1,6 +1,5 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
@@ -105,7 +104,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       final pStatus = data['status_peserta']?.toString();
       // ===== JAM AKSES: cek apakah ujian sudah di waktu-nya =====
       // server RPC soal_milik_ujian sudah filter ujian yang JAM AKSES-nya belum buka
-      // (via my_ujian_aktif → hanya kembalikan ujian yang waktu_mulai <= now <= waktu_selesai)
+      // (via my_ujian_aktif â†’ hanya kembalikan ujian yang waktu_mulai <= now <= waktu_selesai)
       // Jadi kalau siswa sudah masuk sini, artinya JAM AKSES-nya sudah terbuka.
       // TAPI, timer countdown yang ditampilkan harus pakai sisa_detik dari server
       // (bukan alokasi_menit dari client), karena server tahu kapan ujian harus selesai.
@@ -203,7 +202,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               child: Text(
                 keluarApp
                     ? 'App sempat tertutup. Kembali ke ujian ya.'
-                    : 'Terdeteksi jendela/overlay lain! Alarm aktif — kembali fokus ke ujian.',
+                    : 'Terdeteksi jendela/overlay lain! Alarm aktif â€” kembali fokus ke ujian.',
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
@@ -351,7 +350,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Jaringan bermasalah — jawaban TERSIMPAN di server. Tap "Kumpulkan" lagi saat sinyal pulih.'),
+            content: Text('Jaringan bermasalah â€” jawaban TERSIMPAN di server. Tap "Kumpulkan" lagi saat sinyal pulih.'),
             backgroundColor: AppTheme.danger, duration: Duration(seconds: 8)),
       );
       return;
@@ -470,7 +469,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  // ── Kondisi awal ──────────────────────────────────────────────
+  // â”€â”€ Kondisi awal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildLoading() => const Scaffold(
         backgroundColor: Cbt.paper,
         body: Center(
@@ -484,7 +483,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
               SizedBox(height: 20),
               Text('Menyiapkan ujian', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Cbt.ink)),
               SizedBox(height: 6),
-              Text('Lingkungan terkunci • pengawas aktif', style: Cbt.caption),
+              Text('Lingkungan terkunci â€¢ pengawas aktif', style: Cbt.caption),
             ],
           ),
         ),
@@ -510,7 +509,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ),
       );
 
-  // ── Header: judul + jam (elemen paling penting) ──────────────
+  // â”€â”€ Header: judul + jam (elemen paling penting) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildHeader(bool low, bool critical) {
     final jam = _formatJam(_sisaDetik);
     final warnaJam = critical ? Cbt.red : (low ? Cbt.amber : Colors.white);
@@ -613,7 +612,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ],
       );
 
-  // ── Kartu soal: menyerupai kertas dengan pinggiran biru ──────
+  // â”€â”€ Kartu soal: menyerupai kertas dengan pinggiran biru â”€â”€â”€â”€â”€â”€
   Widget _buildSoalCard(Map<String, dynamic> soal, String curId, String jenis, List opsiList) {
     final isJodoh = SoalJodoh.isJodoh(jenis);
     final teks = isJodoh
@@ -675,8 +674,8 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         style: Cbt.option,
         decoration: InputDecoration(
           hintText: jenis == 'essay'
-              ? 'Tulis jawabanmu di sini…'
-              : 'Tulis pasangan jawaban (mis. 1-B, 2-A, 3-C)…',
+              ? 'Tulis jawabanmu di siniâ€¦'
+              : 'Tulis pasangan jawaban (mis. 1-B, 2-A, 3-C)â€¦',
           hintStyle: const TextStyle(color: Cbt.muted),
           filled: true,
           fillColor: Cbt.paper,
@@ -702,19 +701,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  /// Hash string stabil (di semua process) utk seed acak pilihan jodoh.
-  int _stableHash(String s) {
-    int h = 0;
-    for (final c in s.codeUnits) {
-      h = ((h << 5) - h + c) & 0xFFFFFFFF;
-    }
-    return h;
-  }
 
   /// Soal menjodohkan: tiap item kiri dipasangkan ke salah satu pilihan kanan.
   /// Jawaban disimpan sebagai JSON peta {"0":"1", ...} (index kiri -> index kanan
   /// ASLI di data soal), sesuai format yang dicek di server (kunci.map).
-  /// Kolom kanan DIOCAK tampilnya (deterministik per soal — seed dari id soal)
+  /// Kolom kanan DIOCAK tampilnya (deterministik per soal â€” seed dari id soal)
   /// supaya murid ga bisa nebak pola 1-A 2-B 3-C. Yang disimpan tetap index asli.
   Widget _buildJodoh(String curId, dynamic opsiRaw) {
     List<dynamic> kiri = const [];
@@ -731,17 +722,11 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
     }
 
-    // Acak urutan tampil kolom kanan: seed STABIL dari id soal + id peserta.
-    // - Kiri tetap urut 1,2,3 (sesuai keinginan: "kiri 1 = jawaban/pasangan").
-    // - Kanan diacak -> pasangan kiri 1 bisa muncul di posisi A/D/E/F/G.
-    // - Seed dipakai ./peserta biar tiap siswa dapat urutan beda (anti nyontek
-    //   teman sebelah), tapi konsisten untuk siswa yg sama (ga nge-reset pas
-    //   pindah soal / hot reload).
-    // Pakai hash manual (bukan String.hashCode) karena hashCode Dart bisa
-    // beda antar process -> urutan bakal loncat-loncat pas rebuild.
-    final seed = _stableHash('$curId|${widget.pesertaId}');
+    // Urutan pilihan kanan = index asli di bank soal.
+    // TIDAK diacak: index yang disimpan harus sama persis dengan kunci.map.
+    // (Dulu ada shuffle dengan seed stabil, tapi menyebabkan jawaban tersimpan
+    //  sebagai posisi tampilan sehingga penilaian jadi salah.)
     final urutan = List<int>.generate(kanan.length, (i) => i);
-    urutan.shuffle(Random(seed));
 
     Map<String, dynamic> pilihan = {};
     final mentah = _jawaban[curId] ?? '';
@@ -808,7 +793,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   filled: true,
                   fillColor: Colors.white,
-                  hintText: 'Pilih pasangan…',
+                  hintText: 'Pilih pasanganâ€¦',
                   hintStyle: const TextStyle(fontSize: 13, color: Cbt.muted),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(11),
@@ -996,7 +981,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  // ── Bilah bawah: navigasi + lembar jawaban ───────────────────
+  // â”€â”€ Bilah bawah: navigasi + lembar jawaban â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildBottomBar(int answered, int flagged) {
     return Container(
       decoration: BoxDecoration(
@@ -1053,7 +1038,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                         Text('LJK ${_idx + 1}/${_soal.length}',
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Cbt.ink)),
                         const SizedBox(width: 6),
-                        Text('• $answered✓ ${flagged > 0 ? '$flagged⚑' : ''}',
+                        Text('â€¢ $answeredâœ“ ${flagged > 0 ? '$flaggedâš‘' : ''}',
                             style: const TextStyle(fontSize: 11, color: Cbt.muted)),
                       ],
                     ),
@@ -1095,7 +1080,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     );
   }
 
-  // ── Lembar jawaban (palette) ──────────────────────────────────
+  // â”€â”€ Lembar jawaban (palette) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildLembarJawaban() {
     const answeredColor = Cbt.teal;
     const raguColor = Cbt.amber;
@@ -1289,7 +1274,7 @@ class _SelesaiScreen extends StatelessWidget {
               Text(isTimeout ? 'Waktu ujian telah berakhir dan jawaban otomatis terkumpul.' : 'Jawaban berhasil dikumpulkan!', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[600], fontSize: 14, height: 1.5)),
               const SizedBox(height: 8),
                 Text((rekap['jawab'] ?? 0) > 0
-                    ? 'Tersimpan di server: ${rekap['jawab']} butir${(rekap['ragu'] ?? 0) > 0 ? ' • ${rekap['ragu']} ditandai ragu' : ''}'
+                    ? 'Tersimpan di server: ${rekap['jawab']} butir${(rekap['ragu'] ?? 0) > 0 ? ' â€¢ ${rekap['ragu']} ditandai ragu' : ''}'
                     : 'Jawaban Anda telah terkirim ke server.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Color(0xFF059669), fontSize: 12)),
@@ -1310,3 +1295,4 @@ class _SelesaiScreen extends StatelessWidget {
     );
   }
 }
+
