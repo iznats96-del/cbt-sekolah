@@ -95,8 +95,8 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
             ));
           }
         }
-        if (_kiri.isEmpty) _kiri = List.generate(3, (_) => TextEditingController());
-        if (_kanan.isEmpty) _kanan = List.generate(3, (_) => TextEditingController());
+        if (_kiri.isEmpty) _kiri = List.generate(5, (_) => TextEditingController());
+        if (_kanan.isEmpty) _kanan = List.generate(5, (_) => TextEditingController());
       } else if (_jenis == 'essay') {
         // Essay kunci: teks biasa (old rows may still hold a JSON map — unwrap it).
         dynamic k = kunci;
@@ -194,6 +194,13 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
         opsi = [for (final o in _opsi) o.text.trim()];
         kunci = {'index': _kunciIdx, 'jawaban': _opsi[_kunciIdx!].text.trim()};
       } else if (_jenis == 'jodoh') {
+        if (_kiri.length < 5 || _kiri.length > 10 ||
+            _kanan.length < 5 || _kanan.length > 10) {
+          setState(() => _loading = false);
+          _snack('Soal menjodohkan wajib 5–10 pasangan (kiri & kanan).',
+              error: true);
+          return;
+        }
         if (_kiri.any((c) => c.text.trim().isEmpty) ||
             _kanan.any((c) => c.text.trim().isEmpty)) {
           setState(() => _loading = false);
@@ -574,7 +581,8 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
               const SizedBox(height: 12),
               _card('Pasangan Jodoh', [
                 const Text(
-                  'Tulis item di kolom kiri, lalu pasangkan dengan pilihan di kolom kanan.',
+                  'Wajib 5–10 pasangan. Item kiri = soal, pilihan kanan = jawaban. '
+                  'Bobot soal dibagi rata ke tiap pasangan.',
                   style: TextStyle(fontSize: 12, color: Colors.grey),
                 ),
                 const SizedBox(height: 10),
@@ -626,10 +634,14 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                       ],
                     ),
                   ),
-                TextButton.icon(
-                  onPressed: () => setState(() => _kiri.add(TextEditingController())),
+                 TextButton.icon(
+                  onPressed: _kiri.length >= 10
+                      ? null
+                      : () => setState(() => _kiri.add(TextEditingController())),
                   icon: const Icon(Icons.add),
-                  label: const Text('Tambah pasangan'),
+                  label: Text(_kiri.length >= 10
+                      ? 'Maksimal 10 pasangan'
+                      : 'Tambah pasangan'),
                 ),
                 const Divider(height: 22),
                 const Text('Pilihan kolom kanan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -658,10 +670,14 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
                         ),
                     ],
                   ),
-                TextButton.icon(
-                  onPressed: () => setState(() => _kanan.add(TextEditingController())),
+                 TextButton.icon(
+                  onPressed: _kanan.length >= 10
+                      ? null
+                      : () => setState(() => _kanan.add(TextEditingController())),
                   icon: const Icon(Icons.add),
-                  label: const Text('Tambah pilihan kanan'),
+                  label: Text(_kanan.length >= 10
+                      ? 'Maksimal 10 pilihan'
+                      : 'Tambah pilihan kanan'),
                 ),
               ]),
             ] else ...[

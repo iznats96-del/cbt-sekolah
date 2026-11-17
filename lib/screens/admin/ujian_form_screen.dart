@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
 
@@ -196,6 +197,21 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     } catch (_) {}
   }
 
+  /// 1 ujian cukup 1 soal menjodohkan (item kiri bukan soal terpisah).
+  List<String> _maksSatuJodoh(List<String> ids, List<Map<String, dynamic>> sumber) {
+    final jodohIds = sumber
+        .where((s) => SoalJodoh.isJodoh(s['jenis']))
+        .map((s) => s['id'].toString())
+        .toSet();
+    var sudahAda = false;
+    return ids.where((id) {
+      if (!jodohIds.contains(id)) return true;
+      if (sudahAda) return false;
+      sudahAda = true;
+      return true;
+    }).toList();
+  }
+
   Future<void> _pickSoal() async {
     if (_mapelId == null) {
       _err('Pilih mata pelajaran dulu baru pilih soalnya');
@@ -211,8 +227,13 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     if (result != null) {
       // only keep soal yang memang milik mapel terpilih
       final legal = _bankSoalMapel.map((s) => '${s['id']}').toSet();
-      final keep =
-          result.where((id) => legal.contains(id)).toList();
+      final keep = _maksSatuJodoh(
+        result.where((id) => legal.contains(id)).toList(),
+        _bankSoalMapel,
+      );
+      if (keep.length < result.length) {
+        _err('1 ujian hanya boleh 1 soal menjodohkan');
+      }
       setState(() => _selectedSoal = keep);
     }
   }
@@ -237,7 +258,13 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
     );
     if (result != null) {
       final legal = eligible.map((s) => '${s['id']}').toSet();
-      final keep = result.where((id) => legal.contains(id)).toList();
+      final keep = _maksSatuJodoh(
+        result.where((id) => legal.contains(id)).toList(),
+        eligible,
+      );
+      if (keep.length < result.length) {
+        _err('1 ujian hanya boleh 1 soal menjodohkan');
+      }
       setState(() {
         if (keep.isEmpty) {
           _soalPerKelas[kelasId] = [];
