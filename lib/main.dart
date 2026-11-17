@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/config.dart';
 import 'screens/splash_screen.dart';
 import 'core/app_theme.dart';
+import 'core/nav.dart';
 import 'services/api.dart';
 import 'widgets/update_checker.dart';
 
@@ -32,6 +33,7 @@ class CbtApp extends StatelessWidget {
     return MaterialApp(
       title: 'CBT Sekolah',
       debugShowCheckedModeBanner: false,
+      navigatorKey: AppNav.key,
       theme: AppTheme.light,
       // CBT Sekolah memakai tampilan terang agar tetap konsisten di web,
       // Android, dan perangkat yang memakai dark mode sistem.

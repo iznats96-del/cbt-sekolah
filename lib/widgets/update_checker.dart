@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/nav.dart';
 import '../screens/shared/update_screen.dart';
 import '../services/app_update.dart';
 
@@ -30,9 +31,16 @@ class _UpdateCheckerState extends State<UpdateChecker> {
     final info = await AppUpdate.check();
     if (info == null || !mounted || _shown) return;
     _shown = true;
-    if (!mounted) return;
+
+    BuildContext? ctx = AppNav.key.currentContext;
+    if (ctx == null) {
+      await Future.delayed(const Duration(seconds: 2));
+      ctx = AppNav.key.currentContext;
+    }
+    if (ctx == null || !ctx.mounted) return;
+
     showDialog(
-      context: context,
+      context: ctx,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('Pembaruan tersedia'),
@@ -49,7 +57,7 @@ class _UpdateCheckerState extends State<UpdateChecker> {
           FilledButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              Navigator.of(context).push(
+              AppNav.key.currentState?.push(
                 MaterialPageRoute(builder: (_) => const UpdateScreen()),
               );
             },
