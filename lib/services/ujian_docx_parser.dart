@@ -302,7 +302,11 @@ class UjianDocxParser {
     }
     if (u.jodoh.isNotEmpty) {
       final jml = u.jodoh.fold<int>(0, (s, j) => s + j.kiri.length);
-      u.warnings.add('$jml item menjodohkan terdeteksi — kunci pasangan isi via menu edit soal');
+      u.warnings.add('$jml item menjodohkan terdeteksi');
+      final tanpaKunci = u.jodoh.where((j) => j.kunciText == null).length;
+      if (tanpaKunci > 0) {
+        u.warnings.add('$tanpaKunci grup jodoh tanpa kunci — isi via menu edit soal');
+      }
     }
     if (u.pg.isNotEmpty && !u.pg.any((p) => p.kunci != null)) {
       u.warnings.add('Kunci jawaban PG tidak terdeteksi — isi via menu “Isi Kunci Jawaban”');
@@ -316,6 +320,7 @@ class UjianDocxParser {
     if (table == null) return;
     final kiri = <String>[];
     final kanan = <String>[];
+    final pasangan = <String>[];
     for (final r in table) {
       if (r.length < 2) continue;
       final head = r[0].join(' ').trim().toUpperCase();
@@ -325,7 +330,8 @@ class UjianDocxParser {
           .join(' ')
           .trim();
       final soalBersih = soal.replaceAll(_poin, '').trim();
-      if (soalBersih.isNotEmpty) kiri.add(soalBersih);
+      if (soalBersih.isEmpty) continue;
+      kiri.add(soalBersih);
 
       final opsiTeks = r[1].where((l) => !_isDots(l)).join(' ').trim();
       for (final seg in opsiTeks.split(RegExp(r'[,;]|\s{2,}')).map((s) => s.trim())) {
@@ -333,8 +339,22 @@ class UjianDocxParser {
         o = o.replaceAll(_poin, '').trim();
         if (o.isNotEmpty && !kanan.contains(o)) kanan.add(o);
       }
+
+      final jawabTeks = r.length > 2
+          ? r[2].where((l) => !_isDots(l)).join(' ').trim()
+          : '';
+      final mJwb = RegExp(r'([A-Ja-j])').firstMatch(jawabTeks);
+      if (mJwb != null) {
+        pasangan.add('${kiri.length}-${mJwb.group(1)!.toUpperCase()}');
+      }
     }
-    if (kiri.isNotEmpty && kanan.isNotEmpty) u.jodoh.add(JodohSoal(kiri, kanan));
+    if (kiri.isNotEmpty && kanan.isNotEmpty) {
+      u.jodoh.add(JodohSoal(
+        kiri,
+        kanan,
+        kunciText: pasangan.isEmpty ? null : pasangan.join(', '),
+      ));
+    }
   }
 
   /// Tabel essay (header mengandung PERTANYAAN / URAIAN, tanpa "PILIHAN JAWABAN").
