@@ -142,10 +142,12 @@ class KartuSiswaPdf {
           ]),
           pw.SizedBox(height: 4),
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-            if (qr != null)
-              pw.Image(pw.MemoryImage(qr), width: 40, height: 40)
-            else
-              pw.SizedBox(width: 40, height: 40),
+            pw.Padding(
+              padding: const pw.EdgeInsets.only(left: 6, bottom: 2),
+              child: qr != null
+                  ? pw.Image(pw.MemoryImage(qr), width: 42, height: 42)
+                  : pw.SizedBox(width: 42, height: 42),
+            ),
             pw.Spacer(),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
               pw.Text('Kepala Sekolah',

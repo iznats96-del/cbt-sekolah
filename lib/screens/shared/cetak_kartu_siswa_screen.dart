@@ -133,109 +133,373 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
   Widget build(BuildContext context) {
     final list = _difilter;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cetak Kartu Siswa'),
-        actions: [
-          IconButton(
-            onPressed: _load,
-            tooltip: 'Muat ulang',
-            icon: const Icon(Icons.refresh),
+      backgroundColor: const Color(0xFFF4F7FF),
+      body: Column(
+        children: [
+          _Header(
+            total: _siswa.length,
+            selected: _pilih.length,
+            onRefresh: _load,
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFF2563EB)))
+                : _error != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(_error!, textAlign: TextAlign.center),
+                        ),
+                      )
+                    : Column(children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: TextField(
+                              onChanged: (v) => setState(() => _cari = v),
+                              decoration: InputDecoration(
+                                hintText: 'Cari nama, NIS, atau kelas…',
+                                prefixIcon: const Icon(Icons.search_rounded,
+                                    color: Color(0xFF2563EB)),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 14),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 6, 16, 6),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.groups_outlined,
+                                  size: 16, color: Color(0xFF2563EB)),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Daftar siswa (${list.length})',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF101F3C)),
+                              ),
+                              const Spacer(),
+                              _miniBtn(
+                                  label: 'Semua',
+                                  onTap: () => setState(() => _pilih
+                                    ..clear()
+                                    ..addAll(list.map((r) => r['id'].toString())))),
+                              const SizedBox(width: 6),
+                              _miniBtn(
+                                  label: 'Kosongkan',
+                                  onTap: () => setState(() => _pilih.clear())),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+                            itemCount: list.length,
+                            itemBuilder: (_, i) => _SiswaRow(
+                              data: list[i],
+                              selected: _pilih.contains(list[i]['id'].toString()),
+                              password: _pw['${list[i]['profile_id']}'] ?? '-',
+                              onTap: () {
+                                final id = list[i]['id'].toString();
+                                setState(() {
+                                  if (_pilih.contains(id)) _pilih.remove(id);
+                                  else _pilih.add(id);
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF1E3A8A).withValues(alpha: 0.08),
+                                blurRadius: 18,
+                                offset: const Offset(0, -4),
+                              ),
+                            ],
+                          ),
+                          child: SafeArea(
+                            top: false,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                              child: SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF0EA5A4),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  onPressed: _printing ? null : _cetak,
+                                  icon: _printing
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2, color: Colors.white))
+                                      : const Icon(Icons.print_rounded),
+                                  label: Text(
+                                    'Cetak Kartu (${_pilih.length})',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700, fontSize: 14),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ]),
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(_error!, textAlign: TextAlign.center),
+    );
+  }
+
+  Widget _miniBtn({required String label, required VoidCallback onTap}) =>
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8F1FF),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2563EB))),
+        ),
+      );
+}
+
+class _Header extends StatelessWidget {
+  final int total, selected;
+  final VoidCallback onRefresh;
+  const _Header({
+    required this.total,
+    required this.selected,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1D4ED8), Color(0xFF2563EB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(26),
+          bottomRight: Radius.circular(26),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 18, 18, 22),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: 'Kembali',
+                    icon: const Icon(Icons.arrow_back_ios_new,
+                        color: Colors.white, size: 20),
                   ),
-                )
-              : Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                      child: TextField(
-                        onChanged: (v) => setState(() => _cari = v),
-                        decoration: InputDecoration(
-                          hintText: 'Cari nama / NIS / kelas…',
-                          prefixIcon: const Icon(Icons.search),
-                          isDense: true,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: const [
+                        Text('CETAK KARTU SISWA',
+                            style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white)),
+                        SizedBox(height: 3),
+                        Text('Kartu Peserta CBT',
+                            style: TextStyle(
+                                fontSize: 11, color: Colors.white70)),
+                      ],
                     ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Row(
-                        children: [
-                          Text('${_pilih.length} terpilih dari ${_siswa.length} siswa',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.grey)),
-                          const Spacer(),
-                          TextButton(
-                            onPressed: () => setState(() => _pilih
-                              ..clear()
-                              ..addAll(list.map((r) => r['id'].toString()))),
-                            child: const Text('Pilih semua'),
-                          ),
-                          TextButton(
-                            onPressed: () => setState(() => _pilih.clear()),
-                            child: const Text('Kosongkan'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: list.length,
-                        itemBuilder: (_, i) {
-                          final s = list[i];
-                          final id = s['id'].toString();
-                          final k = s['kelas'];
-                          final kelas = k is Map ? '${k['nama'] ?? ''}' : '';
-                          return CheckboxListTile(
-                            value: _pilih.contains(id),
-                            onChanged: (v) => setState(() {
-                              if (v == true) _pilih.add(id);
-                              else _pilih.remove(id);
-                            }),
-                            title: Text('${s['nama']}',
-                                style: const TextStyle(
-                                    fontSize: 13, fontWeight: FontWeight.w600)),
-                            subtitle: Text(
-                                'NIS ${s['nis']} • $kelas • ${_pw['${s['profile_id']}'] ?? '-'}',
-                                style: const TextStyle(fontSize: 11)),
-                          );
-                        },
-                      ),
-                    ),
-                    SafeArea(
-                      top: false,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: FilledButton.icon(
-                            onPressed: _printing ? null : _cetak,
-                            icon: _printing
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.print),
-                            label: Text('Cetak Kartu (${_pilih.length})'),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
+                  IconButton(
+                    onPressed: onRefresh,
+                    tooltip: 'Muat ulang',
+                    icon: const Icon(Icons.refresh, color: Colors.white),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  _pill(Icons.people_outline, '$total siswa'),
+                  const SizedBox(width: 8),
+                  _pill(Icons.check_circle_outline, '$selected dipilih'),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _pill(IconData icon, String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white)),
+          ],
+        ),
+      );
+}
+
+class _SiswaRow extends StatelessWidget {
+  final Map<String, dynamic> data;
+  final bool selected;
+  final String password;
+  final VoidCallback onTap;
+  const _SiswaRow({
+    required this.data,
+    required this.selected,
+    required this.password,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final k = data['kelas'];
+    final kelas = k is Map ? '${k['nama'] ?? ''}' : '';
+    final jur = k is Map && k['jurusan'] is Map
+        ? '${(k['jurusan'] as Map)['singkatan'] ?? ''}'
+        : '';
+    final nama = '${data['nama'] ?? ''}';
+    final inisial = nama
+        .trim()
+        .split(RegExp(r'\s+'))
+        .take(2)
+        .map((e) => e.isEmpty ? '' : e[0])
+        .join()
+        .toUpperCase();
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 9),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? const Color(0xFF2563EB) : const Color(0xFFE7EDFA),
+            width: selected ? 1.8 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E3A8A).withValues(alpha: 0.05),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: const Color(0xFFE8F1FF),
+              child: Text(inisial.isEmpty ? '?' : inisial,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2563EB))),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(nama,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF101F3C))),
+                  const SizedBox(height: 4),
+                  Text(
+                    'NIS ${data['nis']} • ${jur.isNotEmpty ? '$kelas • $jur' : kelas}',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF8A97B1)),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(password,
+                  style: const TextStyle(
+                      fontSize: 10, color: Color(0xFF3D5873))),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: selected ? const Color(0xFF2563EB) : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: selected
+                      ? const Color(0xFF2563EB)
+                      : const Color(0xFFB8C4D9),
+                  width: 1.6,
                 ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  : null,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
