@@ -83,14 +83,11 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
   KartuSiswaData _keKartu(Map<String, dynamic> s) {
     final k = s['kelas'];
     final kelas = k is Map ? '${k['nama'] ?? ''}' : '';
-    final jur = k is Map && k['jurusan'] is Map
-        ? '${(k['jurusan'] as Map)['singkatan'] ?? ''}'
-        : '';
     final nis = '${s['nis'] ?? ''}';
     return KartuSiswaData(
       noPeserta: '${s['nomor_peserta'] ?? ''}',
       nama: '${s['nama'] ?? ''}',
-      kelas: jur.isNotEmpty ? '$kelas â€¢ $jur' : kelas,
+      kelas: kelas,
       username: nis,
       password: _pw['${s['profile_id']}'] ?? '',
       fotoUrl: '${s['foto_url'] ?? ''}',
@@ -139,7 +136,7 @@ class _CetakKartuSiswaScreenState extends State<CetakKartuSiswaScreen> {
         children: [
           DashboardHeader(
             title: 'CETAK KARTU SISWA',
-            subtitle: 'Kartu Peserta CBT â€¢ ${KartuSiswaPdf.tahunAjaran()}',
+            subtitle: 'Kartu Peserta CBT - ${KartuSiswaPdf.tahunAjaran()}',
             showBack: true,
             stats: [
               ('siswa', '${_siswa.length}'),
@@ -321,9 +318,6 @@ class _SiswaRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final k = data['kelas'];
     final kelas = k is Map ? '${k['nama'] ?? ''}' : '';
-    final jur = k is Map && k['jurusan'] is Map
-        ? '${(k['jurusan'] as Map)['singkatan'] ?? ''}'
-        : '';
     final nama = '${data['nama'] ?? ''}';
     final inisial = nama
         .trim()
@@ -377,7 +371,7 @@ class _SiswaRow extends StatelessWidget {
                           color: Color(0xFF101F3C))),
                   const SizedBox(height: 4),
                   Text(
-                    'NIS ${data['nis']} â€¢ ${jur.isNotEmpty ? '$kelas â€¢ $jur' : kelas}',
+                    'NIS ${data['nis']} - $kelas',
                     style: const TextStyle(fontSize: 11, color: Color(0xFF8A97B1)),
                   ),
                 ],
