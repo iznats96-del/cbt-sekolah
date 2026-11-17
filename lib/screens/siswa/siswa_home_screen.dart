@@ -116,10 +116,8 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
         children: [
           _Header(nama: nama, nis: nis, kelas: kelas, jur: jur, foto: foto),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
-            child: Transform.translate(
-              offset: const Offset(0, -26),
-              child: Column(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _InfoPeserta(nomor: nomor, onSalin: () => _salin(nomor)),
@@ -141,7 +139,6 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
                   const _PesanCard(),
                 ],
               ),
-            ),
           ),
         ],
       ),
@@ -149,7 +146,7 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
   }
 }
 
-/// Header biru dengan foto, nama, chip NIS & kelas.
+/// Kartu profil siswa, nama, chip NIS & kelas.
 class _Header extends StatelessWidget {
   final String nama, nis, kelas, jur, foto;
   const _Header({
@@ -162,80 +159,57 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_blueDeep, _blue],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomLeft: Radius.circular(28),
-          bottomRight: Radius.circular(28),
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -40,
-            top: -50,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.07),
-                  shape: BoxShape.circle),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 28, 20, 56),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: const BoxDecoration(
-                      color: Colors.white, shape: BoxShape.circle),
-                  child: CircleAvatar(
-                    radius: 34,
-                    backgroundColor: _blueLight,
-                    backgroundImage: foto.isNotEmpty ? NetworkImage(foto) : null,
-                    child: foto.isEmpty
-                        ? const Icon(Icons.person_rounded, size: 34, color: _blue)
-                        : null,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: _SoftCard(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                    color: _blueLight, shape: BoxShape.circle),
+                child: CircleAvatar(
+                  radius: 34,
+                  backgroundColor: _blueLight,
+                  backgroundImage: foto.isNotEmpty ? NetworkImage(foto) : null,
+                  child: foto.isEmpty
+                      ? const Icon(Icons.person_rounded, size: 34, color: _blue)
+                      : null,
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        nama,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nama,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w800,
+                        color: _navy,
                       ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 7,
-                        children: [
-                          if (nis.isNotEmpty) _chip('NIS $nis'),
-                          if (kelas.isNotEmpty)
-                            _chip(jur.isNotEmpty ? '$kelas • $jur' : kelas),
-                        ],
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 7,
+                      runSpacing: 6,
+                      children: [
+                        if (nis.isNotEmpty) _chip('NIS $nis'),
+                        if (kelas.isNotEmpty)
+                          _chip(jur.isNotEmpty ? '$kelas • $jur' : kelas),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -243,14 +217,14 @@ class _Header extends StatelessWidget {
   Widget _chip(String t) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.16),
+          color: _blueLight,
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+          border: Border.all(color: _line),
         ),
         child: Text(
           t,
           style: const TextStyle(
-              fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600),
+              fontSize: 11, color: _blue, fontWeight: FontWeight.w600),
         ),
       );
 }

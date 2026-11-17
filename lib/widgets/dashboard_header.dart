@@ -41,21 +41,7 @@ class DashboardHeader extends StatelessWidget implements PreferredSizeWidget {
       ),
       child: SafeArea(
         bottom: false,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -30,
-              top: -50,
-              child: Container(
-                width: 170,
-                height: 170,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
-                ),
-              ),
-            ),
-            Padding(
+        child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 10, 16, 14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,8 +93,6 @@ class DashboardHeader extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ],
               ),
-            ),
-          ],
         ),
       ),
     );
