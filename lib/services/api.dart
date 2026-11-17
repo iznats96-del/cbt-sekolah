@@ -153,11 +153,15 @@ class Api {
     if (elapsed.inSeconds < AppConfig.circuitBreakerOpenSec) return;
 
     try {
-      await client
-          .from('profiles')
-          .select('id')
-          .limit(1)
-          .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
+      final probe = await http.get(
+        Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/profiles?select=id&limit=1'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      ).timeout(Duration(seconds: AppConfig.requestTimeoutSec));
+      if (probe.statusCode != 200) throw Exception('probe ${probe.statusCode}');
       debugPrint(
           '[BackendRouter] ✅ Supabase recovered — switching back to PRIMARY');
       _circuitOpen = false;
@@ -184,6 +188,14 @@ class Api {
       );
       _notifyFallback();
     }
+  }
+
+  /// Dipanggil setelah login fallback supaya semua Api.client.* ikut ke fallback.
+  static void forceFallback() {
+    if (!AppConfig.failoverEnabled || _circuitOpen) return;
+    _circuitOpen = true;
+    _circuitOpenedAt = DateTime.now();
+    _notifyFallback();
   }
 
   /// Reset failure counter on successful primary request

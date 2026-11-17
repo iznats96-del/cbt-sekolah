@@ -60,11 +60,9 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
         .substring(tingkat.length)
         .replaceAll(RegExp(r'[^A-Z0-9]'), '')
         .replaceAll(RegExp(r'^(SEBELAS|DUA BELAS|SEPULUH)*'), '');
-    final cand = _kelOptions.where((k) {
-      final nm = '${k['nama']}'.toUpperCase();
-      return nm.startsWith(tingkat) &&
-          RegExp('^$tingkat\\b').hasMatch(nm) == false;
-    }).where((k) => '${k['nama']}'.toUpperCase().startsWith(tingkat)).toList();
+    final cand = _kelOptions
+        .where((k) => '${k['nama']}'.toUpperCase().startsWith(tingkat))
+        .toList();
     List<Map<String, dynamic>> pool;
     if (tingkat == 'XI') {
       pool = cand.where((k) => RegExp(r'^XI[^I]').hasMatch('${k['nama']}'.toUpperCase().trim())).toList();

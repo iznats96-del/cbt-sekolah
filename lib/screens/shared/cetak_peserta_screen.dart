@@ -323,7 +323,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
         final profId = '${sw['profile_id'] ?? ''}';
         final pass = _pwByProfile[profId] ?? '';
         final foto = await _urlBytes('${sw['foto_url'] ?? p['foto_url'] ?? ''}');
-        final qr = await _qrBytes('${p['nomor_peserta'] ?? nis}');
+        final qr = await _qrBytes(nis);
         cards.add(pw.Container(
           padding: const pw.EdgeInsets.all(6),
           decoration: pw.BoxDecoration(

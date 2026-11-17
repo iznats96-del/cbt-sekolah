@@ -6,6 +6,7 @@ import 'guru/guru_shell.dart';
 import 'siswa/siswa_shell.dart';
 import 'panitia/panitia_shell.dart';
 import 'auth/login_screen.dart';
+import '../../services/hybrid_api.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -51,7 +52,8 @@ class LogoutButton extends StatelessWidget {
           ),
         );
         if (ok == true && context.mounted) {
-          await Api.client.auth.signOut();
+          await HybridApi.logout();
+          Api.setRole(null);
           if (context.mounted) {
             Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const LoginScreen()));

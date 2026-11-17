@@ -61,8 +61,16 @@ class _LoginScreenState extends State<LoginScreen> {
           } catch (_) {
             Api.setRole(user['role'] as String?);
           }
-          await Api.init();
+          Api.forceFallback();
+          final ok = await Api.init();
           if (!mounted) return;
+          if (!ok || Api.role == null) {
+            setState(() {
+              _loading = false;
+              _error = 'Akun fallback belum memiliki peran. Hubungi operator sekolah.';
+            });
+            return;
+          }
           _goToRole();
           return;
         }
@@ -90,7 +98,22 @@ class _LoginScreenState extends State<LoginScreen> {
           // Fallback ke metadata saja
           Api.setRole(metadataRole);
         }
-        await Api.init();
+        final ok = await Api.init();
+        if (!ok || Api.role == null) {
+          if (!mounted) return;
+          setState(() {
+            _loading = false;
+            _error = 'Akun belum memiliki peran. Hubungi operator sekolah.';
+          });
+          return;
+        }
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _error = 'Login gagal. Periksa email/username dan password.';
+        });
+        return;
       }
       if (!mounted) return;
       _goToRole();

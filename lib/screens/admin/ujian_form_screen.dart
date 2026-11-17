@@ -315,7 +315,6 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'jenis_ujian_id': _jenisUjianId,
         'mapel_id': _mapelId,
         'kelas_id': _kelasIds.first,
-        'guru_id': Api.user?.id,
         'tanggal': _tanggal,
         'sesi_id': _sesiId,
         'alokasi_menit': num.tryParse(_menitCtrl.text.trim()) ?? 90,
@@ -327,6 +326,7 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
         'waktu_mulai': _gabung(_tanggal, _jamMulai),
         'waktu_selesai': _gabung(_tanggal, _jamSelesai),
       };
+      if (widget.ujianId == null) data['guru_id'] = Api.user?.id;
       String uid = widget.ujianId ?? '';
       if (widget.ujianId != null) {
         await Api.client.from('ujian').update(data).eq('id', widget.ujianId!);

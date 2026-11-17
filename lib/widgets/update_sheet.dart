@@ -131,6 +131,12 @@ class _UpdateSheetState extends State<UpdateSheet> {
                   ],
                 ),
               ),
+              IconButton(
+                tooltip: 'Tutup',
+                icon: const Icon(Icons.close_rounded,
+                    size: 20, color: Color(0xFF94A3B8)),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
             ],
           ),
           const SizedBox(height: 22),

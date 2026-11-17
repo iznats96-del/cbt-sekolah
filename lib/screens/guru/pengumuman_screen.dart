@@ -27,6 +27,7 @@ class _PengumumanScreenState extends State<PengumumanScreen> {
           .from('pengumuman')
           .select()
           .eq('aktif', true)
+          .or('target_role.eq.semua,target_role.eq.guru')
           .order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {

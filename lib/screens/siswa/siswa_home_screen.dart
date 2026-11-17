@@ -105,8 +105,8 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
     final foto = '${s['foto_url'] ?? ''}';
     final kelasMap = s['kelas'];
     final kelas = kelasMap is Map ? '${kelasMap['nama'] ?? ''}' : '';
-    final jur = kelasMap is Map
-        ? '${kelasMap['singkatan'] ?? ''}'
+    final jur = kelasMap is Map && kelasMap['jurusan'] is Map
+        ? '${(kelasMap['jurusan'] as Map)['singkatan'] ?? ''}'
         : '';
 
     return Scaffold(

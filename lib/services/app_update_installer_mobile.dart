@@ -23,23 +23,33 @@ Future<String> downloadApk(
   final file = File('${dir.path}/cbt-sekolah-update.apk');
   if (await file.exists()) await file.delete();
 
-  final request = http.Request('GET', Uri.parse(url));
-  final response = await http.Client().send(request);
-  if (response.statusCode != 200) {
-    throw Exception('Gagal mengunduh APK (${response.statusCode})');
-  }
-
-  final total = response.contentLength;
-  var received = 0;
-  final sink = file.openWrite();
-  await response.stream.forEach((chunk) {
-    sink.add(chunk);
-    received += chunk.length;
-    if (total != null && total > 0) {
-      onProgress?.call((received / total).clamp(0.0, 1.0));
+  final client = http.Client();
+  try {
+    final request = http.Request('GET', Uri.parse(url));
+    final response = await client
+        .send(request)
+        .timeout(const Duration(seconds: 30));
+    if (response.statusCode != 200) {
+      throw Exception('Gagal mengunduh APK (${response.statusCode})');
     }
-  });
-  await sink.close();
+
+    final total = response.contentLength;
+    var received = 0;
+    final sink = file.openWrite();
+    try {
+      await response.stream.forEach((chunk) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (total != null && total > 0) {
+          onProgress?.call((received / total).clamp(0.0, 1.0));
+        }
+      });
+    } finally {
+      await sink.close();
+    }
+  } finally {
+    client.close();
+  }
   onProgress?.call(1.0);
   return file.path;
 }

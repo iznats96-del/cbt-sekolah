@@ -42,6 +42,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   // satu pelanggaran per siklus keluar-masuk (jangan dobel hitung)
   bool _sudahDihitungSiklusIni = false;
   DateTime? _terakhirPelanggaran;
+  DateTime? _deadline;
 
   // ===== LOCAL STORAGE + FLUSH BERKALA (anti rate-limit & anti-hilang) =====
   late final JawabanStore _store = JawabanStore(widget.pesertaId);
@@ -100,7 +101,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         }
       }
       final sisa = data['sisa_detik'];
-      if (sisa is num && sisa > 0) _sisaDetik = sisa.toInt();
+      if (sisa is num && sisa > 0) {
+        _sisaDetik = sisa.toInt();
+        _deadline = DateTime.now().add(Duration(seconds: _sisaDetik));
+      }
       final pStatus = data['status_peserta']?.toString();
       // ===== JAM AKSES: cek apakah ujian sudah di waktu-nya =====
       // server RPC soal_milik_ujian sudah filter ujian yang JAM AKSES-nya belum buka
@@ -164,7 +168,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
-      setState(() => _sisaDetik--);
+      final sisa =
+          _deadline?.difference(DateTime.now()).inSeconds ?? _sisaDetik - 1;
+      if (sisa != _sisaDetik) setState(() => _sisaDetik = sisa);
       if (_sisaDetik <= 0) {
         t.cancel();
         _submit(auto: true);
@@ -180,6 +186,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
 
   void _onIntrusion() {
     if (!_kiosk || !mounted || _showPalette || _submitting) return;
+    _sudahDihitungSiklusIni = true;
     // Native sudah menyaring fokus hilang < 2.5 detik (notif shade, dialog,
     // keyboard, immersive flicker) -> event ini = intrusi sungguhan.
     _hitungPelanggaran('tab_switch');
@@ -229,6 +236,14 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       }
     } else if (state == AppLifecycleState.resumed) {
       Kiosk.alarmStop();
+      if (_kiosk && _deadline != null) {
+        final sisa = _deadline!.difference(DateTime.now()).inSeconds;
+        if (mounted) setState(() => _sisaDetik = sisa);
+        if (sisa <= 0) {
+          _timer?.cancel();
+          _submit(auto: true);
+        }
+      }
       if (_kiosk) _evaluasiKeluar();
     }
   }
@@ -276,6 +291,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
   /// Dipanggil tiap murid tap jawaban: SIMPAN LOKAL SAJA (gak kirim server).
   Future<void> _saveJawaban(String soalId, {bool flush = false, String? value}) async {
     if (value != null) _jawaban[soalId] = value;
+    _jawaban.putIfAbsent(soalId, () => '');
     _belumKirim.add(soalId);
     await _simpanLokal();
     // flush=true hanya dipakai saat submit (paksa kirim)
@@ -341,9 +357,18 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       }
     }
     if (okKumpul) {
-      // Server mengkonfirmasi -> hapus cache lokal HP (anti duplikat, privasi)
-      try { _store.clear(); } catch (_) {}
-      _belumKirim.clear();
+      if (_belumKirim.isEmpty) {
+        try { _store.clear(); } catch (_) {}
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sebagian jawaban belum terkirim — tersimpan di HP '
+                'dan akan dikirim ulang saat sinyal pulih.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 8),
+          ),
+        );
+      }
     }
     if (!okKumpul) {
       if (!mounted) return;

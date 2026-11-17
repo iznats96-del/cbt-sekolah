@@ -39,7 +39,7 @@ class _UjianBerandaListState extends State<UjianBerandaList> {
     final s = Api.client.auth.currentSession;
     if (s != null &&
         DateTime.fromMillisecondsSinceEpoch((s.expiresAt ?? 0) * 1000)
-            .isBefore(DateTime.now().subtract(const Duration(minutes: 1)))) {
+            .isBefore(DateTime.now().add(const Duration(seconds: 30)))) {
       try {
         await Api.client.auth.refreshSession();
       } catch (_) {

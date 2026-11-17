@@ -281,7 +281,7 @@ class _HeroCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   decoration: BoxDecoration(
-                    color: _redPill,
+                    color: warnaStatus.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Row(

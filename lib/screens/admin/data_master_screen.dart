@@ -324,6 +324,7 @@ class DataMasterScreen extends StatelessWidget {
         CrudField('email', label: 'Email'),
         CrudField('website', label: 'Website'),
         CrudField('kepala_sekolah', label: 'Kepala Sekolah'),
+        CrudField('nip_kepala', label: 'NIP Kepala Sekolah'),
         CrudField('kota', label: 'Kota'),
         CrudField('provinsi', label: 'Provinsi'),
       ],

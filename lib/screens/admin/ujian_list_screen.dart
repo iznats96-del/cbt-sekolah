@@ -749,10 +749,13 @@ class _MapelBankPickerState extends State<_MapelBankPicker> {
 
   Future<void> _load() async {
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('bank_soal')
-          .select('id,jenis,soal,bobot,mapel_id,mata_pelajaran(nama)')
-          .order('created_at', ascending: false);
+          .select('id,jenis,soal,bobot,mapel_id,mata_pelajaran(nama)');
+      if (Api.role == 'guru') {
+        q = q.eq('guru_id', Api.user?.id ?? '');
+      }
+      final rows = await q.order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {
         _rows = List<Map<String, dynamic>>.from(rows);

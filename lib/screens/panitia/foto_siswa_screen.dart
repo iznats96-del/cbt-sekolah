@@ -98,8 +98,10 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
         dialogTitle: 'Pilih foto untuk ${siswa['nama']}',
         type: FileType.image,
       );
+      if (result.isEmpty) return;
       final file = result.first;
-      final path = file.path!;
+      final path = file.path;
+      if (path == null) return;
       final fileName =
           'siswa_${siswa['id']}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
