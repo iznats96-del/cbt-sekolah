@@ -53,7 +53,7 @@ jobs:
           MAX_RETRIES=3
           for i in $(seq 1 $MAX_RETRIES); do
             echo "=== Attempt $i of $MAX_RETRIES ==="
-            if flutter build apk --release --obfuscate --split-debug-info=debug --build-number=${{ github.run_number }}; then
+            if flutter build apk --release --obfuscate --split-debug-info=debug --target-platform android-arm,android-arm64 --build-number=${{ github.run_number }}; then
               echo "Build succeeded on attempt $i"
               exit 0
             fi
