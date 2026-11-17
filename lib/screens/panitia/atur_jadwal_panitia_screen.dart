@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 class AturJadwalPanitiaScreen extends StatefulWidget {
   final String ujianId;
@@ -132,9 +133,11 @@ class _AturJadwalPanitiaScreenState extends State<AturJadwalPanitiaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: Text('Atur Jadwal: ${widget.ujianNama}'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'ATUR JADWAL',
+        subtitle: widget.ujianNama,
+        showBack: true,
         actions: [
           if (!_loading && !_saving)
             TextButton.icon(

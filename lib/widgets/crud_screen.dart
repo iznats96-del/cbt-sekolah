@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../services/api.dart';
 import '../screens/home.dart';
+import 'dashboard_header.dart';
 import 'state_views.dart';
 
 /// Definisi kolom untuk form CRUD generik.
@@ -189,10 +190,11 @@ class _CrudScreenState extends State<CrudScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: widget.showLogout ? const [LogoutButton()] : null,
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: widget.title.toUpperCase(),
+        showBack: true,
+        actions: widget.showLogout ? const [LogoutButton()] : const [],
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,

@@ -204,119 +204,241 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF1A6DB4), Color(0xFF2E9B8F)],
+            colors: [Color(0xFF1E40AF), Color(0xFF2563EB), Color(0xFF0EA5A4)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
-                    child: Image.asset('assets/images/logo_yp.png', width: 64, height: 64, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, size: 48, color: Color(0xFF1A6DB4))),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(AppConfig.appName,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  const Text('Silakan masuk untuk memulai ujian',
-                      style: TextStyle(color: Colors.white70)),
-                  const SizedBox(height: 32),
-                  Card(
-                    elevation: 6,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            controller: _email,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                            decoration: const InputDecoration(
-                              labelText: 'Email atau NIS',
-                              prefixIcon: Icon(Icons.person_outline),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          TextField(
-                            controller: _pass,
-                            obscureText: _obscure,
-                            onSubmitted: (_) => _login(),
-                            decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
-                              suffixIcon: IconButton(
-                                icon: Icon(_obscure
-                                    ? Icons.visibility
-                                    : Icons.visibility_off),
-                                onPressed: () =>
-                                    setState(() => _obscure = !_obscure),
+          child: Stack(
+            children: [
+              Positioned(right: -70, top: -90, child: _glow(230)),
+              Positioned(left: -80, bottom: -100, child: _glow(270)),
+              Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 26, 20, 22),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: Column(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0x331E3A66),
+                                blurRadius: 22,
+                                offset: const Offset(0, 8),
                               ),
-                            ),
+                            ],
                           ),
-                          if (_queueNote != null) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                const SizedBox(
-                                    width: 14, height: 14,
-                                    child: CircularProgressIndicator(strokeWidth: 2)),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(_queueNote!,
-                                      style: const TextStyle(
-                                          fontSize: 12, color: Colors.grey)),
+                          child: Image.asset(
+                            'assets/images/logo_yp.png',
+                            width: 66,
+                            height: 66,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.school_outlined,
+                                size: 44,
+                                color: Color(0xFF2563EB)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          AppConfig.appName,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 27,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        const Text(
+                          'Silakan masuk untuk memulai ujian',
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                        const SizedBox(height: 26),
+                        Container(
+                          padding: const EdgeInsets.all(22),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(24),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0x2E0F172A),
+                                blurRadius: 26,
+                                offset: const Offset(0, 12),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextField(
+                                controller: _email,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                style: const TextStyle(fontSize: 14),
+                                decoration: _input('Email atau NIS',
+                                    Icons.person_outline),
+                              ),
+                              const SizedBox(height: 14),
+                              TextField(
+                                controller: _pass,
+                                obscureText: _obscure,
+                                onSubmitted: (_) => _login(),
+                                style: const TextStyle(fontSize: 14),
+                                decoration: _input('Password', Icons.lock_outline).copyWith(
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscure
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      color: const Color(0xFF94A3B8),
+                                      size: 20,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _obscure = !_obscure),
+                                  ),
+                                ),
+                              ),
+                              if (_queueNote != null) ...[
+                                const SizedBox(height: 14),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F1FF),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Color(0xFF2563EB)),
+                                      ),
+                                      const SizedBox(width: 9),
+                                      Expanded(
+                                        child: Text(
+                                          _queueNote!,
+                                          style: const TextStyle(
+                                              fontSize: 11.5,
+                                              color: Color(0xFF1E40AF)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
-                            ),
-                          ],
-                          if (_error != null) ...[
-                            const SizedBox(height: 12),
-                            Text(_error!,
-                                style: const TextStyle(
-                                    color: Colors.red, fontSize: 13)),
-                          ],
-                          const SizedBox(height: 24),
-                          ElevatedButton(
-                            onPressed: _loading ? null : _login,
-                            child: _loading
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2, color: Colors.white))
-                                : const Text('MASUK',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1)),
+                              if (_error != null) ...[
+                                const SizedBox(height: 14),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFF1F2),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.error_outline,
+                                          size: 17, color: Color(0xFFEF4444)),
+                                      const SizedBox(width: 9),
+                                      Expanded(
+                                        child: Text(
+                                          _error!,
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFFB91C1C)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                              const SizedBox(height: 22),
+                              SizedBox(
+                                height: 50,
+                                child: FilledButton.icon(
+                                  onPressed: _loading ? null : _login,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: const Color(0xFF2563EB),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                  icon: _loading
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.login, size: 19),
+                                  label: Text(
+                                    _loading ? 'Memeriksa akun…' : 'MASUK',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 18),
+                        const Text(
+                          'Gunakan akun yang diberikan operator sekolah',
+                          style: TextStyle(
+                              color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Gunakan akun yang diberikan operator sekolah',
-                    style: TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  InputDecoration _input(String label, IconData icon) => InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+        prefixIcon: Icon(icon, color: const Color(0xFF2563EB), size: 20),
+        filled: true,
+        fillColor: const Color(0xFFF8FAFF),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE7EDFA)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE7EDFA)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.6),
+        ),
+      );
+
+  Widget _glow(double size) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.06),
+        ),
+      );
 }

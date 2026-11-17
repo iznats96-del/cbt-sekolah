@@ -4,6 +4,7 @@ import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../home.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Manajemen Akun Guru & Panitia: buat/list/reset password/hapus.
 /// Password auto format 79xxxx. Login pakai email atau @cbt.local.
@@ -200,8 +201,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Widget _akunRow(Map<String, dynamic> p, {bool isGuru = true}) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
       child: ListTile(
         dense: true,
         leading: CircleAvatar(
@@ -246,9 +258,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Manajemen Akun'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'MANAJEMEN AKUN',
+        subtitle: 'Kelola akun guru & panitia',
         actions: const [LogoutButton()],
       ),
       body: ContentMaxWidth(

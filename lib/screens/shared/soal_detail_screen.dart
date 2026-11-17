@@ -6,6 +6,7 @@ import '../../core/app_theme.dart';
 import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Detail soal: tampilkan semua isi soal lengkap (opsi, kunci, pembahasan, gambar).
 /// Dipakai dari Bank Soal (drill-down) dan dari Ujian List.
@@ -65,25 +66,33 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
   }
 
   Widget _card(String title, Widget child) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: Colors.grey.shade100),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
+                Container(width: 4, height: 15, decoration: BoxDecoration(color: const Color(0xFF2563EB), borderRadius: BorderRadius.circular(4))),
+                const SizedBox(width: 8),
                 Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: Color(0xFF101F3C))),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             child,
           ],
         ),
@@ -147,12 +156,10 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Detail Soal', style: const TextStyle(fontSize: 16)),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: false,
-        leading: const BackButton(),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(
+        title: 'DETAIL SOAL',
+        showBack: true,
       ),
       body: SafeArea(
         child: ListView(

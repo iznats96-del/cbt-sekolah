@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 class HasilScreen extends StatefulWidget {
   const HasilScreen({super.key});
@@ -50,8 +51,8 @@ class _HasilScreenState extends State<HasilScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Hasil Ujian')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(title: 'HASIL UJIAN', showBack: true),
       body: _buildBody(),
     );
   }

@@ -7,6 +7,7 @@ import 'siswa_home_screen.dart';
 import 'hasil_siswa_screen.dart';
 import 'pengumuman_siswa_screen.dart';
 import 'kartu_saya_screen.dart';
+import '../../widgets/app_bottom_nav.dart';
 
 class SiswaShell extends StatefulWidget {
   const SiswaShell({super.key});
@@ -30,7 +31,7 @@ class _SiswaShellState extends State<SiswaShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Cbt.paper,
+        backgroundColor: const Color(0xFFF4F7FF),
         foregroundColor: Cbt.ink,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -71,26 +72,14 @@ class _SiswaShellState extends State<SiswaShell> {
         ],
       ),
       body: ContentMaxWidth(child: _pages[_index]),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: AppBottomNav(
         selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Beranda'),
-          NavigationDestination(
-              icon: Icon(Icons.assessment_outlined),
-              selectedIcon: Icon(Icons.assessment),
-              label: 'Hasil'),
-          NavigationDestination(
-              icon: Icon(Icons.campaign_outlined),
-              selectedIcon: Icon(Icons.campaign),
-              label: 'Info'),
-          NavigationDestination(
-              icon: Icon(Icons.qr_code_2_outlined),
-              selectedIcon: Icon(Icons.qr_code_2),
-              label: 'Kartu'),
+        onChanged: (i) => setState(() => _index = i),
+        items: const [
+          NavItem(Icons.home_outlined, Icons.home, 'Beranda'),
+          NavItem(Icons.assessment_outlined, Icons.assessment, 'Hasil'),
+          NavItem(Icons.campaign_outlined, Icons.campaign, 'Info'),
+          NavItem(Icons.qr_code_2_outlined, Icons.qr_code_2, 'Kartu'),
         ],
       ),
     );

@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 import 'crud_kelas_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Komponen Kelas/Rombel modern: kelompok tingkat X / XI / XII,
 /// tap sebuah rombel => accordion daftar anggotanya (murid).
@@ -173,13 +174,14 @@ class _KelasRombelScreenState extends State<KelasRombelScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Kelas / Rombel'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'KELAS / ROMBEL',
+        showBack: true,
         actions: [
           IconButton(
               tooltip: 'Kelola tabel kelas (CSV-like CRUD)',
-              icon: const Icon(Icons.table_view_outlined),
+              icon: const Icon(Icons.table_view_outlined, color: Colors.white),
               onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => const CrudKelasScreen()))),
         ],
@@ -355,3 +357,4 @@ String? namaTingkatFromStr(String nama) {
   final t = kelasTingkat(nama);
   return ['X', 'XI', 'XII'].contains(t) ? t : null;
 }
+

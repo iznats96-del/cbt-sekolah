@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primary = Color(0xFF1A6DB4);
-  static const Color secondary = Color(0xFF2E9B8F);
-  static const Color accent = Color(0xFFF4A940);
-  static const Color danger = Color(0xFFD9534F);
+  static const Color primary = Color(0xFF2563EB);
+  static const Color secondary = Color(0xFF0EA5A4);
+  static const Color accent = Color(0xFFF59E0B);
+  static const Color danger = Color(0xFFEF4444);
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color background = Color(0xFFF4F6FA);
+  static const Color background = Color(0xFFF4F7FF);
 
   static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
@@ -23,26 +23,35 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        titleTextStyle: TextStyle(
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
       ),
-      cardTheme: const CardThemeData(
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-         margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(18)),
+          side: const BorderSide(color: Color(0xFFE7EDFA)),
+        ),
+        margin: const EdgeInsets.only(bottom: 9),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: Colors.white,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFD0D7DE)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE7EDFA)),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Color(0xFFD0D7DE)),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE7EDFA)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: primary, width: 2),
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: primary, width: 1.8),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       ),
@@ -51,7 +60,7 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -59,12 +68,12 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
       listTileTheme: const ListTileThemeData(
         iconColor: primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(8))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surface,

@@ -1,8 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
 
 const _hari = <int, String>{
   1: 'Senin', 2: 'Selasa', 3: 'Rabu', 4: 'Kamis', 5: 'Jumat', 6: 'Sabtu',
@@ -231,8 +232,11 @@ class _JadwalPelajaranScreenState extends State<JadwalPelajaranScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Jadwal Pelajaran')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(
+        title: 'JADWAL PELAJARAN',
+        showBack: true,
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         onPressed: () => _form(),
@@ -306,3 +310,4 @@ class _JadwalPelajaranScreenState extends State<JadwalPelajaranScreen> {
     );
   }
 }
+

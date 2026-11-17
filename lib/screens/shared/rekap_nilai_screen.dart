@@ -6,6 +6,8 @@ import '../../services/file_saver.dart';
 import '../../services/nilai_xlsx.dart';
 import '../home.dart';
 import 'rekap_detail_screen.dart';
+import '../../core/design.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Rekap hasil ujian per rombel (X/XI/XII — TKJ / TSM / AKA) — admin & guru.
 class RekapNilaiScreen extends StatefulWidget {
@@ -36,11 +38,14 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('ujian')
           .select(
-              '*,mata_pelajaran(nama,kkm),kelas!ujian_kelas_id_fkey(nama),jenis_ujian(nama)')
-          .order('tanggal', ascending: false);
+              '*,mata_pelajaran(nama,kkm),kelas!ujian_kelas_id_fkey(nama),jenis_ujian(nama)');
+      if (Api.role == 'guru') {
+        q = q.eq('guru_id', Api.user?.id ?? '');
+      }
+      final rows = await q.order('tanggal', ascending: false);
       if (!mounted) return;
       setState(() {
         _ujian = List<Map<String, dynamic>>.from(rows);
@@ -228,53 +233,25 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Rekap Nilai per Rombel'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'REKAP NILAI PER ROMBEL',
+        showBack: true,
         actions: [
           if (_selected != null)
             IconButton(
               tooltip: 'Export Nilai XLSX',
-              icon: const Icon(Icons.file_download_outlined),
+              icon: const Icon(Icons.file_download_outlined, color: Colors.white),
               onPressed: _exportXlsx,
             ),
           if (!Navigator.of(context).canPop()) const LogoutButton(),
         ],
-        bottom: (_ujian.isEmpty || _loadingUjian)
-            ? null
-            : PreferredSize(
-                preferredSize: const Size.fromHeight(64),
-                child: Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 14),
-                  alignment: Alignment.center,
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    borderRadius: const BorderRadius.all(Radius.circular(16)),
-                    value: _selected?['id']?.toString(),
-                    hint: const Text('— pilih ujian untuk direkap —',
-                        style: TextStyle(fontSize: 13)),
-                    items: _ujian
-                        .map((u) => DropdownMenuItem(
-                              value: u['id'].toString(),
-                              child: Text(
-                                  '${u['nama']} — '
-                                  '${u['mata_pelajaran'] is Map ? (u['mata_pelajaran'] as Map)['nama'] ?? '' : ''} • ${u['tanggal']?.toString().split('T').first}',
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 1,
-                                  style: const TextStyle(fontSize: 13)),
-                            ))
-                        .toList(),
-                    onChanged: (id) {
-                      final u = _ujian.firstWhere(
-                          (x) => x['id'].toString() == id);
-                      _pilih(u);
-                    },
-                  ),
-                ),
-              ),
       ),
-      body: _loadingUjian || _loadingRekap
+      body: Column(
+        children: [
+          if (_ujian.isNotEmpty && !_loadingUjian) _buildPicker(),
+          Expanded(
+            child: _loadingUjian || _loadingRekap
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
@@ -297,11 +274,66 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
                   ),
                 )
               : _selected == null
-                  ? const Center(
-                      child: Text(
-                          'Pilih ujian untuk melihat rekap per rombel',
-                          style: TextStyle(color: Colors.grey)))
-                  : _buildRekap(),
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(28),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [BoxShadow(color: const Color(0xFF1E3A8A).withValues(alpha: 0.06), blurRadius: 18, offset: const Offset(0,8))],
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.assignment_outlined, size: 46, color: Color(0xFF2563EB)),
+                              SizedBox(height: 12),
+                              Text('Pilih ujian untuk melihat rekap', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF101F3C))),
+                              SizedBox(height: 6),
+                              Text('Rekap per rombel akan muncul di sini.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Color(0xFF8A97B1))),
+                            ],
+                          ),
+                        ),
+                      ))
+                   : _buildRekap(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPicker() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Cbt.card(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: DropdownButton<String>(
+          isExpanded: true,
+          underline: const SizedBox(),
+          borderRadius: BorderRadius.circular(14),
+          value: _selected?['id']?.toString(),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Cbt.blue),
+          hint: const Text('Pilih ujian untuk direkap…',
+              style: TextStyle(fontSize: 13, color: Cbt.muted)),
+          items: _ujian
+              .map((u) => DropdownMenuItem(
+                    value: u['id'].toString(),
+                    child: Text(
+                      '${u['nama']} — '
+                      '${u['mata_pelajaran'] is Map ? (u['mata_pelajaran'] as Map)['nama'] ?? '' : ''} • ${u['tanggal']?.toString().split('T').first}',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ))
+              .toList(),
+          onChanged: (id) {
+            final u = _ujian.firstWhere((x) => x['id'].toString() == id);
+            _pilih(u);
+          },
+        ),
+      ),
     );
   }
 
@@ -317,8 +349,18 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
     return ListView(
       padding: const EdgeInsets.all(12),
       children: [
-        Card(
-          margin: EdgeInsets.zero,
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Column(
@@ -360,8 +402,19 @@ class _RekapNilaiScreenState extends State<RekapNilaiScreen> {
         .where((p) => p['status'] != 'selesai' && p['status'] != 'mengikuti')
         .length;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: ExpansionTile(
         initiallyExpanded: true,
         shape: const Border(),

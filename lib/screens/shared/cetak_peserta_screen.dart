@@ -10,6 +10,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Cetak nomor peserta format baru KODE-S-YYZZ-NN (mis TKJ-1-2627-01).
 /// Dua keluaran PDF: Kartu Peserta (per siswa) + Daftar Nominatif (tabel).
@@ -448,22 +449,24 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: Text('Nomor & Cetak: $_ujianNama',
-            maxLines: 1, overflow: TextOverflow.ellipsis),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'CETAK KARTU & NOMINATIF',
+        subtitle: _ujianNama,
+        showBack: true,
+        stats: [('peserta', '${_peserta.length}')],
         actions: [
           IconButton(
               tooltip: 'Terbitkan nomor format baru',
-              icon: const Icon(Icons.format_list_numbered),
+              icon: const Icon(Icons.format_list_numbered, color: Colors.white),
               onPressed: _terbitkan),
           IconButton(
               tooltip: 'Cetak daftar nominatif (PDF)',
-              icon: const Icon(Icons.print_outlined),
+              icon: const Icon(Icons.print_outlined, color: Colors.white),
               onPressed: _peserta.isEmpty ? null : _printDaftar),
           IconButton(
               tooltip: 'Cetak kartu peserta (PDF)',
-              icon: const Icon(Icons.badge_outlined),
+              icon: const Icon(Icons.badge_outlined, color: Colors.white),
               onPressed: _peserta.isEmpty ? null : _printKartu),
         ],
       ),

@@ -4,6 +4,7 @@ import '../../core/design.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 import 'atur_jadwal_panitia_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 class MonitoringUjianScreen extends StatefulWidget {
   const MonitoringUjianScreen({super.key});
@@ -71,18 +72,10 @@ class _MonitoringUjianScreenState extends State<MonitoringUjianScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Cbt.paper,
-      appBar: AppBar(
-        backgroundColor: Cbt.paper,
-        foregroundColor: Cbt.ink,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Monitoring Ujian', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            Text('${_rows.length} ujian aktif & selesai', style: Cbt.caption),
-          ],
-        ),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'MONITORING UJIAN',
+        stats: [('ujian', '${_rows.length}')],
       ),
       body: _buildBody(),
     );

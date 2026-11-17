@@ -8,6 +8,7 @@ import 'dart:typed_data' show Uint8List;
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 class DaftarAkunScreen extends StatefulWidget {
   const DaftarAkunScreen({super.key});
@@ -183,21 +184,24 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Daftar Akun Siswa'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'DAFTAR AKUN SISWA',
+        subtitle: 'Username, password & nomor peserta',
+        stats: [('siswa', '${_rows.length}')],
         actions: [
           IconButton(
               tooltip: 'Salin semua',
-              icon: const Icon(Icons.copy_all_outlined),
+              icon: const Icon(Icons.copy_all_outlined, color: Colors.white),
               onPressed: _salinSemua),
           IconButton(
               tooltip: 'Reset semua password (79xxxx baru)',
-              icon: const Icon(Icons.admin_panel_settings_outlined),
+              icon: const Icon(Icons.admin_panel_settings_outlined,
+                  color: Colors.white),
               onPressed: _resetSemua),
           PopupMenuButton<String>(
             tooltip: 'Export per kelas',
-            icon: const Icon(Icons.file_download_outlined),
+            icon: const Icon(Icons.file_download_outlined, color: Colors.white),
             onSelected: (v) => _exportPerKelas(v),
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'semua', child: Text('Semua kelas (gabungan)')),
@@ -310,8 +314,19 @@ class _DaftarAkunScreenState extends State<DaftarAkunScreen> {
         out.add(Container(
             height: 1, color: Colors.grey.shade200));
       }
-      out.add(Card(
-        margin: const EdgeInsets.symmetric(vertical: 3),
+      out.add(Container(
+        margin: const EdgeInsets.only(bottom: 9),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
         child: ListTile(
           dense: true,
           title: Text('${r['nama']}',

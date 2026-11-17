@@ -76,7 +76,7 @@ class _RekapDetailScreenState extends State<RekapDetailScreen> {
   Widget build(BuildContext context) {
     final m = _murid;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: const Color(0xFFF4F7FF),
       appBar: _DetailHeader(
         nama: '${m?['nama'] ?? '...'}',
         nis: '${m?['nis'] ?? ''}',

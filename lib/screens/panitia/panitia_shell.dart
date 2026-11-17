@@ -9,6 +9,7 @@ import 'monitoring_ujian_screen.dart';
 import 'peserta_ujian_screen.dart';
 import 'rekap_panitia_screen.dart';
 import 'foto_siswa_screen.dart';
+import '../../widgets/app_bottom_nav.dart';
 
 class PanitiaShell extends StatefulWidget {
   const PanitiaShell({super.key});
@@ -32,15 +33,15 @@ class _PanitiaShellState extends State<PanitiaShell> {
     ];
     return Scaffold(
       body: IndexedStack(index: _index, children: pages),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: AppBottomNav(
         selectedIndex: _index,
-        onDestinationSelected: _go,
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'Ringkasan'),
-          NavigationDestination(icon: Icon(Icons.monitor_heart_outlined), selectedIcon: Icon(Icons.monitor_heart), label: 'Monitoring'),
-          NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Peserta'),
-          NavigationDestination(icon: Icon(Icons.assessment_outlined), selectedIcon: Icon(Icons.assessment), label: 'Rekap'),
-          NavigationDestination(icon: Icon(Icons.photo_camera_outlined), selectedIcon: Icon(Icons.photo_camera), label: 'Foto'),
+        onChanged: _go,
+        items: const [
+          NavItem(Icons.space_dashboard_outlined, Icons.space_dashboard, 'Ringkasan'),
+          NavItem(Icons.monitor_heart_outlined, Icons.monitor_heart, 'Monitoring'),
+          NavItem(Icons.people_outline, Icons.people, 'Peserta'),
+          NavItem(Icons.assessment_outlined, Icons.assessment, 'Rekap'),
+          NavItem(Icons.photo_camera_outlined, Icons.photo_camera, 'Foto'),
         ],
       ),
     );
@@ -83,7 +84,7 @@ class _PanitiaHomeState extends State<PanitiaHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Cbt.paper,
+      backgroundColor: const Color(0xFFF4F7FF),
       appBar: DashboardHeader(
         title: 'RINGKASAN PANITIA',
         subtitle: 'Pantau pelaksanaan ujian hari ini',

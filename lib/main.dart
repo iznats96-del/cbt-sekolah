@@ -5,6 +5,7 @@ import 'core/config.dart';
 import 'screens/splash_screen.dart';
 import 'core/app_theme.dart';
 import 'services/api.dart';
+import 'widgets/update_checker.dart';
 
 // Aktifkan DevicePreview hanya di Chrome/Web untuk lihat frame HP di VS Code
 // import 'package:device_preview/device_preview.dart'; // uncomment jika sudah `flutter pub add device_preview`
@@ -35,6 +36,8 @@ class CbtApp extends StatelessWidget {
       // CBT Sekolah memakai tampilan terang agar tetap konsisten di web,
       // Android, dan perangkat yang memakai dark mode sistem.
       themeMode: ThemeMode.light,
+      builder: (context, child) =>
+          UpdateChecker(child: child ?? const SizedBox.shrink()),
       home: const SplashScreen(),
     );
   }

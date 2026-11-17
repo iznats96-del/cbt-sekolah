@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart';
+import '../shared/update_screen.dart';
 import 'user_management_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 class PengaturanScreen extends StatelessWidget {
   const PengaturanScreen({super.key});
@@ -11,9 +13,10 @@ class PengaturanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Pengaturan'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'SETELAN',
+        subtitle: 'Pengaturan aplikasi & sekolah',
         actions: const [LogoutButton()],
       ),
       body: ContentMaxWidth(
@@ -65,9 +68,10 @@ class PengaturanScreen extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.update),
                   title: const Text('Update Aplikasi'),
-                  subtitle: const Text('Periksa versi terbaru'),
+                  subtitle: const Text('Periksa & pasang versi terbaru'),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _comingSoon(context, 'Update'),
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const UpdateScreen())),
                 ),
                 const Divider(height: 1),
                 ListTile(

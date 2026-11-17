@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
 
 const _namaHari = [
   'Senin',
@@ -486,8 +487,8 @@ class _RekapAbsenScreenState extends State<RekapAbsenScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Rekap Absen')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(title: 'REKAP ABSEN', showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : Column(

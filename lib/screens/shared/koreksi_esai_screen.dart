@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Koreksi jawaban essay (esai) utk satu ujian — guru/admin.
 /// 0..10 per butir, simpan per peserta -> nilai akhir terhitung ulang.
@@ -65,8 +66,8 @@ class _KoreksiEsaiScreenState extends State<KoreksiEsaiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text('Koreksi Esai — ${widget.ujian['nama']}')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(title: 'KOREKSI ESAI', showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _err != null
@@ -252,7 +253,7 @@ class _SatuPesertaEsaiState extends State<_SatuPesertaEsai> {
           body: const Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: const Color(0xFFF4F7FF),
       appBar: AppBar(
           title: Text('Esai: ${_namaPeserta()}',
               overflow: TextOverflow.ellipsis),

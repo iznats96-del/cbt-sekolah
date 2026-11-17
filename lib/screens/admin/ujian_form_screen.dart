@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 class UjianFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initial;
@@ -370,8 +371,11 @@ class _UjianFormScreenState extends State<UjianFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text(widget.initial == null ? 'Buat Ujian' : 'Edit Ujian')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: widget.initial == null ? 'BUAT UJIAN' : 'EDIT UJIAN',
+        showBack: true,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
+import '../../core/design.dart';
 
 class PesertaUjianScreen extends StatefulWidget {
   const PesertaUjianScreen({super.key});
@@ -120,31 +122,27 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Daftar Peserta')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(title: 'DAFTAR PESERTA', showBack: true),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: TextField(
+            child: Cbt.searchField(
               controller: _cari,
+              hint: 'Cari nama siswa, NIS, kelas, atau ujian…',
               onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                hintText: 'Cari nama siswa, NIS, kelas, atau ujian…',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedJurusanId,
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            child: Cbt.card(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _selectedJurusanId,
                     decoration: const InputDecoration(
                       labelText: 'Jurusan',
                       border: OutlineInputBorder(),
@@ -229,6 +227,7 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
               ],
             ),
           ),
+          ),
           Expanded(child: _buildBody()),
         ],
       ),
@@ -285,10 +284,8 @@ class _PesertaUjianScreenState extends State<PesertaUjianScreen> {
               ? kelasMap['jurusan']
               : {};
           final jurusan = jurusanMap['nama'] as String?;
-          return Card(
-            elevation: 1,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+          return Cbt.card(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: ListTile(
               leading: CircleAvatar(
                 backgroundColor: _statusColor(p['status']),

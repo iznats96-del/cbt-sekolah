@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
 
 class PengumumanScreen extends StatefulWidget {
   const PengumumanScreen({super.key});
@@ -44,8 +45,8 @@ class _PengumumanScreenState extends State<PengumumanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Pengumuman')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(title: 'INFORMASI', showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _rows.isEmpty

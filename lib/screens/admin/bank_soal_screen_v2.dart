@@ -8,6 +8,7 @@ import '../home.dart' show LogoutButton;
 import '../shared/soal_detail_screen.dart';
 import '../shared/soal_form_screen.dart';
 import '../admin/import_ujian_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Bank Soal — REWRITE v3: MASTER-DETAIL per MAPEL.
 ///
@@ -38,10 +39,13 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('bank_soal')
-          .select('id,mapel_id,jenis,mata_pelajaran(nama),kelas(nama)')
-          .order('created_at', ascending: false);
+          .select('id,mapel_id,jenis,mata_pelajaran(nama),kelas(nama)');
+      if (Api.role == 'guru') {
+        q = q.eq('guru_id', Api.user?.id ?? '');
+      }
+      final rows = await q.order('created_at', ascending: false);
       if (!mounted) return;
       setState(() {
         _soal = List<Map<String, dynamic>>.from(rows);
@@ -86,13 +90,14 @@ class _BankSoalScreenState extends State<BankSoalScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Bank Soal'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'BANK SOAL',
+        subtitle: 'Kelola soal per mata pelajaran',
         actions: [
           IconButton(
             tooltip: 'Import soal dari naskah .docx',
-            icon: const Icon(Icons.upload_file_outlined),
+            icon: const Icon(Icons.upload_file_outlined, color: Colors.white),
             onPressed: () async {
               final ok = await Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ImportUjianScreen()),
@@ -324,8 +329,12 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
     final jodohCount = _soal.where((s) => s['jenis']?.toString() == 'jodoh').length;
     final essayCount = _soal.where((s) => s['jenis']?.toString() == 'essay').length;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text(widget.mapelNama)),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: widget.mapelNama.toUpperCase(),
+        subtitle: 'Daftar soal mata pelajaran',
+        showBack: true,
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTheme.primary,
         onPressed: _add,

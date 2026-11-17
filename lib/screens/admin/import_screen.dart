@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../services/sheet_parser.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Layar impor massal siswa / mapel dari xls, xlsx, csv.
 class ImportScreen extends StatefulWidget {
@@ -228,8 +229,11 @@ class _ImportScreenState extends State<ImportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text(widget.isSiswa ? 'Import Siswa' : 'Import Mata Pelajaran')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: widget.isSiswa ? 'IMPORT SISWA' : 'IMPORT MATA PELAJARAN',
+        showBack: true,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

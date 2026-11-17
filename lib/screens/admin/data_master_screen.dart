@@ -6,11 +6,17 @@ import '../../services/api.dart';
 
 import '../home.dart';
 import '../../widgets/crud_screen.dart';
+import '../../widgets/dashboard_header.dart';
 import '../../widgets/state_views.dart';
 import 'import_screen.dart';
 import 'jadwal_pelajaran_screen.dart';
 import 'kelas_rombel_screen.dart';
 import 'siswa_master_grouped_screen.dart';
+
+const _dmBg = Color(0xFFF4F7FF);
+const _dmNavy = Color(0xFF101F3C);
+const _dmMuted = Color(0xFF8A97B1);
+const _dmBlue = Color(0xFF2563EB);
 
 class DataMasterScreen extends StatelessWidget {
   const DataMasterScreen({super.key});
@@ -42,27 +48,84 @@ class DataMasterScreen extends StatelessWidget {
     ];
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Data Master'),
+      backgroundColor: _dmBg,
+      appBar: DashboardHeader(
+        title: 'DATA MASTER',
+        subtitle: 'Kelola data pokok sekolah',
+        stats: [('menu', '${items.length}')],
         actions: const [LogoutButton()],
       ),
       body: ContentMaxWidth(
         child: ListView(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
           children: [
-            ...items.map((item) => Card(
-                  margin: const EdgeInsets.symmetric(vertical: 4),
-                  child: ListTile(
-                    leading:
-                        Icon(item.icon, color: Theme.of(context).colorScheme.primary),
-                    title: Text(item.title,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    trailing: const Icon(Icons.chevron_right),
+            Row(
+              children: [
+                const Icon(Icons.folder_shared_outlined,
+                    size: 18, color: _dmBlue),
+                const SizedBox(width: 8),
+                const Text('DAFTAR DATA',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: _dmNavy)),
+                const Spacer(),
+                Text('${items.length} menu',
+                    style: const TextStyle(fontSize: 11, color: _dmMuted)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            for (final item in items)
+              Container(
+                margin: const EdgeInsets.only(bottom: 9),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => item.page()),
                     ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: _dmBlue.withValues(alpha: 0.11),
+                              borderRadius: BorderRadius.circular(13),
+                            ),
+                            child: Icon(item.icon, color: _dmBlue, size: 21),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(item.title,
+                                style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _dmNavy)),
+                          ),
+                          const Icon(Icons.chevron_right,
+                              color: _dmMuted, size: 20),
+                        ],
+                      ),
+                    ),
                   ),
-                )),
+                ),
+              ),
           ],
         ),
       ),

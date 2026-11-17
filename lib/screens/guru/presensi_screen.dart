@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
+import '../../widgets/dashboard_header.dart';
+import '../../core/design.dart';
 
 class PresensiScreen extends StatefulWidget {
   const PresensiScreen({super.key});
@@ -71,8 +73,8 @@ class _PresensiScreenState extends State<PresensiScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Presensi Harian')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(title: 'PRESENSI HARIAN', showBack: true),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
@@ -85,24 +87,40 @@ class _PresensiScreenState extends State<PresensiScreen> {
                   final s = _siswa[i];
                   final kelas =
                       s['kelas'] is Map ? (s['kelas'] as Map)['nama'] ?? '' : '';
-                  return Card(
-                    margin: EdgeInsets.zero,
-                    child: ListTile(
-                      title: Text('${s['nama']}',
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                      subtitle: Text([s['nis'], kelas].where((e) => '${e ?? ''}'.isNotEmpty).join(' • ')),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _StatusChip(label: 'H', color: AppTheme.secondary, onTap: () => _absen(s, 'hadir')),
-                          const SizedBox(width: 4),
-                          _StatusChip(label: 'I', color: AppTheme.accent, onTap: () => _absen(s, 'izin')),
-                          const SizedBox(width: 4),
-                          _StatusChip(label: 'S', color: AppTheme.primary, onTap: () => _absen(s, 'sakit')),
-                          const SizedBox(width: 4),
-                          _StatusChip(label: 'A', color: AppTheme.danger, onTap: () => _absen(s, 'alpa')),
-                        ],
-                      ),
+                  return Cbt.card(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                    child: Row(
+                      children: [
+                        Cbt.iconBox(Icons.person_outline),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${s['nama']}',
+                                  style: const TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Cbt.ink)),
+                              const SizedBox(height: 3),
+                              Text([s['nis'], kelas].where((e) => '${e ?? ''}'.isNotEmpty).join(' • '),
+                                  style: Cbt.caption),
+                            ],
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _StatusChip(label: 'H', color: AppTheme.secondary, onTap: () => _absen(s, 'hadir')),
+                            const SizedBox(width: 4),
+                            _StatusChip(label: 'I', color: AppTheme.accent, onTap: () => _absen(s, 'izin')),
+                            const SizedBox(width: 4),
+                            _StatusChip(label: 'S', color: AppTheme.primary, onTap: () => _absen(s, 'sakit')),
+                            const SizedBox(width: 4),
+                            _StatusChip(label: 'A', color: AppTheme.danger, onTap: () => _absen(s, 'alpa')),
+                          ],
+                        ),
+                      ],
                     ),
                   );
                 },

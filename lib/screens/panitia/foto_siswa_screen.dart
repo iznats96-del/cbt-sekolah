@@ -6,6 +6,8 @@ import 'package:supabase_flutter/supabase_flutter.dart' show FileOptions;
 
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
+import '../../core/design.dart';
 
 class FotoSiswaScreen extends StatefulWidget {
   const FotoSiswaScreen({super.key});
@@ -141,9 +143,10 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Upload Foto Siswa'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'UPLOAD FOTO SISWA',
+        showBack: true,
         actions: [
           IconButton(
             onPressed: _load,
@@ -164,11 +167,13 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
         // ── Filter JURUSAN + KELAS ──────────────────────────
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedJurusanId,
+          child: Cbt.card(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _selectedJurusanId,
                   decoration: const InputDecoration(
                     labelText: 'Jurusan',
                     border: OutlineInputBorder(),
@@ -225,7 +230,8 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
             ],
           ),
         ),
-        const Divider(height: 1),
+      ),
+        const SizedBox(height: 10),
         // ── Daftar siswa ────────────────────────────────────
         Expanded(
           child: _siswaList.isEmpty
@@ -246,10 +252,8 @@ class _FotoSiswaScreenState extends State<FotoSiswaScreen> {
                     final jurusan =
                         jurusanMap['nama'] as String?;
                     final fotoUrl = s['foto_url'] as String?;
-                    return Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                    return Cbt.card(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: ListTile(
                         leading: CircleAvatar(
                           radius: 24,

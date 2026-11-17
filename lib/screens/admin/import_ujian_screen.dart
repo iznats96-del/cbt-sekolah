@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../services/ujian_docx_parser.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Import satu berkas DOCX -> mapel + bank soal + ujian (draft) dibuat sekaligus.
 class ImportUjianScreen extends StatefulWidget {
@@ -252,13 +253,23 @@ class _ImportUjianScreenState extends State<ImportUjianScreen> {
   Widget build(BuildContext context) {
     final doc = _doc;
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Import Ujian dari DOCX')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(title: 'IMPORT UJIAN DARI DOCX', showBack: true),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Card(
-            margin: EdgeInsets.zero,
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

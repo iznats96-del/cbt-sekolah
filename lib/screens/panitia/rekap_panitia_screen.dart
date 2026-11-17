@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/design.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 class RekapPanitiaScreen extends StatefulWidget {
   const RekapPanitiaScreen({super.key});
@@ -72,18 +73,10 @@ class _RekapPanitiaScreenState extends State<RekapPanitiaScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Cbt.paper,
-      appBar: AppBar(
-        backgroundColor: Cbt.paper,
-        foregroundColor: Cbt.ink,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Rekap Hasil Ujian', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            Text('${_rows.length} hasil tercatat', style: Cbt.caption),
-          ],
-        ),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'REKAP HASIL UJIAN',
+        stats: [('hasil', '${_rows.length}')],
       ),
       body: _buildBody(),
     );

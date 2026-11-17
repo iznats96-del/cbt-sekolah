@@ -153,7 +153,7 @@ class _KunciJawabanScreenState extends State<KunciJawabanScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: const Color(0xFFF4F7FF),
       appBar: AppBar(
         title: const Text('Kunci Jawaban'),
         bottom: _soal.isEmpty

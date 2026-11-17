@@ -6,6 +6,7 @@ import '../../services/api.dart';
 import '../home.dart';
 import 'presensi_screen.dart';
 import 'rekap_absen_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 /// Absen barcode (Opsi A): guru scan QR NIS milik murid.
 /// QR murid = NIS (bisa dari layar "Kartu Saya" murid / kartu cetak).
@@ -107,9 +108,10 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(
-        title: const Text('Scan Absen'),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'SCAN ABSEN',
+        showBack: true,
         actions: [
           IconButton(
             tooltip: 'Rekap per kelas & jurusan',
@@ -146,6 +148,38 @@ class _ScanAbsenScreenState extends State<ScanAbsenScreen> {
               children: [
                 MobileScanner(
                   controller: _ctrl,
+                  errorBuilder: (context, error) => Container(
+                    color: const Color(0xFF0F172A),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.qr_code_scanner,
+                              size: 32, color: Colors.white70),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('Kamera tidak tersedia',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Akses kamera belum diizinkan browser/HP.\n'
+                          'Arahkan kamera atau pakai input NIS manual di bawah.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white60, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
                   onDetect: (cap) {
                     final v = cap.barcodes.isNotEmpty
                         ? cap.barcodes.first.rawValue

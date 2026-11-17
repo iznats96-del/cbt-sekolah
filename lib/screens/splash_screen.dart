@@ -68,7 +68,7 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF1A6DB4), Color(0xFF2E9B8F)],
+            colors: [Color(0xFF1E40AF), Color(0xFF2563EB), Color(0xFF0EA5A4)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -81,8 +81,14 @@ class _SplashScreenState extends State<SplashScreen> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 12)],
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x331E3A66),
+                      blurRadius: 22,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
                 ),
                 child: Image.asset('assets/images/logo_yp.png', width: 72, height: 72, errorBuilder: (_, __, ___) => const Icon(Icons.school_outlined, size: 48, color: Color(0xFF1A6DB4))),
               ),
@@ -100,10 +106,14 @@ class _SplashScreenState extends State<SplashScreen> {
                 'Computer Based Test',
                 style: TextStyle(color: Colors.white70, fontSize: 14),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                'API v15+ (kunci & token terkunci server)',
-                style: TextStyle(color: Colors.white38, fontSize: 10),
+              const SizedBox(height: 22),
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                ),
               ),
             ],
           ),

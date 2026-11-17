@@ -9,6 +9,7 @@ import 'bank_soal_screen.dart';
 import 'jadwal_screen.dart';
 import 'nilai_screen.dart';
 import 'scan_absen_screen.dart';
+import '../../widgets/app_bottom_nav.dart';
 
 class GuruShell extends StatefulWidget {
   const GuruShell({super.key});
@@ -33,30 +34,15 @@ class _GuruShellState extends State<GuruShell> {
     ];
     return Scaffold(
       body: pages[_index],
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: AppBottomNav(
         selectedIndex: _index,
-        onDestinationSelected: _go,
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Beranda'),
-          NavigationDestination(
-              icon: Icon(Icons.quiz_outlined),
-              selectedIcon: Icon(Icons.quiz),
-              label: 'Soal'),
-          NavigationDestination(
-              icon: Icon(Icons.event_outlined),
-              selectedIcon: Icon(Icons.event),
-              label: 'Jadwal'),
-          NavigationDestination(
-              icon: Icon(Icons.grade_outlined),
-              selectedIcon: Icon(Icons.grade),
-              label: 'Nilai'),
-          NavigationDestination(
-              icon: Icon(Icons.qr_code_scanner_outlined),
-              selectedIcon: Icon(Icons.qr_code_scanner),
-              label: 'Absen'),
+        onChanged: _go,
+        items: const [
+          NavItem(Icons.home_outlined, Icons.home, 'Beranda'),
+          NavItem(Icons.quiz_outlined, Icons.quiz, 'Soal'),
+          NavItem(Icons.event_outlined, Icons.event, 'Jadwal'),
+          NavItem(Icons.grade_outlined, Icons.grade, 'Nilai'),
+          NavItem(Icons.qr_code_scanner_outlined, Icons.qr_code_scanner, 'Absen'),
         ],
       ),
     );

@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
 import '../../widgets/state_views.dart';
+import '../../widgets/dashboard_header.dart';
 
 class SiswaMasterGroupedScreen extends StatefulWidget {
   const SiswaMasterGroupedScreen({super.key});
@@ -126,8 +127,11 @@ class _SiswaMasterGroupedScreenState extends State<SiswaMasterGroupedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Siswa — per Kelas dan Jurusan')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: const DashboardHeader(
+        title: 'SISWA PER KELAS & JURUSAN',
+        showBack: true,
+      ),
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: AppTheme.primary,
         onPressed: () => _openForm(),
@@ -394,3 +398,4 @@ class _SiswaFormDialogState extends State<_SiswaFormDialog> {
     );
   }
 }
+

@@ -10,6 +10,7 @@ import '../shared/koreksi_esai_screen.dart';
 import '../shared/cetak_peserta_screen.dart';
 import 'daftar_akun_screen.dart';
 import 'ujian_form_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 class UjianListScreen extends StatefulWidget {
   final bool showLogout;
@@ -38,11 +39,14 @@ class _UjianListScreenState extends State<UjianListScreen> {
       _error = null;
     });
     try {
-      final rows = await Api.client
+      var q = Api.client
           .from('ujian')
           .select(
-              '*,mata_pelajaran(nama),kelas!ujian_kelas_id_fkey(nama),jenis_ujian(nama),sesi(nama)')
-          .order('tanggal', ascending: false);
+              '*,mata_pelajaran(nama),kelas!ujian_kelas_id_fkey(nama),jenis_ujian(nama),sesi(nama)');
+      if (Api.role == 'guru') {
+        q = q.eq('guru_id', Api.user?.id ?? '');
+      }
+      final rows = await q.order('tanggal', ascending: false);
       if (!mounted) return;
       setState(() {
         _ujian = List<Map<String, dynamic>>.from(rows);
@@ -135,25 +139,29 @@ class _UjianListScreenState extends State<UjianListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: const Text('Jadwal Ujian'), actions: [
-        IconButton(
-          tooltip: 'Rekap nilai per rombel',
-          icon: const Icon(Icons.insert_chart_outlined),
-          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => const RekapNilaiScreen())),
-        ),
-        IconButton(
-          tooltip: 'Import naskah ujian (.docx)',
-          icon: const Icon(Icons.upload_file),
-          onPressed: () async {
-            final ok = await Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const ImportUjianScreen()));
-            if (ok == true) _load();
-          },
-        ),
-        if (widget.showLogout) const LogoutButton(),
-      ]),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: 'JADWAL UJIAN',
+        subtitle: 'Kelola ujian & cetak kartu peserta',
+        actions: [
+          IconButton(
+            tooltip: 'Rekap nilai per rombel',
+            icon: const Icon(Icons.insert_chart_outlined, color: Colors.white),
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const RekapNilaiScreen())),
+          ),
+          IconButton(
+            tooltip: 'Import naskah ujian (.docx)',
+            icon: const Icon(Icons.upload_file, color: Colors.white),
+            onPressed: () async {
+              final ok = await Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const ImportUjianScreen()));
+              if (ok == true) _load();
+            },
+          ),
+          if (widget.showLogout) const LogoutButton(),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: AppTheme.primary,
         onPressed: _add,

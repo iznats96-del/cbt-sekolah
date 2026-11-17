@@ -391,7 +391,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     if (_error != null) return _buildError();
     if (_soal.isEmpty) {
       return const Scaffold(
-        backgroundColor: Cbt.paper,
+        backgroundColor: const Color(0xFFF4F7FF),
         body: CbtEmpty('Ujian belum punya soal', 'Hubungi guru kalau ini bukan seharusnya.'),
       );
     }
@@ -424,7 +424,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         );
       },
       child: Scaffold(
-        backgroundColor: Cbt.paper,
+        backgroundColor: const Color(0xFFF4F7FF),
         body: SafeArea(
           bottom: false,
           child: Stack(
@@ -471,7 +471,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
 
   // â”€â”€ Kondisi awal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Widget _buildLoading() => const Scaffold(
-        backgroundColor: Cbt.paper,
+        backgroundColor: const Color(0xFFF4F7FF),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -490,7 +490,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       );
 
   Widget _buildError() => Scaffold(
-        backgroundColor: Cbt.paper,
+        backgroundColor: const Color(0xFFF4F7FF),
         appBar: AppBar(title: const Text('Ujian'), backgroundColor: Cbt.ink),
         body: Center(
           child: Padding(
@@ -1256,7 +1256,7 @@ class _SelesaiScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isTimeout = title == 'Waktu habis';
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: const Color(0xFFF4F7FF),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),

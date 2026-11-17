@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_theme.dart';
 import '../../services/api.dart';
 import '../../widgets/crud_screen.dart';
+import '../../widgets/dashboard_header.dart';
 
 class SoalFormScreen extends StatefulWidget {
   final Map<String, dynamic>? initial;
@@ -317,8 +318,11 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
-      appBar: AppBar(title: Text(widget.initial == null ? 'Buat Soal' : 'Edit Soal')),
+      backgroundColor: const Color(0xFFF4F7FF),
+      appBar: DashboardHeader(
+        title: widget.initial == null ? 'BUAT SOAL' : 'EDIT SOAL',
+        showBack: true,
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

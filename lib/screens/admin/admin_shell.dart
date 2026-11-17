@@ -15,6 +15,18 @@ import 'daftar_akun_screen.dart';
 import 'user_management_screen.dart';
 import '../shared/rekap_nilai_screen.dart';
 import 'pengaturan_screen.dart';
+import '../../widgets/app_bottom_nav.dart';
+
+const _bg = Color(0xFFF4F7FF);
+const _card = Colors.white;
+const _navy = Color(0xFF101F3C);
+const _navySoft = Color(0xFF3B4B6B);
+const _muted = Color(0xFF8A97B1);
+const _blue = Color(0xFF2563EB);
+const _blueLight = Color(0xFFE8F1FF);
+const _green = Color(0xFF22C55E);
+const _amber = Color(0xFFF59E0B);
+const _purple = Color(0xFF7C4DFF);
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
@@ -40,34 +52,16 @@ class _AdminShellState extends State<AdminShell> {
     ];
     return Scaffold(
       body: pages[_index],
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: AppBottomNav(
         selectedIndex: _index,
-        onDestinationSelected: _go,
-        destinations: const [
-          NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Beranda'),
-          NavigationDestination(
-              icon: Icon(Icons.folder_outlined),
-              selectedIcon: Icon(Icons.folder),
-              label: 'Master'),
-          NavigationDestination(
-              icon: Icon(Icons.quiz_outlined),
-              selectedIcon: Icon(Icons.quiz),
-              label: 'Soal'),
-          NavigationDestination(
-              icon: Icon(Icons.assignment_outlined),
-              selectedIcon: Icon(Icons.assignment),
-              label: 'Ujian'),
-          NavigationDestination(
-              icon: Icon(Icons.campaign_outlined),
-              selectedIcon: Icon(Icons.campaign),
-              label: 'Info'),
-          NavigationDestination(
-              icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings),
-              label: 'Setelan'),
+        onChanged: _go,
+        items: const [
+          NavItem(Icons.home_outlined, Icons.home, 'Beranda'),
+          NavItem(Icons.folder_outlined, Icons.folder, 'Master'),
+          NavItem(Icons.quiz_outlined, Icons.quiz, 'Soal'),
+          NavItem(Icons.assignment_outlined, Icons.assignment, 'Ujian'),
+          NavItem(Icons.campaign_outlined, Icons.campaign, 'Info'),
+          NavItem(Icons.settings_outlined, Icons.settings, 'Setelan'),
         ],
       ),
     );
@@ -92,12 +86,29 @@ class _AdminHomeState extends State<_AdminHome> {
     _load();
   }
 
+  Future<int> _count(String table, {String? role}) async {
+    var q = Api.client.from(table).select('id');
+    if (role != null) q = q.eq('role', role);
+    final rows = await q;
+    return (rows as List).length;
+  }
+
   Future<void> _load() async {
     try {
-      final res = await Api.fallbackGetApi('/api/admin/dashboard');
+      final results = await Future.wait([
+        _count('siswa'),
+        _count('profiles', role: 'guru'),
+        _count('kelas'),
+        _count('bank_soal'),
+      ]);
       if (!mounted) return;
       setState(() {
-        _stats = res is Map ? Map<String, dynamic>.from(res['stats'] ?? res) : {};
+        _stats = {
+          'total_siswa': results[0],
+          'total_guru': results[1],
+          'total_kelas': results[2],
+          'total_soal': results[3],
+        };
         _loading = false;
       });
     } catch (_) {
@@ -108,7 +119,7 @@ class _AdminHomeState extends State<_AdminHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Cbt.paper,
+      backgroundColor: _bg,
       appBar: DashboardHeader(
         title: 'CBT SEKOLAH',
         subtitle: 'Pusat kendali ujian',
@@ -125,30 +136,7 @@ class _AdminHomeState extends State<_AdminHome> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
             children: [
-              // Header ringkas
-              Cbt.card(
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(11),
-                      decoration: BoxDecoration(color: Cbt.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.admin_panel_settings_outlined, color: Cbt.blue, size: 24),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Selamat datang, Administrator',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Cbt.ink)),
-                          SizedBox(height: 3),
-                          Text('Kelola siswa, soal, dan jalannya ujian dari satu tempat.', style: Cbt.caption),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const _AdminHero(),
               const SizedBox(height: 14),
 
               // Statistik (dari /api/admin/dashboard)
@@ -165,10 +153,10 @@ class _AdminHomeState extends State<_AdminHome> {
                       crossAxisSpacing: 9,
                       childAspectRatio: 2,
                       children: [
-                        _stat('Siswa', _stats['total_siswa'], Icons.people_outline, Cbt.blue),
-                        _stat('Guru', _stats['total_guru'], Icons.person_outline, Cbt.teal),
-                        _stat('Kelas', _stats['total_kelas'], Icons.school_outlined, Cbt.amber),
-                        _stat('Bank soal', _stats['total_soal'], Icons.quiz_outlined, Cbt.blue),
+                        _statV2('Siswa', _stats['total_siswa'], Icons.people_outline, _blue),
+                        _statV2('Guru', _stats['total_guru'], Icons.person_outline, _green),
+                        _statV2('Kelas', _stats['total_kelas'], Icons.school_outlined, _amber),
+                        _statV2('Bank soal', _stats['total_soal'], Icons.quiz_outlined, _purple),
                       ],
                     ),
               const SizedBox(height: 16),
@@ -224,24 +212,106 @@ class _AdminHomeState extends State<_AdminHome> {
     );
   }
 
-  Widget _stat(String label, dynamic value, IconData icon, Color color) => Cbt.card(
-        padding: const EdgeInsets.all(13),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Row(
-              children: [
-                Icon(icon, size: 17, color: color),
-                const Spacer(),
-                Text('$value', style: Cbt.display.copyWith(fontSize: 24, color: Cbt.ink)),
-              ],
+  Widget _statV2(String label, dynamic value, IconData icon, Color color) =>
+      Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        decoration: BoxDecoration(
+          color: _card,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1E3A8A).withValues(alpha: 0.07),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            const SizedBox(height: 5),
-            Text(label, style: Cbt.caption),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('$value',
+                      style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: color),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text(label,
+                      style: const TextStyle(fontSize: 11, color: _muted)),
+                ],
+              ),
+            ),
           ],
         ),
       );
+
+}
+
+class _AdminHero extends StatelessWidget {
+  const _AdminHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.07),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: _blueLight,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(Icons.admin_panel_settings_outlined,
+                color: _blue, size: 26),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Selamat datang, Administrator',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: _navy)),
+                SizedBox(height: 4),
+                Text('Kelola siswa, soal, dan jalannya ujian dari satu tempat.',
+                    style: TextStyle(fontSize: 11.5, color: _muted)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ControlCenter extends StatelessWidget {
@@ -319,26 +389,48 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      color: color.withValues(alpha: 0.08),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 8),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
-            ],
+    return Container(
+      decoration: BoxDecoration(
+        color: _card,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1E3A8A).withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(height: 9),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: _navySoft)),
+              ],
+            ),
           ),
         ),
       ),
