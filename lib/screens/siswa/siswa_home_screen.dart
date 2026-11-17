@@ -49,22 +49,50 @@ class _SiswaHomeScreenState extends State<SiswaHomeScreen> {
   }
 
   Future<void> _load() async {
-    final stats = <String, dynamic>{};
-    try {
-      final res = await Api.fallbackGetApi('/api/siswa/dashboard');
-      if (res is Map) stats.addAll(Map<String, dynamic>.from(res));
-    } catch (_) {}
-    if (stats.isEmpty) {
-      final rows = await Api.routerSelect(
+    final results = await Future.wait([
+      Api.routerSelect(
         'siswa',
         select: 'nama,nis,nomor_peserta,foto_url,kelas(nama,jurusan(singkatan))',
         eq: {'profile_id': Api.user?.id ?? ''},
-      ).catchError((_) => <Map<String, dynamic>>[]);
-      if (rows.isNotEmpty) stats.addAll(Map<String, dynamic>.from(rows.first));
+        limit: 1,
+      ).catchError((_) => <Map<String, dynamic>>[]),
+      Api.routerRpc('my_hasil').catchError((_) => <dynamic>[]),
+      Api.routerRpc('my_ujian_aktif').catchError((_) => <dynamic>[]),
+    ]);
+
+    final identitas = <String, dynamic>{};
+    final siswaRows = results[0] as List;
+    if (siswaRows.isNotEmpty && siswaRows.first is Map) {
+      identitas.addAll(Map<String, dynamic>.from(siswaRows.first as Map));
     }
+
+    final hasil = results[1] is List ? results[1] as List : <dynamic>[];
+    final aktif = results[2] is List ? results[2] as List : <dynamic>[];
+    final ids = <String>{};
+    final nilai = <int>[];
+    for (final r in hasil) {
+      if (r is! Map) continue;
+      final id = '${r['ujian_id'] ?? ''}';
+      if (id.isNotEmpty && id != 'null') ids.add(id);
+      final n = num.tryParse('${r['nilai'] ?? ''}');
+      if (n != null) nilai.add(n.round());
+    }
+    for (final r in aktif) {
+      if (r is! Map) continue;
+      final id = '${r['id'] ?? ''}';
+      if (id.isNotEmpty && id != 'null') ids.add(id);
+    }
+    final stats = <String, dynamic>{
+      'total_ujian': ids.length,
+      'ujian_selesai': hasil.length,
+      'rata_nilai': nilai.isEmpty
+          ? null
+          : (nilai.fold<int>(0, (a, b) => a + b) / nilai.length).round(),
+    };
+
     if (!mounted) return;
     setState(() {
-      _dash = stats;
+      _dash = {...identitas, 'stats': stats};
       _loading = false;
     });
   }
