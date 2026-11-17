@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/nav.dart';
-import '../screens/shared/update_screen.dart';
 import '../services/app_update.dart';
+import 'update_sheet.dart';
 
 class UpdateChecker extends StatefulWidget {
   final Widget child;
@@ -39,33 +39,7 @@ class _UpdateCheckerState extends State<UpdateChecker> {
     }
     if (ctx == null || !ctx.mounted) return;
 
-    showDialog(
-      context: ctx,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Pembaruan tersedia'),
-        content: Text(
-          'Versi ${info.label} sudah dirilis.\n\n'
-          '${info.notes.isEmpty ? 'Perbaikan & peningkatan performa.' : info.notes}',
-          style: const TextStyle(fontSize: 13),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Nanti'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(dialogContext);
-              AppNav.key.currentState?.push(
-                MaterialPageRoute(builder: (_) => const UpdateScreen()),
-              );
-            },
-            child: const Text('Update'),
-          ),
-        ],
-      ),
-    );
+    UpdateSheet.show(ctx, info);
   }
 
   @override
