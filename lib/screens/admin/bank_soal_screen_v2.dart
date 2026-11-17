@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 import '../home.dart' show LogoutButton;
@@ -259,7 +260,7 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
     if (_search.trim().isNotEmpty) {
       final q = _search.toLowerCase();
       out = out.where((s) =>
-          (s['soal']?.toString().toLowerCase().contains(q) ?? false) ||
+          SoalJodoh.teksPencarian(s['jenis'], s['soal'], s['opsi']).contains(q) ||
           (s['pembahasan']?.toString().toLowerCase().contains(q) ?? false));
     }
     return out.toList();
@@ -286,7 +287,7 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('Hapus soal?'),
-        content: Text((soal['soal'] ?? '').toString(),
+        content: Text(SoalJodoh.judul(soal['jenis'], soal['soal'], soal['opsi']),
             maxLines: 3, overflow: TextOverflow.ellipsis),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Batal')),
@@ -452,7 +453,7 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    (s['soal'] ?? '').toString(),
+                    SoalJodoh.judul(s['jenis'], s['soal'], s['opsi']),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, height: 1.4),
@@ -463,8 +464,24 @@ class _MapelSoalPageState extends State<MapelSoalPage> {
                     runSpacing: 4,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      if (kelasNama.isNotEmpty) _miniTag(Icons.school_outlined, kelasNama, const Color(0xFF1D4ED8)),
+                      _miniTag(
+                        SoalJodoh.isJodoh(s['jenis'])
+                            ? Icons.link
+                            : (s['jenis']?.toString() == 'essay'
+                                ? Icons.edit_note
+                                : Icons.radio_button_checked),
+                        SoalJodoh.labelJenis(s['jenis']),
+                        badgeColor,
+                      ),
+                      if (SoalJodoh.isJodoh(s['jenis']))
+                        _miniTag(
+                          Icons.grid_view_rounded,
+                          '${SoalJodoh.jumlahPasangan(s['opsi'])} pasangan',
+                          badgeColor,
+                        ),
                       _miniTag(Icons.star_outline, 'bobot ${s['bobot'] ?? 1}', Colors.grey),
+                      if (kelasNama.isNotEmpty)
+                        _miniTag(Icons.school_outlined, kelasNama, const Color(0xFF1D4ED8)),
                     ],
                   ),
                 ],

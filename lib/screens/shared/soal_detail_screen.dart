@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
 
@@ -103,10 +104,12 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
     }
 
     final jenis = s['jenis']?.toString() ?? 'pg';
+    final isJodoh = SoalJodoh.isJodoh(jenis);
     final soal = s['soal']?.toString() ?? '';
     final pembahasan = s['pembahasan']?.toString() ?? '';
     final bobot = s['bobot'];
     final gambarUrl = s['gambar_url']?.toString();
+    final jmlPasangan = SoalJodoh.jumlahPasangan(s['opsi']);
 
     // Opsi PG
     List<String> opsiList = [];
@@ -167,7 +170,7 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    jenis.toUpperCase(),
+                    isJodoh ? 'MENJODOHKAN' : jenis.toUpperCase(),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -176,6 +179,21 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                             : AppTheme.primary),
                   ),
                 ),
+                const SizedBox(width: 10),
+                if (isJodoh)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDE9FE),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text('$jmlPasangan pasangan',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF5B21B6))),
+                  ),
                 const Spacer(),
                 if (bobot != null)
                   Text('Bobot: $bobot',
@@ -185,14 +203,40 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
 
             const SizedBox(height: 14),
 
-            // SOAL
-            _card('Soal',
-                Text(soal,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
-                        color: Color(0xFF0F172A),
-                        fontWeight: FontWeight.w500))),
+            // SOAL (untuk jodoh: item kiri = soal, tanpa teks pertanyaan utama)
+            if (isJodoh)
+              _card(
+                'Item Soal (kolom kiri)',
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(SoalJodoh.instruksi,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            height: 1.5,
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 10),
+                    for (var i = 0; i < SoalJodoh.kiri(s['opsi']).length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Text(
+                          '${i + 1}. ${SoalJodoh.kiri(s['opsi'])[i]}',
+                          style: const TextStyle(
+                              fontSize: 13.5, height: 1.4, color: Color(0xFF0F172A)),
+                        ),
+                      ),
+                  ],
+                ),
+              )
+            else
+              _card('Soal',
+                  Text(soal,
+                      style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.5,
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w500))),
 
             // GAMBAR (kalau ada)
             if (gambarUrl != null && gambarUrl.isNotEmpty)
@@ -216,8 +260,83 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                 ),
               ),
 
+            // PILIHAN KOLOM KANAN (jodoh)
+            if (isJodoh && SoalJodoh.kanan(s['opsi']).isNotEmpty)
+              _card(
+                'Pilihan Jawaban (kolom kanan)',
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < SoalJodoh.kanan(s['opsi']).length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${String.fromCharCode(65 + i)}. ',
+                                style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF0F172A))),
+                            Expanded(
+                              child: Text(SoalJodoh.kanan(s['opsi'])[i],
+                                  style: const TextStyle(
+                                      fontSize: 13.5,
+                                      height: 1.4,
+                                      color: Color(0xFF0F172A))),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+            // PASANGAN BENAR (jodoh)
+            if (isJodoh && _pasanganBenar.isNotEmpty)
+              _card(
+                'Pasangan Benar',
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final p in _pasanganBenar)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 22,
+                              height: 22,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: AppTheme.secondary.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text('${p.$1 + 1}',
+                                  style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppTheme.secondary)),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${SoalJodoh.kiri(s['opsi']).elementAtOrNull(p.$1) ?? '-'} → '
+                                '${SoalJodoh.kanan(s['opsi']).elementAtOrNull(p.$2) ?? '-'}',
+                                style: const TextStyle(
+                                    fontSize: 12.5, height: 1.4, color: Color(0xFF0F172A)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
             // OPSI
-            if (opsiList.isNotEmpty) ...[
+            if (!isJodoh && opsiList.isNotEmpty) ...[
               _card('Pilihan Jawaban',
                   _buildPilihanJawaban(opsiList, kunciLabel)),
             ],
@@ -238,6 +357,27 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
         ),
       ),
     );
+  }
+
+  List<(int, int)> get _pasanganBenar {
+    final kunci = _soal?['kunci'];
+    dynamic map = kunci is Map ? kunci['map'] : null;
+    if (map is String) {
+      try {
+        map = jsonDecode(map);
+      } catch (_) {
+        map = null;
+      }
+    }
+    if (map is! Map) return const [];
+    final out = <(int, int)>[];
+    for (final e in map.entries) {
+      final a = int.tryParse(e.key.toString());
+      final b = int.tryParse(e.value.toString());
+      if (a != null && b != null) out.add((a, b));
+    }
+    out.sort((x, y) => x.$1.compareTo(y.$1));
+    return out;
   }
 
   Widget _buildPilihanJawaban(List<String> opsi, String kunci) {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/app_theme.dart';
 import '../../core/design.dart';
+import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../services/kiosk.dart';
 import '../../services/jawaban_store.dart';
@@ -614,9 +615,9 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
 
   // ── Kartu soal: menyerupai kertas dengan pinggiran biru ──────
   Widget _buildSoalCard(Map<String, dynamic> soal, String curId, String jenis, List opsiList) {
-    final isJodoh = jenis == 'jodoh' || jenis == 'menjodohkan';
+    final isJodoh = SoalJodoh.isJodoh(jenis);
     final teks = isJodoh
-        ? 'Pasangkan setiap item di kolom kiri dengan jawaban yang sesuai di kolom kanan.'
+        ? SoalJodoh.instruksi
         : (soal['soal'] ?? '').toString();
     final opsiRaw = soal['opsi'];
     final gambar = soal['gambar_url']?.toString();
@@ -781,7 +782,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ),
         const SizedBox(height: 6),
         const Text(
-          'Pasangkan tiap pernyataan di kiri dengan jawaban yang tepat di kanan.',
+          SoalJodoh.instruksi,
           style: Cbt.caption,
         ),
         const SizedBox(height: 12),
