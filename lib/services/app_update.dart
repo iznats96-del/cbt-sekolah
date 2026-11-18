@@ -99,6 +99,8 @@ class AppUpdate {
     }
   }
 
+  static Future<bool> hasInstallPermission() => hasInstallPermissionPlatform();
+
   static Future<bool> requestInstallPermission() => ensureInstallPermission();
 
   static Future<String> download(

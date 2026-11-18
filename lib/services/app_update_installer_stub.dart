@@ -1,3 +1,5 @@
+Future<bool> hasInstallPermissionPlatform() async => true;
+
 Future<bool> ensureInstallPermission() async => false;
 
 Future<String> downloadApk(

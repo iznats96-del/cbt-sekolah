@@ -7,19 +7,30 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-Future<bool> ensureInstallPermission() async {
+Future<bool> hasInstallPermissionPlatform() async {
   if (!Platform.isAndroid) return true;
   final status = await Permission.requestInstallPackages.status;
-  if (status.isGranted) return true;
+  return status.isGranted;
+}
+
+Future<bool> ensureInstallPermission() async {
+  if (!Platform.isAndroid) return true;
+  if (await hasInstallPermissionPlatform()) return true;
   final result = await Permission.requestInstallPackages.request();
   if (result.isGranted) return true;
 
   final info = await PackageInfo.fromPlatform();
-  final intent = AndroidIntent(
-    action: 'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
-    data: 'package:${info.packageName}',
-  );
-  await intent.launch();
+  try {
+    await AndroidIntent(
+      action: 'android.settings.MANAGE_UNKNOWN_APP_SOURCES',
+      data: 'package:${info.packageName}',
+    ).launch();
+  } catch (_) {
+    await AndroidIntent(
+      action: 'android.settings.APPLICATION_DETAILS_SETTINGS',
+      data: 'package:${info.packageName}',
+    ).launch();
+  }
   return false;
 }
 
@@ -54,6 +65,9 @@ Future<String> downloadApk(
       });
     } finally {
       await sink.close();
+    }
+    if (total != null && received != total) {
+      throw Exception('Unduhan tidak lengkap ($received/$total byte)');
     }
   } finally {
     client.close();

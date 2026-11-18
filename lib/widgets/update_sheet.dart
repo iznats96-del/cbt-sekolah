@@ -25,6 +25,7 @@ class _UpdateSheetState extends State<UpdateSheet> {
   double _progress = 0;
   String _status = 'Menyiapkan pembaruan…';
   String? _error;
+  String? _apkPath;
 
   @override
   void initState() {
@@ -32,33 +33,44 @@ class _UpdateSheetState extends State<UpdateSheet> {
     _start();
   }
 
-  Future<void> _start() async {
-    final granted = await AppUpdate.requestInstallPermission();
-    if (!mounted) return;
-    if (!granted) {
-      setState(() {
-        _error = 'Izin pemasangan belum aktif';
-        _status = 'Aktifkan izin lalu ulangi';
-      });
-      return;
-    }
+  Future<String> _download() async {
+    setState(() {
+      _progress = 0;
+      _error = null;
+      _status = 'Mengunduh pembaruan…';
+    });
+    final path = await AppUpdate.download(widget.info.apkUrl, (p) {
+      if (mounted) setState(() => _progress = p);
+    });
+    _apkPath = path;
+    return path;
+  }
 
+  Future<void> _start() async {
+    setState(() {
+      _error = null;
+      _status = _apkPath == null ? 'Mengunduh pembaruan…' : 'Membuka pemasang…';
+    });
     try {
-      setState(() => _status = 'Mengunduh pembaruan…');
-      final path = await AppUpdate.download(widget.info.apkUrl, (p) {
-        if (mounted) setState(() => _progress = p);
-      });
+      final path = _apkPath ?? await _download();
       if (!mounted) return;
       setState(() => _status = 'Membuka pemasang…');
       await AppUpdate.install(path);
-      if (mounted && context.mounted) Navigator.of(context).pop();
-    } catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+      if (!await AppUpdate.hasInstallPermission()) {
         setState(() {
-          _error = 'Gagal mengunduh';
-          _status = '$e';
+          _error = 'Aktifkan "Instal aplikasi tidak dikenal" untuk CBT Sekolah';
+          _status = 'Izin pemasangan belum aktif';
         });
+        return;
       }
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Gagal menyiapkan APK';
+        _status = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -172,18 +184,39 @@ class _UpdateSheetState extends State<UpdateSheet> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: FilledButton(
-                onPressed: _start,
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.primary,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        await AppUpdate.requestInstallPermission();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Pengaturan izin'),
+                    ),
+                  ),
                 ),
-                child: const Text('Coba lagi'),
-              ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: SizedBox(
+                    height: 42,
+                    child: FilledButton(
+                      onPressed: _start,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: const Text('Coba lagi'),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
