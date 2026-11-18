@@ -255,9 +255,9 @@ class _SoalFormScreenState extends State<SoalFormScreen> {
             ? null
             : _pembahasanCtrl.text.trim(),
         'gambar_url': _gambarUrl,
-        'guru_id': Api.user?.id,
       };
 
+      if (widget.soalId == null) data['guru_id'] = Api.user?.id;
       if (widget.soalId != null) {
         await Api.client.from('bank_soal').update(data).eq('id', widget.soalId!);
       } else {

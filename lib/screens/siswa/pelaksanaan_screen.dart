@@ -392,11 +392,15 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
     } catch (_) {}
     _flushTimer?.cancel();
     if (!mounted) return;
-    _gotoResults(auto ? 'Waktu habis' : 'Ujian selesai', rekap);
+    _gotoResults(auto ? 'Waktu habis' : 'Ujian selesai', rekap,
+        _belumKirim.isEmpty);
   }
 
-  void _gotoResults(String title, Map<String, dynamic> rekap) {
-    try { _store.clear(); } catch (_) {}
+  void _gotoResults(
+      String title, Map<String, dynamic> rekap, bool bersihkanCache) {
+    if (bersihkanCache) {
+      try { _store.clear(); } catch (_) {}
+    }
     _kiosk = false;
     Kiosk.exitKiosk();
     Navigator.of(context).pushReplacement(MaterialPageRoute(
@@ -695,7 +699,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       final c = _ctrlFor(curId);
       return TextField(
         controller: c,
-        onChanged: (v) => _saveJawaban(curId),
+        onChanged: (v) => _saveJawaban(curId, value: v),
         maxLines: jenis == 'essay' ? 8 : 4,
         style: Cbt.option,
         decoration: InputDecoration(
@@ -1276,7 +1280,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
         ],
       ),
     );
-    if (ok == true) await _submit();
+    if (ok == true) {
+      if (!mounted) return;
+      await _submit();
+    }
   }
 }
 

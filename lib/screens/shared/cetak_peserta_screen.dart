@@ -74,7 +74,7 @@ class _CetakPesertaScreenState extends State<CetakPesertaScreen> {
           final pr = await Api.client
               .from('profiles')
               .select('id,pw_default')
-              .filter('id', 'in', ids);
+              .inFilter('id', ids);
           pwMap = {
             for (final r in (pr as List))
               '${r['id']}': '${r['pw_default'] ?? ''}'

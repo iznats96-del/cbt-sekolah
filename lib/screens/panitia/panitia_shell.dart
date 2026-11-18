@@ -5,6 +5,7 @@ import '../../services/api.dart';
 import '../../widgets/cetak_kartu_helper.dart';
 import '../../widgets/dashboard_header.dart';
 import '../home.dart';
+import '../guru/scan_absen_screen.dart';
 import 'monitoring_ujian_screen.dart';
 import 'peserta_ujian_screen.dart';
 import 'rekap_panitia_screen.dart';
@@ -214,7 +215,8 @@ class _PanitiaHomeState extends State<PanitiaHome> {
           child: InkWell(
             onTap: () {
               if (m.$4 == -1) {
-                Navigator.of(context).pushNamed('/panitia/scan');
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ScanAbsenScreen()));
               } else if (m.$4 == -2) {
                 pilihDanCetakKartu(context);
               } else {

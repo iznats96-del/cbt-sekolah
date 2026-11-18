@@ -327,9 +327,9 @@ class Api {
   ) async {
     final res = await http
         .patch(
-          Uri.parse('${AppConfig.fallbackApiUrl}/rest/v1/$table'),
+          Uri.parse('${AppConfig.fallbackApiUrl}/rest/v1/$table?id=eq.$id'),
           headers: _fallbackHeaders(contentType: 'application/json'),
-          body: jsonEncode({...data, 'id': id}),
+          body: jsonEncode(data),
         )
         .timeout(Duration(seconds: AppConfig.requestTimeoutSec));
     if (res.statusCode != 200) {
