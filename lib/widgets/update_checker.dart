@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/nav.dart';
 import '../services/app_update.dart';
+import '../services/hybrid_api.dart';
 import 'update_sheet.dart';
 
 class UpdateChecker extends StatefulWidget {
@@ -25,7 +26,10 @@ class _UpdateCheckerState extends State<UpdateChecker> {
 
   Future<void> _maybeCheck() async {
     if (kIsWeb || _shown) return;
-    if (Supabase.instance.client.auth.currentSession == null) return;
+    if (Supabase.instance.client.auth.currentSession == null &&
+        HybridApi.fallbackToken == null) {
+      return;
+    }
     if (!await AppUpdate.autoEnabled()) return;
     await Future.delayed(const Duration(seconds: 3));
     final info = await AppUpdate.check();
