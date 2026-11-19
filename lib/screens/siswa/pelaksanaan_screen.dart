@@ -810,6 +810,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 initialValue: sudah ? '$posisiTampil' : null,
                 isDense: false,
                 isExpanded: true,
+                menuMaxHeight: 360,
                 decoration: InputDecoration(
                   contentPadding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -833,7 +834,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                       DropdownMenuItem<String>(
                         value: '$j',
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 90),
+                          constraints: const BoxConstraints(maxHeight: 140),
                           child: SingleChildScrollView(
                             primary: false,
                             child: Text(
