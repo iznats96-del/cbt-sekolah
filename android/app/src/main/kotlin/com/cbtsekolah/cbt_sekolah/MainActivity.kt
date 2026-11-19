@@ -243,7 +243,6 @@ class MainActivity : FlutterActivity() {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (isKioskLocked) {
             when (event.keyCode) {
-                KeyEvent.KEYCODE_BACK,
                 KeyEvent.KEYCODE_HOME,
                 KeyEvent.KEYCODE_APP_SWITCH,
                 KeyEvent.KEYCODE_MENU,

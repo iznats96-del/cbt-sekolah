@@ -439,18 +439,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        _hitungPelanggaran('keluar_app');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(children: [
-              Icon(Icons.block, color: Colors.white, size: 20),
-              SizedBox(width: 12),
-              Expanded(child: Text('Tombol kembali diblokir selama ujian', style: TextStyle(fontWeight: FontWeight.w600))),
-            ]),
-            backgroundColor: Cbt.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final focus = FocusManager.instance.primaryFocus;
+        if (focus != null && focus.hasFocus) {
+          focus.unfocus();
+        }
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF4F7FF),
