@@ -50,6 +50,22 @@ class Cbt {
     height: 1.35,
     color: ink,
   );
+
+  static TextStyle adaptiveText(String teks, TextStyle base) {
+    final panjang = teks.trim().length;
+    final asli = base.fontSize ?? 14;
+    if (panjang > 700) {
+      return base.copyWith(fontSize: (asli - 3).clamp(13.0, asli), height: 1.4);
+    }
+    if (panjang > 300) {
+      return base.copyWith(fontSize: (asli - 2).clamp(13.0, asli), height: 1.42);
+    }
+    if (panjang > 160) {
+      return base.copyWith(fontSize: (asli - 1).clamp(13.0, asli), height: 1.45);
+    }
+    return base;
+  }
+
   static const caption = TextStyle(fontSize: 12, color: muted);
 
   // ── Komponen ────────────────────────────────────────────────

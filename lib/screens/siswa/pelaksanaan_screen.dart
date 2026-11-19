@@ -663,7 +663,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 const SizedBox(height: 10),
                 if (teks.isNotEmpty)
                   Text(teks,
-                      style: Cbt.question,
+                      style: Cbt.adaptiveText(teks, Cbt.question),
                       softWrap: true,
                       maxLines: null),
                 if (gambar != null && gambar.isNotEmpty) ...[
@@ -841,8 +841,10 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                               '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
                               softWrap: true,
                               maxLines: null,
-                              style: const TextStyle(
-                                  fontSize: 14, color: Cbt.ink),
+                              style: Cbt.adaptiveText(
+                                '${String.fromCharCode(65 + j)}. ${kanan[urutan[j]]}',
+                                const TextStyle(fontSize: 14, color: Cbt.ink),
+                              ),
                             ),
                           ),
                         ),
@@ -880,11 +882,14 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                   kiri[i].toString(),
                   softWrap: true,
                   maxLines: null,
-                  style: const TextStyle(
-                      fontSize: 15,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
-                      color: Cbt.ink),
+                  style: Cbt.adaptiveText(
+                    kiri[i].toString(),
+                    const TextStyle(
+                        fontSize: 15,
+                        height: 1.35,
+                        fontWeight: FontWeight.w500,
+                        color: Cbt.ink),
+                  ),
                 ),
               );
               final centang = Icon(
@@ -970,7 +975,7 @@ class _PelaksanaanScreenState extends State<PelaksanaanScreen> with WidgetsBindi
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(teks,
-                      style: Cbt.option,
+                      style: Cbt.adaptiveText(teks, Cbt.option),
                       softWrap: true,
                       maxLines: null),
                 ),

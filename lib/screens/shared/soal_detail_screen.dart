@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import '../../core/app_theme.dart';
+import '../../core/design.dart';
 import '../../core/soal_preview.dart';
 import '../../services/api.dart';
 import '../../widgets/state_views.dart';
@@ -219,11 +220,14 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                   children: [
                     if (soal.trim().isNotEmpty) ...[
                       Text(soal,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              height: 1.5,
-                              color: Color(0xFF0F172A),
-                              fontWeight: FontWeight.w600)),
+                          style: Cbt.adaptiveText(
+                            soal,
+                            const TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: Color(0xFF0F172A),
+                                fontWeight: FontWeight.w600),
+                          )),
                       const SizedBox(height: 8),
                     ],
                     Text(SoalJodoh.instruksi,
@@ -238,8 +242,11 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                         padding: const EdgeInsets.only(bottom: 6),
                         child: Text(
                           '${i + 1}. ${SoalJodoh.kiri(s['opsi'])[i]}',
-                          style: const TextStyle(
-                              fontSize: 13.5, height: 1.4, color: Color(0xFF0F172A)),
+                          style: Cbt.adaptiveText(
+                            '${i + 1}. ${SoalJodoh.kiri(s['opsi'])[i]}',
+                            const TextStyle(
+                                fontSize: 13.5, height: 1.4, color: Color(0xFF0F172A)),
+                          ),
                         ),
                       ),
                   ],
@@ -248,11 +255,14 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
             else
               _card('Soal',
                   Text(soal,
-                      style: const TextStyle(
-                          fontSize: 14,
-                          height: 1.5,
-                          color: Color(0xFF0F172A),
-                          fontWeight: FontWeight.w500))),
+                      style: Cbt.adaptiveText(
+                        soal,
+                        const TextStyle(
+                            fontSize: 14,
+                            height: 1.5,
+                            color: Color(0xFF0F172A),
+                            fontWeight: FontWeight.w500),
+                      ))),
 
             // GAMBAR (kalau ada)
             if (gambarUrl != null && gambarUrl.isNotEmpty)
@@ -296,10 +306,13 @@ class _SoalDetailScreenState extends State<SoalDetailScreen> {
                                     color: Color(0xFF0F172A))),
                             Expanded(
                               child: Text(SoalJodoh.kanan(s['opsi'])[i],
-                                  style: const TextStyle(
-                                      fontSize: 13.5,
-                                      height: 1.4,
-                                      color: Color(0xFF0F172A))),
+                                  style: Cbt.adaptiveText(
+                                    SoalJodoh.kanan(s['opsi'])[i],
+                                    const TextStyle(
+                                        fontSize: 13.5,
+                                        height: 1.4,
+                                        color: Color(0xFF0F172A)),
+                                  )),
                             ),
                           ],
                         ),
