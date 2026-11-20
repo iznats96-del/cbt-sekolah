@@ -490,7 +490,10 @@ class _JadwalTerdekatCardState extends State<_JadwalTerdekatCard> {
 
   Future<void> _load() async {
     try {
-      final raw = await Api.routerRpc('jadwal_siswa_aktif');
+      final raw = await Api.routerRpc(
+        'jadwal_siswa_terdekat',
+        params: {'p_limit': 3},
+      );
       setState(() {
         _rows = raw is List ? raw : const [];
         _loading = false;
@@ -502,17 +505,7 @@ class _JadwalTerdekatCardState extends State<_JadwalTerdekatCard> {
 
   @override
   Widget build(BuildContext context) {
-    final j = _rows.isNotEmpty ? _rows.first : null;
-    final mapel = j is Map ? '${j['mapel'] ?? ''}' : '';
-    final tanggal = j is Map ? '${j['tanggal'] ?? ''}' : '';
-    final jamMulai = j is Map ? '${j['jam_mulai'] ?? ''}' : '';
-    final jamSelesai = j is Map ? '${j['jam_selesai'] ?? ''}' : '';
-    final ruang = j is Map ? '${j['ruang_nama'] ?? ''}' : '';
-    final jam = (jamMulai.isNotEmpty && jamSelesai.isNotEmpty &&
-            jamMulai != 'null' && jamSelesai != 'null')
-        ? '$jamMulai – $jamSelesai'
-        : '';
-
+    final rows = _rows.take(3).toList();
     return _SoftCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -536,7 +529,7 @@ class _JadwalTerdekatCardState extends State<_JadwalTerdekatCard> {
               padding: EdgeInsets.all(20),
               child: Center(child: CircularProgressIndicator(color: _blue)),
             )
-          else if (j == null)
+          else if (rows.isEmpty)
             const Padding(
               padding: EdgeInsets.fromLTRB(18, 4, 18, 18),
               child: Text('Belum ada jadwal ujian untuk kelasmu.',
@@ -545,36 +538,54 @@ class _JadwalTerdekatCardState extends State<_JadwalTerdekatCard> {
           else
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 4, 18, 18),
-              child: Row(
+              child: Column(
                 children: [
-                  _tanggalBadge(tanggal),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          mapel.isEmpty ? 'Ujian' : mapel,
-                          style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: _navy),
-                        ),
-                        const SizedBox(height: 6),
-                        if (jam.isNotEmpty)
-                          _meta(Icons.schedule_rounded, jam),
-                        if (ruang.isNotEmpty && ruang != 'null')
-                          _meta(Icons.meeting_room_outlined, ruang),
-                        if (jam.isEmpty && (ruang.isEmpty || ruang == 'null'))
-                          _meta(Icons.event_rounded, tanggal),
-                      ],
-                    ),
-                  ),
+                  for (var i = 0; i < rows.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 14),
+                    _jadwalRow(rows[i]),
+                  ],
                 ],
               ),
             ),
         ],
       ),
+    );
+  }
+
+  Widget _jadwalRow(dynamic j) {
+    final mapel = j is Map ? '${j['mapel'] ?? ''}' : '';
+    final tanggal = j is Map ? '${j['tanggal'] ?? ''}' : '';
+    final jamMulai = j is Map ? '${j['jam_mulai'] ?? ''}' : '';
+    final jamSelesai = j is Map ? '${j['jam_selesai'] ?? ''}' : '';
+    final ruang = j is Map ? '${j['ruang_nama'] ?? ''}' : '';
+    final jam = (jamMulai.isNotEmpty && jamSelesai.isNotEmpty &&
+            jamMulai != 'null' && jamSelesai != 'null')
+        ? '$jamMulai – $jamSelesai'
+        : '';
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _tanggalBadge(tanggal),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                mapel.isEmpty ? 'Ujian' : mapel,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: _navy),
+              ),
+              const SizedBox(height: 6),
+              if (jam.isNotEmpty) _meta(Icons.schedule_rounded, jam),
+              if (ruang.isNotEmpty && ruang != 'null')
+                _meta(Icons.meeting_room_outlined, ruang),
+              if (jam.isEmpty && (ruang.isEmpty || ruang == 'null'))
+                _meta(Icons.event_rounded, tanggal),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
